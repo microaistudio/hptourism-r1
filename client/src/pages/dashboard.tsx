@@ -66,10 +66,9 @@ export default function Dashboard() {
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
-      draft: { variant: "secondary", label: "Draft" },
-      submitted: { variant: "outline", label: "Submitted" },
-      district_review: { variant: "outline", label: "District Review" },
-      state_review: { variant: "outline", label: "State Review" },
+      draft: { variant: "outline", label: "Draft" },
+      pending: { variant: "secondary", label: "District Review" },
+      state_review: { variant: "secondary", label: "State Review" },
       approved: { variant: "default", label: "Approved" },
       rejected: { variant: "destructive", label: "Rejected" },
     };

@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertUserSchema, type User } from "@shared/schema";
+import { insertUserSchema, type User, type HomestayApplication } from "@shared/schema";
 import { z } from "zod";
 
 // Extend express-session types
@@ -215,6 +215,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ application });
     } catch (error) {
       res.status(500).json({ message: "Failed to update application" });
+    }
+  });
+
+  // Review application (approve/reject)
+  app.post("/api/applications/:id/review", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { action, comments } = req.body;
+
+      if (!action || !["approve", "reject"].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'approve' or 'reject'" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Only officers can review applications
+      if (user.role !== "district_officer" && user.role !== "state_officer") {
+        return res.status(403).json({ message: "Only officers can review applications" });
+      }
+
+      const application = await storage.getApplication(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // District officers can only review applications in their district
+      if (user.role === "district_officer" && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only review applications in your district" });
+      }
+
+      // Validate application is in correct status for this officer role
+      if (user.role === "district_officer" && application.status !== "pending") {
+        return res.status(400).json({ message: "This application is not in pending status and cannot be reviewed by district officer" });
+      }
+      
+      if (user.role === "state_officer" && application.status !== "state_review") {
+        return res.status(400).json({ message: "This application is not in state review status and cannot be reviewed by state officer" });
+      }
+
+      // Prepare update based on officer role and action
+      const updateData: Partial<HomestayApplication> = {};
+
+      if (user.role === "district_officer") {
+        updateData.districtOfficerId = user.id;
+        updateData.districtReviewDate = new Date();
+        updateData.districtNotes = comments || null;
+        
+        if (action === "approve") {
+          // District approval moves to state review
+          updateData.status = "state_review";
+          updateData.currentStage = "state";
+        } else {
+          // District rejection is final
+          updateData.status = "rejected";
+          updateData.rejectionReason = comments || "Rejected at district level";
+        }
+      } else if (user.role === "state_officer") {
+        updateData.stateOfficerId = user.id;
+        updateData.stateReviewDate = new Date();
+        updateData.stateNotes = comments || null;
+        
+        if (action === "approve") {
+          // State approval is final approval
+          updateData.status = "approved";
+          updateData.approvedAt = new Date();
+          updateData.currentStage = "final";
+        } else {
+          // State rejection is final
+          updateData.status = "rejected";
+          updateData.rejectionReason = comments || "Rejected at state level";
+        }
+      }
+
+      const updated = await storage.updateApplication(id, updateData);
+      res.json({ application: updated });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to review application" });
     }
   });
 

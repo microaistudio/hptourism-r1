@@ -10,6 +10,7 @@ import Login from "@/pages/auth/login";
 import Register from "@/pages/auth/register";
 import Dashboard from "@/pages/dashboard";
 import NewApplication from "@/pages/applications/new";
+import ApplicationDetail from "@/pages/applications/detail";
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/applications/new" component={NewApplication} />
+      <Route path="/applications/:id" component={ApplicationDetail} />
       <Route component={NotFound} />
     </Switch>
   );
