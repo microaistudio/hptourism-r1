@@ -56,7 +56,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const data = insertUserSchema.parse(req.body);
+      const rawData = {
+        ...req.body,
+        email: req.body.email || undefined,
+        aadhaarNumber: req.body.aadhaarNumber || undefined,
+        district: req.body.district || undefined,
+      };
+      
+      const data = insertUserSchema.parse(rawData);
       
       // Check if user already exists
       const existing = await storage.getUserByMobile(data.mobile);
@@ -75,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ user: userWithoutPassword });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.errors[0].message });
+        return res.status(400).json({ message: error.errors[0].message, errors: error.errors });
       }
       res.status(500).json({ message: "Registration failed" });
     }

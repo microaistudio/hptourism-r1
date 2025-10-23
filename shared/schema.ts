@@ -20,12 +20,13 @@ export const users = pgTable("users", {
 
 export const insertUserSchema = createInsertSchema(users, {
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid mobile number"),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
   fullName: z.string().min(3, "Name must be at least 3 characters"),
   role: z.enum(['owner', 'district_officer', 'state_officer', 'admin']),
-  aadhaarNumber: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional(),
-  district: z.string().optional(),
-}).omit({ id: true, createdAt: true, updatedAt: true });
+  aadhaarNumber: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional().or(z.literal('')),
+  district: z.string().optional().or(z.literal('')),
+  password: z.string().min(1, "Password is required"),
+}).omit({ id: true, createdAt: true, updatedAt: true, isActive: true });
 
 export const selectUserSchema = createSelectSchema(users);
 export type InsertUser = z.infer<typeof insertUserSchema>;
