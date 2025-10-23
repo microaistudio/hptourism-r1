@@ -111,7 +111,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl">💎 Diamond</CardTitle>
+                <CardTitle className="text-2xl">Diamond</CardTitle>
                 <CardDescription className="text-base">
                   Premium homestays with exceptional amenities and services
                 </CardDescription>
@@ -128,7 +128,7 @@ export default function HomePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl">🥇 Gold</CardTitle>
+                <CardTitle className="text-2xl">Gold</CardTitle>
                 <CardDescription className="text-base">
                   Quality homestays with essential modern amenities
                 </CardDescription>
@@ -145,7 +145,7 @@ export default function HomePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl">🥈 Silver</CardTitle>
+                <CardTitle className="text-2xl">Silver</CardTitle>
                 <CardDescription className="text-base">
                   Comfortable homestays with basic amenities
                 </CardDescription>
