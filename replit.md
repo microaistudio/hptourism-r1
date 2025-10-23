@@ -27,6 +27,53 @@ Backend API routes (development-only, gated by `process.env.NODE_ENV === "develo
 
 This tool dramatically speeds up development workflow by eliminating the need to manually create test data or restart the server to reset state.
 
+## Recent Security Enhancements (October 2025)
+
+**Critical Security Implementation - Application Submission Workflow**
+
+The application creation workflow has been hardened with multi-layer security to prevent privilege escalation and status manipulation:
+
+1. **Route-Level Security** (`server/routes.ts` POST /api/applications):
+   - Zod schema whitelist enforcing only owner-submittable fields (property details, owner info, fees)
+   - Explicit field mapping prevents any non-whitelisted fields from reaching storage
+   - Server forces `status='pending'` and `submittedAt=server timestamp`
+   - Removed insecure PATCH endpoint that allowed unrestricted updates
+
+2. **Storage-Level Security** (`server/storage.ts`):
+   - Introduced trusted flag pattern: `createApplication(data, { trusted: boolean })`
+   - Untrusted calls (default) always create applications with `status='draft'`
+   - Only trusted server code (POST route, dev seed) can override status
+   - Double security layer ensures no bypass even if route validation is circumvented
+
+3. **Blocked Attack Vectors**:
+   - ❌ Client cannot send `status='approved'` to self-approve applications
+   - ❌ Client cannot inject officer IDs (`districtOfficerId`, `stateOfficerId`)
+   - ❌ Client cannot forge review timestamps or notes
+   - ❌ No PATCH bypass to update applications after submission
+   - ❌ Storage layer rejects untrusted status overrides
+
+4. **Form Submission Flow** (secured):
+   - Frontend sends all form data including status/submittedAt
+   - Route validates against whitelist, strips unknown fields
+   - Route explicitly maps only allowed fields + forces status='pending' with trusted flag
+   - Storage honors trusted flag and creates application with pending status
+   - Application immediately visible to district officers for review
+
+5. **Dev Tools** (development only):
+   - Dev seed uses trusted flag to create test applications with custom status
+   - `/api/dev/users` endpoint returns seeded credentials (without passwords)
+   - Dev Console displays storage stats and allows quick data reset
+
+**Test Credentials** (after running Dev Console → Seed Sample Data):
+- Property Owner: mobile `9876543210`, password `test123`
+- District Officer (Shimla): mobile `9876543211`, password `test123`
+- State Officer: mobile `9876543212`, password `test123`
+
+**UI Improvements**:
+- Submit button changed from "Save as Draft" to "Submit Application" for clarity
+- Removed all emojis from category badges (Diamond, Gold, Silver) per architect feedback
+- Category badges now display text-only for consistency
+
 ## System Architecture
 
 ### Frontend Architecture

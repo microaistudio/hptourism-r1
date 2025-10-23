@@ -147,10 +147,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/applications", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const application = await storage.createApplication({
-        ...req.body,
-        userId,
+      
+      // Security: Whitelist only owner-submittable fields
+      // Note: Using default (non-strict) mode to allow form to send extra fields
+      // that will be ignored. Only whitelisted fields are extracted below.
+      const ownerSubmittableSchema = z.object({
+        propertyName: z.string(),
+        category: z.string(),
+        totalRooms: z.coerce.number(),
+        address: z.string(),
+        district: z.string(),
+        pincode: z.string(),
+        latitude: z.string().optional(),
+        longitude: z.string().optional(),
+        ownerName: z.string(),
+        ownerMobile: z.string(),
+        ownerEmail: z.string().optional(),
+        ownerAadhaar: z.string(),
+        amenities: z.any().optional(),
+        rooms: z.any().optional(),
+        baseFee: z.string(),
+        perRoomFee: z.string(),
+        gstAmount: z.string(),
+        totalFee: z.string(),
       });
+      
+      // Validate and extract only whitelisted fields
+      const validatedData = ownerSubmittableSchema.parse(req.body);
+      
+      // Build payload with ONLY allowed fields (double security layer)
+      // Pass trusted flag to allow server-controlled status override
+      const application = await storage.createApplication({
+        propertyName: validatedData.propertyName,
+        category: validatedData.category,
+        totalRooms: validatedData.totalRooms,
+        address: validatedData.address,
+        district: validatedData.district,
+        pincode: validatedData.pincode,
+        ownerName: validatedData.ownerName,
+        ownerMobile: validatedData.ownerMobile,
+        ownerEmail: validatedData.ownerEmail,
+        ownerAadhaar: validatedData.ownerAadhaar,
+        amenities: validatedData.amenities,
+        rooms: validatedData.rooms,
+        baseFee: validatedData.baseFee,
+        perRoomFee: validatedData.perRoomFee,
+        gstAmount: validatedData.gstAmount,
+        totalFee: validatedData.totalFee,
+        latitude: validatedData.latitude,
+        longitude: validatedData.longitude,
+        userId,
+        status: 'pending',
+        submittedAt: new Date().toISOString(),
+      }, { trusted: true });
       
       res.json({ application });
     } catch (error) {
@@ -201,20 +250,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ application });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch application" });
-    }
-  });
-
-  // Update application
-  app.patch("/api/applications/:id", requireAuth, async (req, res) => {
-    try {
-      const application = await storage.updateApplication(req.params.id, req.body);
-      if (!application) {
-        return res.status(404).json({ message: "Application not found" });
-      }
-      
-      res.json({ application });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update application" });
     }
   });
 
@@ -365,6 +400,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = storage.getStats();
       res.json(stats);
     });
+    
+    // Get all users (for testing)
+    app.get("/api/dev/users", async (req, res) => {
+      const users = await storage.getAllUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json({ users: usersWithoutPasswords });
+    });
 
     // Clear all data
     app.post("/api/dev/clear-all", (req, res) => {
@@ -379,33 +422,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const owner = await storage.createUser({
           fullName: "Demo Property Owner",
           mobile: "9876543210",
-          password: "demo123",
+          password: "test123",
           role: "owner",
-          district: "Kullu",
+          district: "Shimla",
         });
 
         const districtOfficer = await storage.createUser({
-          fullName: "District Officer Kullu",
+          fullName: "District Officer Shimla",
           mobile: "9876543211",
-          password: "demo123",
+          password: "test123",
           role: "district_officer",
-          district: "Kullu",
+          district: "Shimla",
         });
 
         const stateOfficer = await storage.createUser({
           fullName: "State Tourism Officer",
           mobile: "9876543212",
-          password: "demo123",
+          password: "test123",
           role: "state_officer",
         });
 
-        // Create sample applications
+        // Create sample applications (trusted server code can set status)
         await storage.createApplication({
           userId: owner.id,
           propertyName: "Mountain View Homestay",
-          address: "Near Mall Road, Old Manali",
-          district: "Kullu",
-          pincode: "175131",
+          address: "Near Mall Road, Shimla",
+          district: "Shimla",
+          pincode: "171001",
           ownerName: owner.fullName,
           ownerMobile: owner.mobile,
           ownerAadhaar: "123456789012",
@@ -415,14 +458,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           perRoomFee: "300",
           gstAmount: "1080",
           totalFee: "7080",
-        });
+          status: "pending",
+          submittedAt: new Date().toISOString(),
+        }, { trusted: true });
 
         await storage.createApplication({
           userId: owner.id,
           propertyName: "Valley Retreat",
-          address: "Solang Valley Road",
-          district: "Kullu",
-          pincode: "175103",
+          address: "Lower Bazaar, Shimla",
+          district: "Shimla",
+          pincode: "171003",
           ownerName: owner.fullName,
           ownerMobile: owner.mobile,
           ownerAadhaar: "123456789012",
@@ -432,7 +477,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           perRoomFee: "200",
           gstAmount: "792",
           totalFee: "3392",
-        });
+          status: "pending",
+          submittedAt: new Date().toISOString(),
+        }, { trusted: true });
 
         res.json({
           message: "Sample data created",

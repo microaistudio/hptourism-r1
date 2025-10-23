@@ -116,6 +116,8 @@ export default function NewApplication() {
         perRoomFee: fees.perRoomFee.toFixed(2),
         gstAmount: fees.gstAmount.toFixed(2),
         totalFee: fees.totalFee.toFixed(2),
+        status: 'pending',
+        submittedAt: new Date().toISOString(),
       };
 
       const response = await apiRequest("POST", "/api/applications", payload);
@@ -124,8 +126,8 @@ export default function NewApplication() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
       toast({
-        title: "Application created successfully!",
-        description: "Your homestay registration has been saved as draft.",
+        title: "Application submitted successfully!",
+        description: "Your homestay application has been submitted for review.",
       });
       setLocation("/dashboard");
     },
@@ -160,9 +162,9 @@ export default function NewApplication() {
 
   const getCategoryBadge = (cat: string) => {
     const config = {
-      diamond: { label: "💎 Diamond", variant: "default" as const },
-      gold: { label: "🥇 Gold", variant: "secondary" as const },
-      silver: { label: "🥈 Silver", variant: "outline" as const },
+      diamond: { label: "Diamond", variant: "default" as const },
+      gold: { label: "Gold", variant: "secondary" as const },
+      silver: { label: "Silver", variant: "outline" as const },
     };
     return config[cat as keyof typeof config];
   };
@@ -557,7 +559,7 @@ export default function NewApplication() {
                   data-testid="button-submit-application"
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  {createApplicationMutation.isPending ? "Saving..." : "Save as Draft"}
+                  {createApplicationMutation.isPending ? "Submitting..." : "Submit Application"}
                 </Button>
               )}
             </div>

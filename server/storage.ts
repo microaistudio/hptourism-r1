@@ -5,6 +5,7 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByMobile(mobile: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   
   // Homestay Application methods
@@ -12,7 +13,7 @@ export interface IStorage {
   getApplicationsByUser(userId: string): Promise<HomestayApplication[]>;
   getApplicationsByDistrict(district: string): Promise<HomestayApplication[]>;
   getApplicationsByStatus(status: string): Promise<HomestayApplication[]>;
-  createApplication(app: InsertHomestayApplication): Promise<HomestayApplication>;
+  createApplication(app: InsertHomestayApplication, options?: { trusted?: boolean }): Promise<HomestayApplication>;
   updateApplication(id: string, app: Partial<HomestayApplication>): Promise<HomestayApplication | undefined>;
   
   // Document methods
@@ -52,6 +53,10 @@ export class MemStorage implements IStorage {
       (user) => user.mobile === mobile,
     );
   }
+  
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
@@ -81,17 +86,27 @@ export class MemStorage implements IStorage {
   }
 
   async getApplicationsByDistrict(district: string): Promise<HomestayApplication[]> {
-    return Array.from(this.applications.values()).filter(app => app.district === district);
+    // District officers should only see applications pending review
+    return Array.from(this.applications.values()).filter(
+      app => app.district === district && app.status === 'pending'
+    );
   }
 
   async getApplicationsByStatus(status: string): Promise<HomestayApplication[]> {
     return Array.from(this.applications.values()).filter(app => app.status === status);
   }
 
-  async createApplication(insertApp: InsertHomestayApplication): Promise<HomestayApplication> {
+  async createApplication(insertApp: InsertHomestayApplication, options?: { trusted?: boolean }): Promise<HomestayApplication> {
     const id = randomUUID();
     const now = new Date();
     const applicationNumber = `HP-HS-2025-${String(this.applications.size + 1).padStart(6, '0')}`;
+    
+    // Security: Only trusted server code (not client requests) can override status
+    // Untrusted calls (from client) always get 'draft' status
+    const isTrusted = options?.trusted === true;
+    const status = isTrusted && insertApp.status ? insertApp.status : 'draft';
+    const submittedAt = isTrusted && insertApp.submittedAt ? insertApp.submittedAt : (status === 'pending' ? now.toISOString() : null);
+    const currentStage = status === 'pending' ? 'district' : null;
     
     const app: HomestayApplication = {
       ...insertApp,
@@ -102,8 +117,8 @@ export class MemStorage implements IStorage {
       ownerEmail: insertApp.ownerEmail || null,
       amenities: (insertApp.amenities || null) as any,
       rooms: (insertApp.rooms || null) as any,
-      status: 'draft',
-      currentStage: null,
+      status,
+      currentStage,
       districtOfficerId: null,
       districtReviewDate: null,
       districtNotes: null,
@@ -115,7 +130,7 @@ export class MemStorage implements IStorage {
       certificateNumber: null,
       certificateIssuedDate: null,
       certificateExpiryDate: null,
-      submittedAt: null,
+      submittedAt,
       approvedAt: null,
       createdAt: now,
       updatedAt: now,
