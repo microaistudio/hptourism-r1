@@ -153,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // that will be ignored. Only whitelisted fields are extracted below.
       const ownerSubmittableSchema = z.object({
         propertyName: z.string(),
-        category: z.string(),
+        category: z.enum(['diamond', 'gold', 'silver']),
         totalRooms: z.coerce.number(),
         address: z.string(),
         district: z.string(),
@@ -198,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         longitude: validatedData.longitude,
         userId,
         status: 'pending',
-        submittedAt: new Date().toISOString(),
+        submittedAt: new Date(),
       }, { trusted: true });
       
       res.json({ application });
@@ -393,6 +393,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analytics Routes (Officers Only)
+  
+  // Get analytics dashboard data
+  app.get("/api/analytics/dashboard", requireRole("district_officer", "state_officer"), async (req, res) => {
+    try {
+      const allApplications = await storage.getAllApplications();
+      const allUsers = await storage.getAllUsers();
+      
+      // Calculate overview stats
+      const total = allApplications.length;
+      const byStatus = {
+        pending: allApplications.filter(a => a.status === 'pending').length,
+        district_review: allApplications.filter(a => a.status === 'district_review').length,
+        state_review: allApplications.filter(a => a.status === 'state_review').length,
+        approved: allApplications.filter(a => a.status === 'approved').length,
+        rejected: allApplications.filter(a => a.status === 'rejected').length,
+      };
+      
+      // Calculate category distribution
+      const byCategory = {
+        diamond: allApplications.filter(a => a.category === 'diamond').length,
+        gold: allApplications.filter(a => a.category === 'gold').length,
+        silver: allApplications.filter(a => a.category === 'silver').length,
+      };
+      
+      // Calculate district distribution
+      const districtCounts: Record<string, number> = {};
+      allApplications.forEach(app => {
+        districtCounts[app.district] = (districtCounts[app.district] || 0) + 1;
+      });
+      
+      // Calculate average processing time for approved applications
+      const approvedApps = allApplications.filter(a => a.status === 'approved' && a.submittedAt && a.stateReviewDate);
+      const processingTimes = approvedApps.map(app => {
+        const submitted = new Date(app.submittedAt!).getTime();
+        const approved = new Date(app.stateReviewDate!).getTime();
+        return Math.floor((approved - submitted) / (1000 * 60 * 60 * 24)); // days
+      });
+      const avgProcessingTime = processingTimes.length > 0
+        ? Math.round(processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length)
+        : 0;
+      
+      // Recent applications (last 10)
+      const recentApplications = [...allApplications]
+        .sort((a, b) => {
+          const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+          const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, 10);
+      
+      res.json({
+        overview: {
+          total,
+          byStatus,
+          byCategory,
+          avgProcessingTime,
+          totalOwners: allUsers.filter(u => u.role === 'owner').length,
+        },
+        districts: districtCounts,
+        recentApplications,
+      });
+    } catch (error) {
+      console.error('Analytics error:', error);
+      res.status(500).json({ message: "Failed to fetch analytics data" });
+    }
+  });
+
   // Dev Console Routes (Development Only)
   if (process.env.NODE_ENV === "development") {
     // Get storage stats
@@ -460,12 +528,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gstAmount: "1080",
           totalFee: "7080",
           status: "approved",
-          submittedAt: new Date().toISOString(),
+          submittedAt: new Date(),
           districtOfficerId: districtOfficer.id,
-          districtReviewedAt: new Date().toISOString(),
+          districtReviewDate: new Date(),
           districtOfficerNotes: "Excellent property. All criteria met.",
           stateOfficerId: stateOfficer.id,
-          stateReviewedAt: new Date().toISOString(),
+          stateReviewDate: new Date(),
           stateOfficerNotes: "Approved for tourism operations.",
           certificateNumber: "HP-HM-2025-001",
         }, { trusted: true });
@@ -493,12 +561,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hotWater: true,
           },
           status: "approved",
-          submittedAt: new Date().toISOString(),
+          submittedAt: new Date(),
           districtOfficerId: districtOfficer.id,
-          districtReviewedAt: new Date().toISOString(),
+          districtReviewDate: new Date(),
           districtOfficerNotes: "Good property. Meets all requirements.",
           stateOfficerId: stateOfficer.id,
-          stateReviewedAt: new Date().toISOString(),
+          stateReviewDate: new Date(),
           stateOfficerNotes: "Approved for tourism operations.",
           certificateNumber: "HP-HM-2025-002",
         }, { trusted: true });

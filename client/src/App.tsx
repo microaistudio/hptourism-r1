@@ -13,6 +13,7 @@ import NewApplication from "@/pages/applications/new";
 import ApplicationDetail from "@/pages/applications/detail";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
+import AnalyticsPage from "@/pages/analytics";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/applications/new" component={NewApplication} />
       <Route path="/applications/:id" component={ApplicationDetail} />
       <Route component={NotFound} />
