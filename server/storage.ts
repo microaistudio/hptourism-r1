@@ -27,8 +27,8 @@ export interface IStorage {
   getPaymentsByApplication(applicationId: string): Promise<Payment[]>;
   
   // Dev methods
-  getStats(): { users: number; applications: number; documents: number; payments: number };
-  clearAll(): void;
+  getStats(): Promise<{ users: number; applications: number; documents: number; payments: number }>;
+  clearAll(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -110,7 +110,7 @@ export class MemStorage implements IStorage {
     // Untrusted calls (from client) always get 'draft' status
     const isTrusted = options?.trusted === true;
     const status = isTrusted && insertApp.status ? insertApp.status : 'draft';
-    const submittedAt = isTrusted && insertApp.submittedAt ? insertApp.submittedAt : (status === 'pending' ? now.toISOString() : null);
+    const submittedAt = isTrusted && insertApp.submittedAt ? insertApp.submittedAt : (status === 'pending' ? now : null);
     const currentStage = status === 'pending' ? 'district' : null;
     
     const app: HomestayApplication = {
@@ -225,7 +225,7 @@ export class MemStorage implements IStorage {
   }
 
   // Dev methods
-  getStats() {
+  async getStats() {
     return {
       users: this.users.size,
       applications: this.applications.size,
@@ -234,7 +234,7 @@ export class MemStorage implements IStorage {
     };
   }
 
-  clearAll() {
+  async clearAll() {
     this.users.clear();
     this.applications.clear();
     this.documents.clear();
@@ -242,4 +242,10 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { DbStorage } from './db-storage';
+
+// Use DbStorage by default (PostgreSQL)
+// Set USE_MEM_STORAGE=true to use in-memory storage (testing only)
+export const storage: IStorage = process.env.USE_MEM_STORAGE === 'true' 
+  ? new MemStorage() 
+  : new DbStorage();

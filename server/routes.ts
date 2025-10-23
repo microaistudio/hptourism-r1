@@ -464,8 +464,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dev Console Routes (Development Only)
   if (process.env.NODE_ENV === "development") {
     // Get storage stats
-    app.get("/api/dev/stats", (req, res) => {
-      const stats = storage.getStats();
+    app.get("/api/dev/stats", async (req, res) => {
+      const stats = await storage.getStats();
       res.json(stats);
     });
     
@@ -478,8 +478,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     // Clear all data
-    app.post("/api/dev/clear-all", (req, res) => {
-      storage.clearAll();
+    app.post("/api/dev/clear-all", async (req, res) => {
+      await storage.clearAll();
       res.json({ message: "All data cleared successfully" });
     });
 
@@ -531,10 +531,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           submittedAt: new Date(),
           districtOfficerId: districtOfficer.id,
           districtReviewDate: new Date(),
-          districtOfficerNotes: "Excellent property. All criteria met.",
+          districtNotes: "Excellent property. All criteria met.",
           stateOfficerId: stateOfficer.id,
           stateReviewDate: new Date(),
-          stateOfficerNotes: "Approved for tourism operations.",
+          stateNotes: "Approved for tourism operations.",
           certificateNumber: "HP-HM-2025-001",
         }, { trusted: true });
 
@@ -564,10 +564,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           submittedAt: new Date(),
           districtOfficerId: districtOfficer.id,
           districtReviewDate: new Date(),
-          districtOfficerNotes: "Good property. Meets all requirements.",
+          districtNotes: "Good property. Meets all requirements.",
           stateOfficerId: stateOfficer.id,
           stateReviewDate: new Date(),
-          stateOfficerNotes: "Approved for tourism operations.",
+          stateNotes: "Approved for tourism operations.",
           certificateNumber: "HP-HM-2025-002",
         }, { trusted: true });
 
