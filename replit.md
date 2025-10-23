@@ -26,11 +26,11 @@ The frontend uses React 18+ with TypeScript and Vite. It leverages Shadcn/ui (bu
 
 ### Backend
 
-The backend is built with Node.js and Express.js, using TypeScript. It follows a RESTful API design. The development server integrates Vite with Express middleware for HMR. Session management will use Connect-pg-simple for PostgreSQL-backed storage. An abstracted `IStorage` interface allows for flexible data storage implementations, currently MemStorage for development, with Drizzle ORM planned for production.
+The backend is built with Node.js and Express.js, using TypeScript. It follows a RESTful API design. The development server integrates Vite with Express middleware for HMR. Session management uses Connect-pg-simple for PostgreSQL-backed storage. An abstracted `IStorage` interface allows for flexible data storage implementations. The system now uses PostgreSQL with Drizzle ORM (DbStorage) for persistent data storage in both development and production, with MemStorage available as a fallback for testing via environment variable.
 
 ### Data Storage
 
-The project uses PostgreSQL via Neon's serverless driver and Drizzle ORM for type-safe queries. Schema definitions are shared between client and server for consistency, with Drizzle Kit handling migrations. The current schema includes user authentication and is designed to expand for property registrations, application workflows, and public listings. Drizzle-zod generates Zod schemas for consistent validation.
+The project uses PostgreSQL via Neon's serverless driver and Drizzle ORM for type-safe queries. Schema definitions are shared between client and server for consistency, with Drizzle Kit handling schema synchronization. The database includes tables for users, homestay applications, documents, payments, notifications, reviews, and audit logs. All data persists across server restarts. User passwords are securely hashed with bcrypt. The DbStorage class implements the IStorage interface using Drizzle ORM, providing efficient database queries including COUNT operations for statistics. Drizzle-zod generates Zod schemas for consistent validation.
 
 ### Authentication and Authorization
 
