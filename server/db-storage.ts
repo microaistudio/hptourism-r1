@@ -129,18 +129,20 @@ export class DbStorage implements IStorage {
 
   // Dev methods
   async getStats() {
+    const { sql, count } = await import('drizzle-orm');
+    
     const [usersCount, appsCount, docsCount, paymentsCount] = await Promise.all([
-      db.select().from(users).then(rows => rows.length),
-      db.select().from(homestayApplications).then(rows => rows.length),
-      db.select().from(documents).then(rows => rows.length),
-      db.select().from(payments).then(rows => rows.length),
+      db.select({ count: count() }).from(users).then(rows => rows[0]?.count || 0),
+      db.select({ count: count() }).from(homestayApplications).then(rows => rows[0]?.count || 0),
+      db.select({ count: count() }).from(documents).then(rows => rows[0]?.count || 0),
+      db.select({ count: count() }).from(payments).then(rows => rows[0]?.count || 0),
     ]);
     
     return {
-      users: usersCount,
-      applications: appsCount,
-      documents: docsCount,
-      payments: paymentsCount,
+      users: Number(usersCount),
+      applications: Number(appsCount),
+      documents: Number(docsCount),
+      payments: Number(paymentsCount),
     };
   }
 
