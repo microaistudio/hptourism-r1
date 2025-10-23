@@ -443,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Create sample applications (trusted server code can set status)
-        await storage.createApplication({
+        const app1 = await storage.createApplication({
           userId: owner.id,
           propertyName: "Mountain View Homestay",
           address: "Near Mall Road, Shimla",
@@ -451,6 +451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pincode: "171001",
           ownerName: owner.fullName,
           ownerMobile: owner.mobile,
+          ownerEmail: `demo${Date.now()}@example.com`,
           ownerAadhaar: "123456789012",
           totalRooms: 5,
           category: "gold",
@@ -458,11 +459,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           perRoomFee: "300",
           gstAmount: "1080",
           totalFee: "7080",
-          status: "pending",
+          status: "approved",
           submittedAt: new Date().toISOString(),
+          districtOfficerId: districtOfficer.id,
+          districtReviewedAt: new Date().toISOString(),
+          districtOfficerNotes: "Excellent property. All criteria met.",
+          stateOfficerId: stateOfficer.id,
+          stateReviewedAt: new Date().toISOString(),
+          stateOfficerNotes: "Approved for tourism operations.",
+          certificateNumber: "HP-HM-2025-001",
         }, { trusted: true });
 
-        await storage.createApplication({
+        const app2 = await storage.createApplication({
           userId: owner.id,
           propertyName: "Valley Retreat",
           address: "Lower Bazaar, Shimla",
@@ -470,6 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pincode: "171003",
           ownerName: owner.fullName,
           ownerMobile: owner.mobile,
+          ownerEmail: `demo${Date.now() + 1}@example.com`,
           ownerAadhaar: "123456789012",
           totalRooms: 3,
           category: "silver",
@@ -477,8 +486,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           perRoomFee: "200",
           gstAmount: "792",
           totalFee: "3392",
-          status: "pending",
+          amenities: {
+            wifi: true,
+            parking: true,
+            mountainView: true,
+            hotWater: true,
+          },
+          status: "approved",
           submittedAt: new Date().toISOString(),
+          districtOfficerId: districtOfficer.id,
+          districtReviewedAt: new Date().toISOString(),
+          districtOfficerNotes: "Good property. Meets all requirements.",
+          stateOfficerId: stateOfficer.id,
+          stateReviewedAt: new Date().toISOString(),
+          stateOfficerNotes: "Approved for tourism operations.",
+          certificateNumber: "HP-HM-2025-002",
         }, { trusted: true });
 
         res.json({
