@@ -13,6 +13,7 @@ export interface IStorage {
   getApplicationsByUser(userId: string): Promise<HomestayApplication[]>;
   getApplicationsByDistrict(district: string): Promise<HomestayApplication[]>;
   getApplicationsByStatus(status: string): Promise<HomestayApplication[]>;
+  getAllApplications(): Promise<HomestayApplication[]>;
   createApplication(app: InsertHomestayApplication, options?: { trusted?: boolean }): Promise<HomestayApplication>;
   updateApplication(id: string, app: Partial<HomestayApplication>): Promise<HomestayApplication | undefined>;
   
@@ -94,6 +95,10 @@ export class MemStorage implements IStorage {
 
   async getApplicationsByStatus(status: string): Promise<HomestayApplication[]> {
     return Array.from(this.applications.values()).filter(app => app.status === status);
+  }
+
+  async getAllApplications(): Promise<HomestayApplication[]> {
+    return Array.from(this.applications.values());
   }
 
   async createApplication(insertApp: InsertHomestayApplication, options?: { trusted?: boolean }): Promise<HomestayApplication> {
