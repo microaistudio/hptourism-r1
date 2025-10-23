@@ -127,7 +127,7 @@ export default function NewApplication() {
         title: "Application created successfully!",
         description: "Your homestay registration has been saved as draft.",
       });
-      setLocation(`/applications/${data.application.id}`);
+      setLocation("/dashboard");
     },
     onError: (error: any) => {
       toast({
@@ -139,6 +139,14 @@ export default function NewApplication() {
   });
 
   const onSubmit = (data: ApplicationForm) => {
+    // Only allow submission on the final step
+    if (step !== totalSteps) {
+      if (import.meta.env.MODE === "development") {
+        console.warn("Form submission blocked - not on final step");
+      }
+      return;
+    }
+    
     createApplicationMutation.mutate(data);
   };
 
@@ -531,7 +539,14 @@ export default function NewApplication() {
               <div className="flex-1" />
 
               {step < totalSteps ? (
-                <Button type="button" onClick={nextStep} data-testid="button-next">
+                <Button 
+                  type="button" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    nextStep();
+                  }} 
+                  data-testid="button-next"
+                >
                   Next
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>

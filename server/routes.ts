@@ -278,6 +278,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dev Console Routes (Development Only)
+  if (process.env.NODE_ENV === "development") {
+    // Get storage stats
+    app.get("/api/dev/stats", (req, res) => {
+      const stats = storage.getStats();
+      res.json(stats);
+    });
+
+    // Clear all data
+    app.post("/api/dev/clear-all", (req, res) => {
+      storage.clearAll();
+      res.json({ message: "All data cleared successfully" });
+    });
+
+    // Seed sample data
+    app.post("/api/dev/seed", async (req, res) => {
+      try {
+        // Create sample users
+        const owner = await storage.createUser({
+          fullName: "Demo Property Owner",
+          mobile: "9876543210",
+          password: "demo123",
+          role: "owner",
+          district: "Kullu",
+        });
+
+        const districtOfficer = await storage.createUser({
+          fullName: "District Officer Kullu",
+          mobile: "9876543211",
+          password: "demo123",
+          role: "district_officer",
+          district: "Kullu",
+        });
+
+        const stateOfficer = await storage.createUser({
+          fullName: "State Tourism Officer",
+          mobile: "9876543212",
+          password: "demo123",
+          role: "state_officer",
+        });
+
+        // Create sample applications
+        await storage.createApplication({
+          userId: owner.id,
+          propertyName: "Mountain View Homestay",
+          address: "Near Mall Road, Old Manali",
+          district: "Kullu",
+          pincode: "175131",
+          ownerName: owner.fullName,
+          ownerMobile: owner.mobile,
+          ownerAadhaar: "123456789012",
+          totalRooms: 5,
+          category: "gold",
+          baseFee: "3000",
+          perRoomFee: "300",
+          gstAmount: "1080",
+          totalFee: "7080",
+        });
+
+        await storage.createApplication({
+          userId: owner.id,
+          propertyName: "Valley Retreat",
+          address: "Solang Valley Road",
+          district: "Kullu",
+          pincode: "175103",
+          ownerName: owner.fullName,
+          ownerMobile: owner.mobile,
+          ownerAadhaar: "123456789012",
+          totalRooms: 3,
+          category: "silver",
+          baseFee: "2000",
+          perRoomFee: "200",
+          gstAmount: "792",
+          totalFee: "3392",
+        });
+
+        res.json({
+          message: "Sample data created",
+          users: 3,
+          applications: 2,
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to seed data" });
+      }
+    });
+  }
+
   const httpServer = createServer(app);
   return httpServer;
 }

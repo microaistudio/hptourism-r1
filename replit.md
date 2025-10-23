@@ -10,6 +10,23 @@ The system handles multiple tourism registration types (homestays, hotels, guest
 
 Preferred communication style: Simple, everyday language.
 
+## Development Tools
+
+### Dev Console (Development Mode Only)
+A powerful development utility accessible via a yellow floating button in the bottom-right corner of the screen. Features:
+- **Storage Statistics**: Real-time view of in-memory data counts (users, applications, documents, payments)
+- **Clear All Data**: Wipes all in-memory storage with confirmation dialog - perfect for quick testing iterations
+- **Seed Sample Data**: Creates 3 test users (owner, district officer, state officer) and 2 sample applications for immediate testing
+- **Auto-refresh**: Statistics automatically update when dialog opens
+- **Development-only**: Completely hidden in production builds (gated by `import.meta.env.MODE === "development"`)
+
+Backend API routes (development-only, gated by `process.env.NODE_ENV === "development"`):
+- `GET /api/dev/stats` - Returns current storage counts
+- `POST /api/dev/clear-all` - Clears all in-memory data
+- `POST /api/dev/seed` - Creates sample test data
+
+This tool dramatically speeds up development workflow by eliminating the need to manually create test data or restart the server to reset state.
+
 ## System Architecture
 
 ### Frontend Architecture

@@ -23,6 +23,10 @@ export interface IStorage {
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, payment: Partial<Payment>): Promise<Payment | undefined>;
   getPaymentsByApplication(applicationId: string): Promise<Payment[]>;
+  
+  // Dev methods
+  getStats(): { users: number; applications: number; documents: number; payments: number };
+  clearAll(): void;
 }
 
 export class MemStorage implements IStorage {
@@ -59,7 +63,7 @@ export class MemStorage implements IStorage {
       aadhaarNumber: insertUser.aadhaarNumber || null,
       district: insertUser.district || null,
       password: insertUser.password || null,
-      isActive: insertUser.isActive !== undefined ? insertUser.isActive : true,
+      isActive: true,
       createdAt: now,
       updatedAt: now,
     };
@@ -198,6 +202,23 @@ export class MemStorage implements IStorage {
 
   async getPaymentsByApplication(applicationId: string): Promise<Payment[]> {
     return Array.from(this.payments.values()).filter(payment => payment.applicationId === applicationId);
+  }
+
+  // Dev methods
+  getStats() {
+    return {
+      users: this.users.size,
+      applications: this.applications.size,
+      documents: this.documents.size,
+      payments: this.payments.size,
+    };
+  }
+
+  clearAll() {
+    this.users.clear();
+    this.applications.clear();
+    this.documents.clear();
+    this.payments.clear();
   }
 }
 
