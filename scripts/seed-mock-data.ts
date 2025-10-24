@@ -14,7 +14,7 @@ async function seedMockData() {
       mobile: '9999999991',
       fullName: 'Property Owner Demo',
       email: 'owner@hptourism.com',
-      role: 'owner',
+      role: 'property_owner',
       district: 'Shimla',
       aadhaarNumber: '123456789001',
       password: hashedPassword,

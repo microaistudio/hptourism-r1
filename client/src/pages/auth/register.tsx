@@ -18,7 +18,7 @@ const registerSchema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
   email: z.string().email("Enter a valid email").optional().or(z.literal("")),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["owner", "district_officer", "state_officer"]),
+  role: z.enum(["property_owner", "district_officer", "state_officer"]),
   district: z.string().optional(),
   aadhaarNumber: z.string().regex(/^\d{12}$/, "Aadhaar must be 12 digits").optional().or(z.literal("")),
 });
@@ -41,7 +41,7 @@ export default function Register() {
       mobile: "",
       email: "",
       password: "",
-      role: "owner",
+      role: "property_owner",
       district: "",
       aadhaarNumber: "",
     },
@@ -194,7 +194,7 @@ export default function Register() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="owner">Property Owner</SelectItem>
+                        <SelectItem value="property_owner">Property Owner</SelectItem>
                         <SelectItem value="district_officer">District Tourism Officer</SelectItem>
                         <SelectItem value="state_officer">State Tourism Officer</SelectItem>
                       </SelectContent>
@@ -234,7 +234,7 @@ export default function Register() {
                 />
               )}
 
-              {selectedRole === "owner" && (
+              {selectedRole === "property_owner" && (
                 <FormField
                   control={form.control}
                   name="aadhaarNumber"

@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   mobile: varchar("mobile", { length: 15 }).notNull().unique(),
   email: varchar("email", { length: 255 }),
   fullName: text("full_name").notNull(),
-  role: varchar("role", { length: 50 }).notNull().default('owner'), // 'owner', 'district_officer', 'state_officer', 'admin'
+  role: varchar("role", { length: 50 }).notNull().default('property_owner'), // 'property_owner', 'district_officer', 'state_officer', 'admin'
   aadhaarNumber: varchar("aadhaar_number", { length: 12 }).unique(),
   district: varchar("district", { length: 100 }),
   password: text("password"), // For demo/testing, in production would use proper auth
@@ -22,7 +22,7 @@ export const insertUserSchema = createInsertSchema(users, {
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid mobile number"),
   email: z.string().email().optional().or(z.literal('')),
   fullName: z.string().min(3, "Name must be at least 3 characters"),
-  role: z.enum(['owner', 'district_officer', 'state_officer', 'admin']),
+  role: z.enum(['property_owner', 'district_officer', 'state_officer', 'admin']),
   aadhaarNumber: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional().or(z.literal('')),
   district: z.string().optional().or(z.literal('')),
   password: z.string().min(1, "Password is required"),

@@ -246,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       
       let applications: Awaited<ReturnType<typeof storage.getApplicationsByUser>> = [];
-      if (user?.role === 'owner') {
+      if (user?.role === 'property_owner') {
         applications = await storage.getApplicationsByUser(userId);
       } else if (user?.role === 'district_officer' && user.district) {
         applications = await storage.getApplicationsByDistrict(user.district);
@@ -272,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
       
-      if (user?.role === 'owner' && application.userId !== userId) {
+      if (user?.role === 'property_owner' && application.userId !== userId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -490,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           byStatus,
           byCategory,
           avgProcessingTime,
-          totalOwners: allUsers.filter(u => u.role === 'owner').length,
+          totalOwners: allUsers.filter(u => u.role === 'property_owner').length,
         },
         districts: districtCounts,
         recentApplications,
@@ -531,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fullName: "Demo Property Owner",
           mobile: "9876543210",
           password: "test123",
-          role: "owner",
+          role: "property_owner",
           district: "Shimla",
         });
 

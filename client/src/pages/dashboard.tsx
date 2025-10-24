@@ -123,7 +123,7 @@ export default function Dashboard() {
             <h2 className="text-2xl font-bold">Welcome, {user.fullName}!</h2>
             <p className="text-muted-foreground">Manage your homestay applications</p>
           </div>
-          {user.role === 'owner' && (
+          {user.role === 'property_owner' && (
             <Button
               onClick={() => setLocation("/applications/new")}
               data-testid="button-new-application"
@@ -192,7 +192,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>Recent Applications</CardTitle>
             <CardDescription>
-              {user.role === 'owner' ? 'Your homestay applications' : 'Applications for review'}
+              {user.role === 'property_owner' ? 'Your homestay applications' : 'Applications for review'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -207,11 +207,11 @@ export default function Dashboard() {
                 <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No applications yet</h3>
                 <p className="text-muted-foreground mb-4">
-                  {user.role === 'owner' 
+                  {user.role === 'property_owner' 
                     ? 'Start your first homestay registration application'
                     : 'No applications pending review'}
                 </p>
-                {user.role === 'owner' && (
+                {user.role === 'property_owner' && (
                   <Button onClick={() => setLocation("/applications/new")} data-testid="button-create-first">
                     <Plus className="w-4 h-4 mr-2" />
                     Create First Application
