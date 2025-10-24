@@ -8,7 +8,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY client/package*.json ./client/
 
 # Install ALL dependencies (including dev dependencies needed for build)
 RUN npm ci
