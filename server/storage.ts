@@ -26,6 +26,10 @@ export interface IStorage {
   updatePayment(id: string, payment: Partial<Payment>): Promise<Payment | undefined>;
   getPaymentsByApplication(applicationId: string): Promise<Payment[]>;
   
+  // Production Stats methods
+  saveProductionStats(stats: { totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; sourceUrl: string }): Promise<void>;
+  getLatestProductionStats(): Promise<{ totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; scrapedAt: Date } | null>;
+  
   // Dev methods
   getStats(): Promise<{ users: number; applications: number; documents: number; payments: number }>;
   clearAll(): Promise<void>;
@@ -222,6 +226,15 @@ export class MemStorage implements IStorage {
 
   async getPaymentsByApplication(applicationId: string): Promise<Payment[]> {
     return Array.from(this.payments.values()).filter(payment => payment.applicationId === applicationId);
+  }
+
+  // Production Stats methods (stub for MemStorage - not used in production)
+  async saveProductionStats(stats: { totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; sourceUrl: string }): Promise<void> {
+    // No-op for MemStorage
+  }
+
+  async getLatestProductionStats(): Promise<{ totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; scrapedAt: Date } | null> {
+    return null;
   }
 
   // Dev methods

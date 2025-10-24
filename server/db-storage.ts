@@ -1,7 +1,7 @@
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from './db';
 import {
-  users, homestayApplications, documents, payments,
+  users, homestayApplications, documents, payments, productionStats,
   type User, type InsertUser,
   type HomestayApplication, type InsertHomestayApplication,
   type Document, type InsertDocument,
@@ -152,5 +152,26 @@ export class DbStorage implements IStorage {
     await db.delete(documents);
     await db.delete(homestayApplications);
     await db.delete(users);
+  }
+
+  // Production Stats methods
+  async saveProductionStats(stats: { totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; sourceUrl: string }): Promise<void> {
+    await db.insert(productionStats).values(stats);
+  }
+
+  async getLatestProductionStats(): Promise<{ totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; scrapedAt: Date } | null> {
+    const result = await db.select().from(productionStats)
+      .orderBy(desc(productionStats.scrapedAt))
+      .limit(1);
+    
+    if (!result[0]) return null;
+    
+    return {
+      totalApplications: result[0].totalApplications,
+      approvedApplications: result[0].approvedApplications,
+      rejectedApplications: result[0].rejectedApplications,
+      pendingApplications: result[0].pendingApplications,
+      scrapedAt: result[0].scrapedAt || new Date()
+    };
   }
 }
