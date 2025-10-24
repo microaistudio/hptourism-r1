@@ -23,16 +23,16 @@ const HP_DISTRICTS = [
 ];
 
 const AMENITIES = [
-  { id: "wifi", label: "WiFi", icon: Wifi, colorClass: "amenity-wifi" },
-  { id: "parking", label: "Parking", icon: Car, colorClass: "amenity-parking" },
-  { id: "ac", label: "Air Conditioning", icon: AirVent, colorClass: "amenity-ac" },
-  { id: "mountainView", label: "Mountain View", icon: Eye, colorClass: "amenity-view" },
-  { id: "restaurant", label: "Restaurant", icon: UtensilsCrossed, colorClass: "amenity-restaurant" },
-  { id: "hotWater", label: "Hot Water 24/7", icon: Droplet, colorClass: "amenity-water" },
-  { id: "garden", label: "Garden", icon: Trees, colorClass: "amenity-garden" },
-  { id: "tv", label: "Television", icon: Tv, colorClass: "amenity-tv" },
-  { id: "breakfast", label: "Breakfast", icon: Coffee, colorClass: "amenity-breakfast" },
-  { id: "heater", label: "Room Heater", icon: Wind, colorClass: "amenity-heater" },
+  { id: "wifi", label: "WiFi", emoji: "📶", icon: Wifi, colorClass: "amenity-wifi" },
+  { id: "parking", label: "Parking", emoji: "🚗", icon: Car, colorClass: "amenity-parking" },
+  { id: "ac", label: "Air Conditioning", emoji: "❄️", icon: AirVent, colorClass: "amenity-ac" },
+  { id: "mountainView", label: "Mountain View", emoji: "👁️", icon: Eye, colorClass: "amenity-view" },
+  { id: "restaurant", label: "Restaurant", emoji: "🍽️", icon: UtensilsCrossed, colorClass: "amenity-restaurant" },
+  { id: "hotWater", label: "Hot Water 24/7", emoji: "💧", icon: Droplet, colorClass: "amenity-water" },
+  { id: "garden", label: "Garden", emoji: "🌳", icon: Trees, colorClass: "amenity-garden" },
+  { id: "tv", label: "Television", emoji: "📺", icon: Tv, colorClass: "amenity-tv" },
+  { id: "breakfast", label: "Breakfast", emoji: "☕", icon: Coffee, colorClass: "amenity-breakfast" },
+  { id: "heater", label: "Room Heater", emoji: "🔥", icon: Wind, colorClass: "amenity-heater" },
 ];
 
 export default function PublicProperties() {
@@ -193,7 +193,8 @@ export default function PublicProperties() {
                           />
                           <label htmlFor={amenity.id} className="flex items-center gap-2 text-sm cursor-pointer flex-1">
                             <div className={`amenity-icon ${amenity.colorClass}`}>
-                              <Icon className="w-4 h-4" />
+                              <span className="text-lg emoji-icon">{amenity.emoji}</span>
+                              <Icon className="w-4 h-4 svg-icon" />
                             </div>
                             <span className="line-clamp-1">{amenity.label}</span>
                           </label>
@@ -297,7 +298,8 @@ export default function PublicProperties() {
                                 className={`property-amenity-icon ${amenity.colorClass}`}
                                 title={amenity.label}
                               >
-                                <AmenityIcon className="w-4 h-4" />
+                                <span className="emoji-icon">{amenity.emoji}</span>
+                                <AmenityIcon className="w-4 h-4 svg-icon" />
                               </div>
                             );
                           })}
