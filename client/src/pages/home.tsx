@@ -2,23 +2,18 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mountain, Home, FileText, CheckCircle, Clock } from "lucide-react";
+import { NavigationHeader } from "@/components/navigation-header";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Mountain className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">HP Tourism eServices</h1>
-              <p className="text-sm text-muted-foreground">Himachal Pradesh Government</p>
-            </div>
-          </div>
+      <NavigationHeader 
+        title="HP Tourism eServices"
+        showBack={false}
+        showHome={false}
+        actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setLocation("/login")} data-testid="button-login">
               Sign In
@@ -27,8 +22,8 @@ export default function HomePage() {
               Register
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <section className="py-20 px-4 bg-gradient-to-b from-primary/5 to-background">
         <div className="max-w-7xl mx-auto text-center">
