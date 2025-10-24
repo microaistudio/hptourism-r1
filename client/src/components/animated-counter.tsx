@@ -6,12 +6,12 @@ interface AnimatedCounterProps {
 }
 
 export function AnimatedCounter({ value, duration = 1000 }: AnimatedCounterProps) {
-  const [displayValue, setDisplayValue] = useState(0);
+  const [displayValue, setDisplayValue] = useState(value);
   const [isAnimating, setIsAnimating] = useState(false);
   const previousValue = useRef(value);
 
   useEffect(() => {
-    if (previousValue.current === value) {
+    if (previousValue.current === value && displayValue !== 0) {
       return;
     }
 
