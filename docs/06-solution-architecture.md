@@ -94,7 +94,7 @@ Hosting:   Cloud-native (Replit → AWS/GCP)
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │                  CDN LAYER (Cloudflare)                 │
-│  • Static assets (images, CSS, JS)                     │
+│  • Static assets (images, CSS, JS)                      │
 │  • DDoS protection                                      │
 │  • Edge caching                                         │
 └────────────────────────────┬────────────────────────────┘
@@ -102,13 +102,13 @@ Hosting:   Cloud-native (Replit → AWS/GCP)
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │              FRONTEND (React SPA)                       │
-│  ┌──────────────────────────────────────────────┐      │
-│  │  React 18 + TypeScript                       │      │
-│  │  • Routing (Wouter)                          │      │
-│  │  • State (TanStack Query)                    │      │
-│  │  • Forms (React Hook Form + Zod)             │      │
-│  │  • UI (Tailwind + shadcn/ui)                 │      │
-│  └──────────────────────────────────────────────┘      │
+│  ┌──────────────────────────────────────────────┐       │
+│  │  React 18 + TypeScript                       │       │
+│  │  • Routing (Wouter)                          │       │
+│  │  • State (TanStack Query)                    │       │
+│  │  • Forms (React Hook Form + Zod)             │       │
+│  │  • UI (Tailwind + shadcn/ui)                 │       │
+│  └──────────────────────────────────────────────┘       │
 └────────────────────────────┬────────────────────────────┘
                              │
                              │ REST API (JSON)
@@ -124,15 +124,15 @@ Hosting:   Cloud-native (Replit → AWS/GCP)
                              ▼
 ┌─────────────────────────────────────────────────────────┐
 │         BACKEND (Node.js + Express)                     │
-│  ┌──────────────────────────────────────────────┐      │
-│  │  Business Logic Layer                        │      │
-│  │  • User Management                           │      │
-│  │  • Application Processing                    │      │
-│  │  • Workflow Engine                           │      │
-│  │  • Notification Service                      │      │
-│  │  • Payment Integration                       │      │
-│  │  • Document Processing                       │      │
-│  └──────────────────────────────────────────────┘      │
+│  ┌──────────────────────────────────────────────┐       │
+│  │  Business Logic Layer                        │       │
+│  │  • User Management                           │       │
+│  │  • Application Processing                    │       │
+│  │  • Workflow Engine                           │       │
+│  │  • Notification Service                      │       │
+│  │  • Payment Integration                       │       │
+│  │  • Document Processing                       │       │
+│  └──────────────────────────────────────────────┘       │
 └──────┬────────────────────────────┬─────────────────────┘
        │                            │
        │                            │
