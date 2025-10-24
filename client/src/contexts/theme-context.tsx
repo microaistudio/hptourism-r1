@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type ThemeName = "classic" | "modern" | "vibrant";
+export type ThemeName = "classic" | "classic-clean" | "modern" | "vibrant";
 
 interface ThemeContextType {
   theme: ThemeName;
@@ -12,7 +12,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeName>(() => {
     const saved = localStorage.getItem("hp-tourism-theme");
-    return (saved as ThemeName) || "classic";
+    return (saved as ThemeName) || "classic-clean";
   });
 
   useEffect(() => {

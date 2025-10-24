@@ -9,9 +9,10 @@ import {
 import { Palette, Check } from "lucide-react";
 
 const THEMES = [
-  { id: "classic", name: "Classic Portal", description: "Traditional government style" },
-  { id: "modern", name: "Modern Bold", description: "Professional & sleek" },
-  { id: "vibrant", name: "Vibrant HP", description: "Energetic & colorful" },
+  { id: "classic-clean", name: "Classic Clean", description: "VM style - No hero image" },
+  { id: "classic", name: "Classic Portal", description: "With Himachal hero image" },
+  { id: "modern", name: "Modern Bold", description: "Dark theme with hero" },
+  { id: "vibrant", name: "Vibrant HP", description: "Colorful with hero" },
 ] as const;
 
 export function ThemeSwitcher() {

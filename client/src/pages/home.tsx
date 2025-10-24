@@ -85,21 +85,21 @@ export default function HomePage() {
         }
       />
 
-      {/* Hero Section - Image only in Vibrant theme */}
+      {/* Hero Section - Image on all themes except Classic Clean */}
       <section 
-        className={`relative py-32 px-4 ${theme === 'vibrant' ? 'bg-cover bg-center' : 'bg-gradient-to-b from-background to-muted/20'}`}
-        style={theme === 'vibrant' ? { backgroundImage: `url(${heroImage})` } : undefined}
+        className={`relative ${theme === 'classic-clean' ? 'py-20' : 'py-32'} px-4 ${theme === 'classic-clean' ? 'bg-gradient-to-b from-background to-muted/20' : 'bg-cover bg-center'}`}
+        style={theme !== 'classic-clean' ? { backgroundImage: `url(${heroImage})` } : undefined}
       >
-        {/* Dark overlay for text readability - only in Vibrant theme */}
-        {theme === 'vibrant' && (
+        {/* Dark overlay for text readability - all themes with hero image */}
+        {theme !== 'classic-clean' && (
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
         )}
         
-        <div className={`${theme === 'vibrant' ? 'relative' : ''} max-w-4xl mx-auto text-center`}>
-          <h1 className={`text-4xl md:text-5xl font-bold mb-6 ${theme === 'vibrant' ? 'text-white' : 'text-foreground'}`}>
+        <div className={`${theme !== 'classic-clean' ? 'relative' : ''} max-w-4xl mx-auto text-center`}>
+          <h1 className={`text-4xl md:text-5xl font-bold mb-6 ${theme !== 'classic-clean' ? 'text-white' : 'text-foreground'}`}>
             Welcome to HP Tourism Digital Ecosystem
           </h1>
-          <p className={`text-lg md:text-xl mb-8 max-w-2xl mx-auto ${theme === 'vibrant' ? 'text-white/90' : 'text-muted-foreground'}`}>
+          <p className={`text-lg md:text-xl mb-8 max-w-2xl mx-auto ${theme !== 'classic-clean' ? 'text-white/90' : 'text-muted-foreground'}`}>
             Streamlined homestay registration system implementing the 2025 Homestay Rules. 
             Get your property registered in 7-15 days instead of 105 days.
           </p>
@@ -114,7 +114,7 @@ export default function HomePage() {
             <Button 
               size="lg" 
               variant="outline"
-              className={theme === 'vibrant' ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
+              className={theme !== 'classic-clean' ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
               onClick={() => setLocation("/properties")} 
               data-testid="button-browse-properties"
             >
@@ -129,7 +129,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl font-bold text-center mb-8">Live Portal Statistics</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-none shadow-sm" data-testid="card-total-applications">
+            <Card className="shadow-md border" data-testid="card-total-applications">
               <CardHeader className="text-center pb-2">
                 <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
                   <FileText className="w-6 h-6 text-primary" />
@@ -145,7 +145,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-approved-applications">
+            <Card className="shadow-md border" data-testid="card-approved-applications">
               <CardHeader className="text-center pb-2">
                 <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
                   <CheckCircle className="w-6 h-6 text-green-600" />
@@ -161,7 +161,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-rejected-applications">
+            <Card className="shadow-md border" data-testid="card-rejected-applications">
               <CardHeader className="text-center pb-2">
                 <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-2">
                   <TrendingUp className="w-6 h-6 text-red-600" />
@@ -177,7 +177,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-pending-applications">
+            <Card className="shadow-md border" data-testid="card-pending-applications">
               <CardHeader className="text-center pb-2">
                 <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-2">
                   <Clock className="w-6 h-6 text-orange-600" />
@@ -202,7 +202,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-center mb-12">Key Features</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-none shadow-sm" data-testid="card-easy-registration">
+            <Card className="shadow-md border" data-testid="card-easy-registration">
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
                   <HomeIcon className="w-8 h-8 text-primary" />
@@ -216,7 +216,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-fast-processing">
+            <Card className="shadow-md border" data-testid="card-fast-processing">
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
                   <Clock className="w-8 h-8 text-primary" />
@@ -230,7 +230,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-digital-documents">
+            <Card className="shadow-md border" data-testid="card-digital-documents">
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
                   <FileText className="w-8 h-8 text-primary" />
@@ -244,7 +244,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-realtime-tracking">
+            <Card className="shadow-md border" data-testid="card-realtime-tracking">
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="w-8 h-8 text-primary" />
@@ -265,7 +265,7 @@ export default function HomePage() {
       <section className="py-12 px-4 bg-muted/30">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="border-none shadow-sm">
+            <Card className="shadow-md border">
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <Search className="w-6 h-6 text-primary" />
@@ -290,7 +290,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm">
+            <Card className="shadow-md border">
               <CardHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <Award className="w-6 h-6 text-primary" />
@@ -325,7 +325,7 @@ export default function HomePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Diamond Category */}
-            <Card className="border-none shadow-sm relative overflow-hidden" data-testid="card-diamond">
+            <Card className="shadow-md border relative overflow-hidden" data-testid="card-diamond">
               {/* Diamond Badge Ribbon */}
               <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden">
                 <div className="absolute top-3 right-[-32px] w-32 bg-gradient-to-r from-cyan-400 to-blue-500 text-white text-xs font-bold py-1 px-8 rotate-45 text-center shadow-lg">
@@ -366,7 +366,7 @@ export default function HomePage() {
             </Card>
 
             {/* Gold Category */}
-            <Card className="border-none shadow-sm relative overflow-hidden" data-testid="card-gold">
+            <Card className="shadow-md border relative overflow-hidden" data-testid="card-gold">
               {/* Gold Badge Ribbon */}
               <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden">
                 <div className="absolute top-3 right-[-32px] w-32 bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-xs font-bold py-1 px-8 rotate-45 text-center shadow-lg">
@@ -407,7 +407,7 @@ export default function HomePage() {
             </Card>
 
             {/* Silver Category */}
-            <Card className="border-none shadow-sm relative overflow-hidden" data-testid="card-silver">
+            <Card className="shadow-md border relative overflow-hidden" data-testid="card-silver">
               {/* Silver Badge Ribbon */}
               <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden">
                 <div className="absolute top-3 right-[-32px] w-32 bg-gradient-to-r from-slate-300 to-gray-400 text-white text-xs font-bold py-1 px-8 rotate-45 text-center shadow-lg">
