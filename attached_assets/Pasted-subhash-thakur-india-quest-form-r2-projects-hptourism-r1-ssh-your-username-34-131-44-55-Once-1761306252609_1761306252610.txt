@@ -1,0 +1,85 @@
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1$ ssh your-username@34.131.44.55
+
+# Once connected:
+cd ~/projects/hptourism-r1
+git pull origin main
+npm install  # if there are new dependencies
+pm2 restart ecosystem.config.cjs
+The authenticity of host '34.131.44.55 (34.131.44.55)' can't be established.
+ED25519 key fingerprint is SHA256:ecRQLyUDaN7k/0sfas3nxK++Y8Ie9Y3UkLgXDAQk9to.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '34.131.44.55' (ED25519) to the list of known hosts.
+your-username@34.131.44.55: Permission denied (publickey).
+remote: Enumerating objects: 88, done.
+remote: Counting objects: 100% (88/88), done.
+remote: Compressing objects: 100% (18/18), done.
+remote: Total 75 (delta 56), reused 75 (delta 56), pack-reused 0 (from 0)
+Unpacking objects: 100% (75/75), 5.01 MiB | 5.55 MiB/s, done.
+From https://github.com/microaistudio/hptourism-r1
+ * branch            main       -> FETCH_HEAD
+   9dfa933..2b6c364  main       -> origin/main
+Updating 9dfa933..2b6c364
+Fast-forward
+ attached_assets/Screenshot 2025-10-24 161602_1761302785988.png | Bin 0 -> 124914 bytes
+ attached_assets/Screenshot 2025-10-24 161611_1761302785990.png | Bin 0 -> 108699 bytes
+ attached_assets/Screenshot 2025-10-24 163742_1761304072738.png | Bin 0 -> 128380 bytes
+ attached_assets/Screenshot 2025-10-24 165718_1761305279138.png | Bin 0 -> 127477 bytes
+ category-badges.png                                            | Bin 0 -> 89517 bytes
+ classic-clean-default.png                                      | Bin 0 -> 238980 bytes
+ classic-clean.png                                              | Bin 0 -> 155742 bytes
+ classic-portal-with-hero.png                                   | Bin 0 -> 944037 bytes
+ client/src/components/theme-switcher.tsx                       |   7 +-
+ client/src/contexts/theme-context.tsx                          |   4 +-
+ client/src/index.css                                           | 184 ++++++++-------
+ client/src/pages/home.tsx                                      | 457 +++++++++++++++++++++---------------
+ complete-homepage-classic.png                                  | Bin 0 -> 205947 bytes
+ hero-with-himachal-image.png                                   | Bin 0 -> 916685 bytes
+ modern-bold.png                                                | Bin 0 -> 254092 bytes
+ modern-dark.png                                                | Bin 0 -> 174299 bytes
+ modern-no-image.png                                            | Bin 0 -> 229936 bytes
+ pine-green-theme.png                                           | Bin 0 -> 206252 bytes
+ replit.md                                                      |  28 ++-
+ vibrant-colorful.png                                           | Bin 0 -> 376128 bytes
+ vibrant-hp.png                                                 | Bin 0 -> 1170740 bytes
+ 21 files changed, 393 insertions(+), 287 deletions(-)
+ create mode 100644 attached_assets/Screenshot 2025-10-24 161602_1761302785988.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 161611_1761302785990.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 163742_1761304072738.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 165718_1761305279138.png
+ create mode 100644 category-badges.png
+ create mode 100644 classic-clean-default.png
+ create mode 100644 classic-clean.png
+ create mode 100644 classic-portal-with-hero.png
+ create mode 100644 complete-homepage-classic.png
+ create mode 100644 hero-with-himachal-image.png
+ create mode 100644 modern-bold.png
+ create mode 100644 modern-dark.png
+ create mode 100644 modern-no-image.png
+ create mode 100644 pine-green-theme.png
+ create mode 100644 vibrant-colorful.png
+ create mode 100644 vibrant-hp.png
+
+up to date, audited 482 packages in 6s
+
+64 packages are looking for funding
+  run `npm fund` for details
+
+8 vulnerabilities (3 low, 5 moderate)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+[PM2] Applying action restartProcessId on app [hp-tourism](ids: [ 4 ])
+[PM2] [hp-tourism](4) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 4  │ hp-tourism         │ fork     │ 5    │ online    │ 0%       │ 26.1mb   │
+│ 0  │ questform          │ fork     │ 0    │ online    │ 0%       │ 100.4mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1$ 
