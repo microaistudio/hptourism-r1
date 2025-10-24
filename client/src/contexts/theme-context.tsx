@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type ThemeName = "classic" | "classic-clean" | "modern" | "vibrant";
+export type ThemeName = "classic-clean" | "classic" | "professional-blue" | "mountain-sky" | "heritage-gold" | "forest-green" | "vibrant";
 
 interface ThemeContextType {
   theme: ThemeName;
