@@ -353,83 +353,95 @@
     inset: -1px;
   }
 
-  /* Colorful Icon Styles - Circular with solid colors */
+  /* Colorful Icon Styles - Emoji-like with gradients and shadows */
   [data-icon-style="colorful"] .amenity-icon {
-    padding: 0.5rem;
-    border-radius: 0.375rem;
+    padding: 0.625rem;
+    border-radius: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: transform 0.2s;
+  }
+
+  [data-icon-style="colorful"] .amenity-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
 
   [data-icon-style="colorful"] .amenity-icon svg {
-    stroke-width: 2;
+    stroke-width: 2.5;
+    fill: white;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
   }
 
-  /* Specific amenity colors - circular solid backgrounds */
+  /* Emoji-like gradient backgrounds */
   [data-icon-style="colorful"] .amenity-wifi {
-    background: #5b7fff;
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-parking {
-    background: #a78bfa;
+    background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-ac {
-    background: #22d3ee;
+    background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-view {
-    background: #10b981;
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-restaurant {
-    background: #fb923c;
+    background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-water {
-    background: #38bdf8;
+    background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-garden {
-    background: #a3e635;
+    background: linear-gradient(135deg, #84cc16 0%, #a3e635 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-tv {
-    background: #818cf8;
+    background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-breakfast {
-    background: #fbbf24;
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-heater {
-    background: #f87171;
+    background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
     color: white;
   }
 
   [data-icon-style="colorful"] .property-amenity-icon {
     width: 2rem;
     height: 2rem;
-    padding: 0.375rem;
+    padding: 0.5rem;
     border-radius: 0.375rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   [data-icon-style="colorful"] .property-amenity-icon svg {
-    stroke-width: 2;
+    stroke-width: 2.5;
     width: 1rem;
     height: 1rem;
+    fill: white;
+    filter: drop-shadow(0 0.5px 0.5px rgba(0, 0, 0, 0.1));
   }
 }
