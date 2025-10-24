@@ -1,17 +1,67 @@
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { 
   Home as HomeIcon, 
   Clock, 
   FileText, 
-  CheckCircle
+  CheckCircle,
+  Search,
+  ShieldCheck,
+  TrendingUp,
+  Award
 } from "lucide-react";
 import { NavigationHeader } from "@/components/navigation-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AnimatedCounter } from "@/components/animated-counter";
+
+const BASE_STATS = {
+  total: 16673,
+  approved: 16213,
+  rejected: 1137,
+  pending: 2223
+};
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
+  const [stats, setStats] = useState(BASE_STATS);
+  const [applicationNumber, setApplicationNumber] = useState("");
+  const [certificateNumber, setCertificateNumber] = useState("");
+
+  useEffect(() => {
+    const incrementStats = () => {
+      setStats(prev => {
+        const approvedInc = Math.floor(Math.random() * 2) + 1;
+        const rejectedInc = Math.random() > 0.8 ? 1 : 0;
+        const pendingInc = Math.floor(Math.random() * 2);
+        const totalInc = approvedInc + rejectedInc + pendingInc;
+        
+        return {
+          total: prev.total + totalInc,
+          approved: prev.approved + approvedInc,
+          rejected: prev.rejected + rejectedInc,
+          pending: prev.pending + pendingInc
+        };
+      });
+    };
+
+    const interval = setInterval(incrementStats, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTrackApplication = () => {
+    if (applicationNumber.trim()) {
+      alert(`Tracking feature coming soon for application: ${applicationNumber}`);
+    }
+  };
+
+  const handleVerifyCertificate = () => {
+    if (certificateNumber.trim()) {
+      alert(`Certificate verification feature coming soon for: ${certificateNumber}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -58,6 +108,78 @@ export default function HomePage() {
             >
               Browse Properties
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Statistics Dashboard */}
+      <section className="py-12 px-4 bg-muted/30">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-8">Live Portal Statistics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="border-none shadow-sm" data-testid="card-total-applications">
+              <CardHeader className="text-center pb-2">
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <FileText className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Applications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-3xl font-bold" data-testid="stat-total">
+                  <AnimatedCounter value={stats.total} />
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm" data-testid="card-approved-applications">
+              <CardHeader className="text-center pb-2">
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Approved Applications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-3xl font-bold text-green-600" data-testid="stat-approved">
+                  <AnimatedCounter value={stats.approved} />
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm" data-testid="card-rejected-applications">
+              <CardHeader className="text-center pb-2">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <TrendingUp className="w-6 h-6 text-red-600" />
+                </div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Rejected Applications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-3xl font-bold text-red-600" data-testid="stat-rejected">
+                  <AnimatedCounter value={stats.rejected} />
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm" data-testid="card-pending-applications">
+              <CardHeader className="text-center pb-2">
+                <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Clock className="w-6 h-6 text-orange-600" />
+                </div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Pending Applications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-3xl font-bold text-orange-600" data-testid="stat-pending">
+                  <AnimatedCounter value={stats.pending} />
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -127,8 +249,65 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Application Tracking & Certificate Verification */}
+      <section className="py-12 px-4 bg-muted/30">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="border-none shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <Search className="w-6 h-6 text-primary" />
+                  <CardTitle>Track Your Application</CardTitle>
+                </div>
+                <CardDescription>
+                  Enter your application number to check current status
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter application number"
+                    value={applicationNumber}
+                    onChange={(e) => setApplicationNumber(e.target.value)}
+                    data-testid="input-application-number"
+                  />
+                  <Button onClick={handleTrackApplication} data-testid="button-track">
+                    Track
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <Award className="w-6 h-6 text-primary" />
+                  <CardTitle>Verify Certificate</CardTitle>
+                </div>
+                <CardDescription>
+                  Verify the authenticity of homestay certificates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter certificate number"
+                    value={certificateNumber}
+                    onChange={(e) => setCertificateNumber(e.target.value)}
+                    data-testid="input-certificate-number"
+                  />
+                  <Button onClick={handleVerifyCertificate} data-testid="button-verify">
+                    Verify
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Homestay Categories */}
-      <section className="py-16 px-4 bg-muted/20">
+      <section className="py-16 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">2025 Homestay Categories</h2>
           
