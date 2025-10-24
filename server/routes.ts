@@ -108,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const user = await storage.getUserByMobile(mobile);
-      if (!user) {
+      if (!user || !user.password) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
