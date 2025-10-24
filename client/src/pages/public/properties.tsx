@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Mountain, MapPin, Bed, Star, Search, Filter } from "lucide-react";
+import { NavigationHeader } from "@/components/navigation-header";
+import { 
+  Mountain, MapPin, Bed, Star, Search, Filter, 
+  Wifi, Car, AirVent, Eye, UtensilsCrossed, Droplet,
+  Trees, Tv, Coffee, Wind, Sparkles
+} from "lucide-react";
 import type { HomestayApplication } from "@shared/schema";
 
 const HP_DISTRICTS = [
@@ -17,12 +22,16 @@ const HP_DISTRICTS = [
 ];
 
 const AMENITIES = [
-  { id: "wifi", label: "WiFi" },
-  { id: "parking", label: "Parking" },
-  { id: "ac", label: "Air Conditioning" },
-  { id: "mountainView", label: "Mountain View" },
-  { id: "restaurant", label: "Restaurant" },
-  { id: "hotWater", label: "Hot Water 24/7" },
+  { id: "wifi", label: "WiFi", icon: Wifi },
+  { id: "parking", label: "Parking", icon: Car },
+  { id: "ac", label: "Air Conditioning", icon: AirVent },
+  { id: "mountainView", label: "Mountain View", icon: Eye },
+  { id: "restaurant", label: "Restaurant", icon: UtensilsCrossed },
+  { id: "hotWater", label: "Hot Water 24/7", icon: Droplet },
+  { id: "garden", label: "Garden", icon: Trees },
+  { id: "tv", label: "Television", icon: Tv },
+  { id: "breakfast", label: "Breakfast", icon: Coffee },
+  { id: "heater", label: "Room Heater", icon: Wind },
 ];
 
 export default function PublicProperties() {
@@ -67,9 +76,9 @@ export default function PublicProperties() {
 
   const getCategoryBadge = (category: string) => {
     const config = {
-      diamond: { label: "Diamond", variant: "default" as const },
-      gold: { label: "Gold", variant: "secondary" as const },
-      silver: { label: "Silver", variant: "outline" as const },
+      diamond: { label: "Diamond", variant: "default" as const, icon: Sparkles },
+      gold: { label: "Gold", variant: "secondary" as const, icon: Star },
+      silver: { label: "Silver", variant: "outline" as const, icon: Star },
     };
     return config[category as keyof typeof config] || config.silver;
   };
@@ -83,16 +92,21 @@ export default function PublicProperties() {
 
   return (
     <div className="min-h-screen bg-background">
+      <NavigationHeader 
+        title="Discover Himachal Pradesh"
+        showBack={false}
+        showHome={true}
+      />
+
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b">
-        <div className="container mx-auto px-4 py-12">
+        <div className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-3 mb-4">
-            <Mountain className="w-10 h-10 text-primary" />
+            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Mountain className="w-7 h-7 text-primary" />
+            </div>
             <div>
-              <h1 className="text-4xl font-bold" data-testid="heading-discover">
-                Discover Himachal Pradesh
-              </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-muted-foreground">
                 Authentic homestays in the heart of the Himalayas
               </p>
             </div>
@@ -159,21 +173,29 @@ export default function PublicProperties() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Amenities</label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {AMENITIES.map(amenity => (
-                      <div key={amenity.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={amenity.id}
-                          checked={selectedAmenities[amenity.id] || false}
-                          onCheckedChange={() => toggleAmenity(amenity.id)}
-                          data-testid={`checkbox-${amenity.id}`}
-                        />
-                        <label htmlFor={amenity.id} className="text-sm cursor-pointer">
-                          {amenity.label}
-                        </label>
-                      </div>
-                    ))}
+                  <label className="text-sm font-medium mb-3 block">Amenities</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {AMENITIES.map(amenity => {
+                      const Icon = amenity.icon;
+                      return (
+                        <div 
+                          key={amenity.id} 
+                          className="flex items-center space-x-2 p-2 rounded-md hover-elevate cursor-pointer"
+                          onClick={() => toggleAmenity(amenity.id)}
+                        >
+                          <Checkbox
+                            id={amenity.id}
+                            checked={selectedAmenities[amenity.id] || false}
+                            onCheckedChange={() => toggleAmenity(amenity.id)}
+                            data-testid={`checkbox-${amenity.id}`}
+                          />
+                          <label htmlFor={amenity.id} className="flex items-center gap-2 text-sm cursor-pointer flex-1">
+                            <Icon className="w-4 h-4 text-primary" />
+                            <span className="line-clamp-1">{amenity.label}</span>
+                          </label>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
@@ -219,16 +241,28 @@ export default function PublicProperties() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProperties.map((property) => {
               const categoryBadge = getCategoryBadge(property.category);
+              const CategoryIcon = categoryBadge.icon;
+              
+              // Get available amenities with icons
+              const availableAmenities = property.amenities 
+                ? Object.entries(property.amenities as any)
+                    .filter(([, value]) => value)
+                    .map(([key]) => AMENITIES.find(a => a.id === key))
+                    .filter(Boolean)
+                    .slice(0, 6)
+                : [];
+
               return (
                 <Link key={property.id} href={`/properties/${property.id}`}>
                   <Card className="hover-elevate active-elevate-2 h-full cursor-pointer" data-testid={`card-property-${property.id}`}>
                     <CardHeader>
                       <div className="flex justify-between items-start mb-2">
-                        <Badge variant={categoryBadge.variant}>
+                        <Badge variant={categoryBadge.variant} className="flex items-center gap-1">
+                          <CategoryIcon className="w-3 h-3" />
                           {categoryBadge.label}
                         </Badge>
-                        <div className="flex items-center gap-1 text-sm">
-                          <Star className="w-4 h-4 fill-primary text-primary" />
+                        <div className="flex items-center gap-1 text-xs text-primary">
+                          <Star className="w-4 h-4 fill-primary" />
                           <span className="font-medium">Certified</span>
                         </div>
                       </div>
@@ -246,19 +280,27 @@ export default function PublicProperties() {
                         <Bed className="w-4 h-4 text-muted-foreground" />
                         <span>{property.totalRooms} {property.totalRooms === 1 ? 'room' : 'rooms'}</span>
                       </div>
-                      {property.amenities && Object.keys(property.amenities as any).length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(property.amenities as any)
-                            .filter(([, value]) => value)
-                            .slice(0, 3)
-                            .map(([key]) => (
-                              <Badge key={key} variant="outline" className="text-xs">
-                                {AMENITIES.find(a => a.id === key)?.label || key}
-                              </Badge>
-                            ))}
+                      
+                      {/* Amenities with icons */}
+                      {availableAmenities.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 border-t">
+                          {availableAmenities.map((amenity) => {
+                            if (!amenity) return null;
+                            const AmenityIcon = amenity.icon;
+                            return (
+                              <div 
+                                key={amenity.id}
+                                className="flex items-center gap-1 text-xs text-muted-foreground"
+                                title={amenity.label}
+                              >
+                                <AmenityIcon className="w-4 h-4" />
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
-                      <Button className="w-full" variant="outline">
+                      
+                      <Button className="w-full" variant="outline" size="sm">
                         View Details
                       </Button>
                     </CardContent>
