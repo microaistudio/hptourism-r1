@@ -382,7 +382,7 @@ export default function HomePage() {
       <footer className="border-t py-8 px-4 bg-background">
         <div className="max-w-7xl mx-auto text-center text-muted-foreground">
           <p>© 2022 Himachal Tourism eServices. All rights reserved.</p>
-          <p className="text-sm mt-2">Powered By: Netgen</p>
+          <p className="text-sm mt-2">Powered by Outline and Agentryx</p>
         </div>
       </footer>
     </div>
