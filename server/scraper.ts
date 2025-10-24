@@ -46,20 +46,33 @@ export async function scrapeProductionStats(): Promise<ScrapedStats | null> {
 
 function extractStatsFromHTML(html: string): ScrapedStats | null {
   try {
-    const totalMatch = html.match(/Total Applications[\s\S]*?(\d+)/i);
-    const approvedMatch = html.match(/Approved Applications[\s\S]*?(\d+)/i);
-    const rejectedMatch = html.match(/Rejected Applications[\s\S]*?(\d+)/i);
-    const pendingMatch = html.match(/Pending Applications[\s\S]*?(\d+)/i);
+    // Match numbers with commas (e.g., "19,583" or "1,137")
+    const totalMatch = html.match(/Total Applications[\s\S]*?([\d,]+)/i);
+    const approvedMatch = html.match(/Approved Applications[\s\S]*?([\d,]+)/i);
+    const rejectedMatch = html.match(/Rejected Applications[\s\S]*?([\d,]+)/i);
+    const pendingMatch = html.match(/Pending Applications[\s\S]*?([\d,]+)/i);
     
     if (totalMatch && approvedMatch && rejectedMatch && pendingMatch) {
-      return {
-        totalApplications: parseInt(totalMatch[1]),
-        approvedApplications: parseInt(approvedMatch[1]),
-        rejectedApplications: parseInt(rejectedMatch[1]),
-        pendingApplications: parseInt(pendingMatch[1])
+      // Remove commas before parsing
+      const stats = {
+        totalApplications: parseInt(totalMatch[1].replace(/,/g, '')),
+        approvedApplications: parseInt(approvedMatch[1].replace(/,/g, '')),
+        rejectedApplications: parseInt(rejectedMatch[1].replace(/,/g, '')),
+        pendingApplications: parseInt(pendingMatch[1].replace(/,/g, ''))
       };
+      
+      // Validate parsed numbers
+      if (isNaN(stats.totalApplications) || isNaN(stats.approvedApplications) || 
+          isNaN(stats.rejectedApplications) || isNaN(stats.pendingApplications)) {
+        console.error('[scraper] Failed to parse numbers from HTML');
+        return null;
+      }
+      
+      console.log('[scraper] Parsed stats:', stats);
+      return stats;
     }
     
+    console.error('[scraper] Failed to match all required statistics in HTML');
     return null;
   } catch (error) {
     console.error('[scraper] Error extracting stats from HTML:', error);
