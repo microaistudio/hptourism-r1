@@ -24,17 +24,22 @@ Three core pillars have been implemented:
 - Minimal shadows and borders for modern, professional appearance
 - Professional footer with government branding
 
-**Experimental Multi-Theme System**: Three dramatically different themes for testing:
-- **Classic Portal** (Default): Clean professional design matching production - white background, teal-green accents, minimal styling
-- **Modern Bold** (Experimental): Dark dramatic theme - nearly black background, electric blue accents, neon glow effects, perfect for dark mode testing
-- **Vibrant HP** (Experimental): Colorful energetic theme - multi-color gradients (purple/orange/teal), playful hover effects with rotation and glow
+**7-Theme System**: Comprehensive theme options for different use cases:
+1. **Classic Clean** (Default): No hero image, VM-matching design, HP Pine green accents
+2. **Classic Portal**: With hero image, traditional HP government style
+3. **Professional Blue**: Traditional government blue theme with hero
+4. **Mountain Sky**: Sky blue representing Himachal mountains
+5. **Heritage Gold**: Warm golden/amber cultural tones
+6. **Forest Green**: Deep emerald green nature theme
+7. **Vibrant HP**: Experimental colorful multi-gradient theme
 
 **Technical Features**:
 - Theme switcher dropdown in header with localStorage persistence
 - Smooth CSS transitions (0.3s ease) for seamless theme changes
-- Theme-specific visual effects and gradients
-- Dark mode support via Modern Bold theme
+- Theme-specific color schemes and visual effects
+- All themes except Classic Clean feature hero image
 - Accessible color contrasts in all themes
+- PostgreSQL-backed sessions for reliable authentication across deployments
 
 ## User Preferences
 
@@ -56,7 +61,7 @@ The project uses PostgreSQL via Neon's serverless driver and Drizzle ORM for typ
 
 ### Authentication and Authorization
 
-The system plans to implement session-based authentication using Express sessions with PostgreSQL storage to allow for immediate access revocation and align with government IT security policies. User roles will include public tourists, property owners, tourism officers, and government administrators.
+The system implements session-based authentication using Express sessions with PostgreSQL storage (connect-pg-simple) to allow for immediate access revocation and align with government IT security policies. Sessions persist across server restarts and deployments. User roles include property owners, district officers, and state officers. Test credentials: 9999999991/test123 (owner), 9999999992/test123 (district), 9999999993/test123 (state).
 
 ### Key Architectural Decisions
 

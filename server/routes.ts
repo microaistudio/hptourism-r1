@@ -1,6 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 import { storage } from "./storage";
 import { insertUserSchema, type User, type HomestayApplication } from "@shared/schema";
 import { z } from "zod";
@@ -37,9 +39,17 @@ export function requireRole(...roles: string[]) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // PostgreSQL session store for production
+  const PgSession = connectPgSimple(session);
+  
   // Session middleware
   app.use(
     session({
+      store: new PgSession({
+        pool: pool,
+        tableName: 'session',
+        createTableIfMissing: true,
+      }),
       secret: process.env.SESSION_SECRET || "hp-tourism-secret-dev-only",
       resave: false,
       saveUninitialized: false,
