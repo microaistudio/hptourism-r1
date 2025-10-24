@@ -16,6 +16,7 @@ import {
 import { NavigationHeader } from "@/components/navigation-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AnimatedCounter } from "@/components/animated-counter";
+import { useTheme } from "@/contexts/theme-context";
 import heroImage from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 
 const BASE_STATS = {
@@ -27,6 +28,7 @@ const BASE_STATS = {
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
+  const { theme } = useTheme();
   const [stats, setStats] = useState(BASE_STATS);
   const [applicationNumber, setApplicationNumber] = useState("");
   const [certificateNumber, setCertificateNumber] = useState("");
@@ -83,19 +85,21 @@ export default function HomePage() {
         }
       />
 
-      {/* Hero Section with Image */}
+      {/* Hero Section - Image only in Vibrant theme */}
       <section 
-        className="relative py-32 px-4 bg-cover bg-center"
-        style={{ backgroundImage: `url(${heroImage})` }}
+        className={`relative py-32 px-4 ${theme === 'vibrant' ? 'bg-cover bg-center' : 'bg-gradient-to-b from-background to-muted/20'}`}
+        style={theme === 'vibrant' ? { backgroundImage: `url(${heroImage})` } : undefined}
       >
-        {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
+        {/* Dark overlay for text readability - only in Vibrant theme */}
+        {theme === 'vibrant' && (
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
+        )}
         
-        <div className="relative max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">
+        <div className={`${theme === 'vibrant' ? 'relative' : ''} max-w-4xl mx-auto text-center`}>
+          <h1 className={`text-4xl md:text-5xl font-bold mb-6 ${theme === 'vibrant' ? 'text-white' : 'text-foreground'}`}>
             Welcome to HP Tourism Digital Ecosystem
           </h1>
-          <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+          <p className={`text-lg md:text-xl mb-8 max-w-2xl mx-auto ${theme === 'vibrant' ? 'text-white/90' : 'text-muted-foreground'}`}>
             Streamlined homestay registration system implementing the 2025 Homestay Rules. 
             Get your property registered in 7-15 days instead of 105 days.
           </p>
@@ -110,7 +114,7 @@ export default function HomePage() {
             <Button 
               size="lg" 
               variant="outline"
-              className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
+              className={theme === 'vibrant' ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
               onClick={() => setLocation("/properties")} 
               data-testid="button-browse-properties"
             >
@@ -320,53 +324,125 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-center mb-12">2025 Homestay Categories</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="border-none shadow-sm" data-testid="card-diamond">
-              <CardHeader>
-                <CardTitle className="text-2xl">Diamond</CardTitle>
+            {/* Diamond Category */}
+            <Card className="border-none shadow-sm relative overflow-hidden" data-testid="card-diamond">
+              {/* Diamond Badge Ribbon */}
+              <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden">
+                <div className="absolute top-3 right-[-32px] w-32 bg-gradient-to-r from-cyan-400 to-blue-500 text-white text-xs font-bold py-1 px-8 rotate-45 text-center shadow-lg">
+                  DIAMOND
+                </div>
+              </div>
+              <CardHeader className="pt-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-100 to-blue-100 rounded-full flex items-center justify-center">
+                    <Award className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <CardTitle className="text-2xl">Diamond</CardTitle>
+                </div>
                 <CardDescription className="text-base">
                   Premium homestays with exceptional amenities and services
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• AC in all rooms</li>
-                  <li>• WiFi throughout</li>
-                  <li>• Restaurant facility</li>
-                  <li>• Premium location</li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600" />
+                    AC in all rooms
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600" />
+                    WiFi throughout
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600" />
+                    Restaurant facility
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-blue-600" />
+                    Premium location
+                  </li>
                 </ul>
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-gold">
-              <CardHeader>
-                <CardTitle className="text-2xl">Gold</CardTitle>
+            {/* Gold Category */}
+            <Card className="border-none shadow-sm relative overflow-hidden" data-testid="card-gold">
+              {/* Gold Badge Ribbon */}
+              <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden">
+                <div className="absolute top-3 right-[-32px] w-32 bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-xs font-bold py-1 px-8 rotate-45 text-center shadow-lg">
+                  GOLD
+                </div>
+              </div>
+              <CardHeader className="pt-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-full flex items-center justify-center">
+                    <Award className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <CardTitle className="text-2xl">Gold</CardTitle>
+                </div>
                 <CardDescription className="text-base">
                   Quality homestays with essential modern amenities
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• AC in select rooms</li>
-                  <li>• WiFi available</li>
-                  <li>• Hot water 24/7</li>
-                  <li>• Good location</li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-amber-600" />
+                    AC in select rooms
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-amber-600" />
+                    WiFi available
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-amber-600" />
+                    Hot water 24/7
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-amber-600" />
+                    Good location
+                  </li>
                 </ul>
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm" data-testid="card-silver">
-              <CardHeader>
-                <CardTitle className="text-2xl">Silver</CardTitle>
+            {/* Silver Category */}
+            <Card className="border-none shadow-sm relative overflow-hidden" data-testid="card-silver">
+              {/* Silver Badge Ribbon */}
+              <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden">
+                <div className="absolute top-3 right-[-32px] w-32 bg-gradient-to-r from-slate-300 to-gray-400 text-white text-xs font-bold py-1 px-8 rotate-45 text-center shadow-lg">
+                  SILVER
+                </div>
+              </div>
+              <CardHeader className="pt-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-gray-100 rounded-full flex items-center justify-center">
+                    <Award className="w-6 h-6 text-gray-600" />
+                  </div>
+                  <CardTitle className="text-2xl">Silver</CardTitle>
+                </div>
                 <CardDescription className="text-base">
                   Comfortable homestays with basic amenities
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• Clean & comfortable</li>
-                  <li>• Essential amenities</li>
-                  <li>• Safe location</li>
-                  <li>• Affordable pricing</li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-gray-600" />
+                    Clean & comfortable
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-gray-600" />
+                    Essential amenities
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-gray-600" />
+                    Safe location
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-gray-600" />
+                    Affordable pricing
+                  </li>
                 </ul>
               </CardContent>
             </Card>
