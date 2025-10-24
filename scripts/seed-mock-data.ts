@@ -40,7 +40,7 @@ async function seedMockData() {
   ]).returning();
 
   console.log('✅ Created 3 test users');
-  console.log('   - Username: owner, Password: test123 (Property Owner)');
+  console.log('   - Mobile: 9999999991, Password: test123 (Property Owner)');
   console.log('   - Username: district, Password: test123 (District Officer)');
   console.log('   - Username: state, Password: test123 (State Officer)');
 
@@ -252,7 +252,7 @@ async function seedMockData() {
   console.log('🎉 Mock data seeding complete!');
   console.log('');
   console.log('📝 Login Credentials:');
-  console.log('   Property Owner: mobile=owner, password=test123');
+  console.log('   Property Owner: mobile=9999999991, password=test123');
   console.log('   District Officer: mobile=district, password=test123');
   console.log('   State Officer: mobile=state, password=test123');
 }

@@ -61,7 +61,7 @@ The project uses PostgreSQL via Neon's serverless driver and Drizzle ORM for typ
 
 ### Authentication and Authorization
 
-The system implements session-based authentication using Express sessions with PostgreSQL storage (connect-pg-simple) to allow for immediate access revocation and align with government IT security policies. Sessions persist across server restarts and deployments. User roles include property owners, district officers, and state officers. Test credentials: 9999999991/test123 (owner), 9999999992/test123 (district), 9999999993/test123 (state).
+The system implements session-based authentication using Express sessions with PostgreSQL storage (connect-pg-simple) to allow for immediate access revocation and align with government IT security policies. Sessions persist across server restarts and deployments. User roles include property owners (role: `property_owner`), district officers, and state officers. Test credentials: 9999999991/test123 (property owner), 9999999992/test123 (district officer), 9999999993/test123 (state officer).
 
 ### Key Architectural Decisions
 
