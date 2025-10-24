@@ -1,0 +1,88 @@
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1$ cd ~/projects/hptourism-r1hptourism-r1
+git pull origin main
+npm run build
+pm2 restart hp-tourism
+pm2 logs hp-tourism --lines 10
+remote: Enumerating objects: 22, done.
+remote: Counting objects: 100% (22/22), done.
+remote: Compressing objects: 100% (6/6), done.
+remote: Total 19 (delta 16), reused 16 (delta 13), pack-reused 0 (from 0)
+Unpacking objects: 100% (19/19), 98.16 KiB | 1.02 MiB/s, done.
+From https://github.com/microaistudio/hptourism-r1
+ * branch            main       -> FETCH_HEAD
+   a520636..be61991  main       -> origin/main
+Updating a520636..be61991
+Fast-forward
+ .replit                                                                                    |   4 --
+ ...projects-hptourism-r1-cd-projects-hptourism-r1-Pull-lat-1761286175191_1761286175192.txt |  98 ++++++++++++++++++++++++++++++++++++++++++++
+ ...projects-hptourism-r1-cd-projects-hptourism-r1-Stop-the-1761286336599_1761286336600.txt |  96 +++++++++++++++++++++++++++++++++++++++++++
+ ...ts-hptourism-r1-pm2-delete-hp-tourism-pm2-start-ecosyst-1761286522983_1761286522985.txt |  50 ++++++++++++++++++++++
+ attached_assets/Screenshot 2025-10-24 114748_1761286675032.png                             | Bin 0 -> 99122 bytes
+ 5 files changed, 244 insertions(+), 4 deletions(-)
+ create mode 100644 attached_assets/Pasted-subhash-thakur-india-quest-form-r2-projects-hptourism-r1-cd-projects-hptourism-r1-Pull-lat-1761286175191_1761286175192.txt
+ create mode 100644 attached_assets/Pasted-subhash-thakur-india-quest-form-r2-projects-hptourism-r1-cd-projects-hptourism-r1-Stop-the-1761286336599_1761286336600.txt
+ create mode 100644 attached_assets/Pasted-subhash-thakur-india-quest-form-r2-projects-hptourism-r1-pm2-delete-hp-tourism-pm2-start-ecosyst-1761286522983_1761286522985.txt
+ create mode 100644 attached_assets/Screenshot 2025-10-24 114748_1761286675032.png
+
+> rest-express@1.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+vite v5.4.20 building for production...
+transforming (3) src/main.tsxBrowserslist: browsers data (caniuse-lite) is 12 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+transforming (4) src/App.tsx
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+✓ 2532 modules transformed.
+../dist/public/index.html                   2.01 kB │ gzip:   0.77 kB
+../dist/public/assets/index-DJ9C8JOg.css   74.13 kB │ gzip:  12.07 kB
+../dist/public/assets/index-CrkltCXh.js   893.50 kB │ gzip: 255.06 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 16.48s
+
+  dist/index.js  42.7kb
+
+⚡ Done in 13ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [hp-tourism](ids: [ 4 ])
+[PM2] [hp-tourism](4) ✓
+┌────┬───────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name          │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 4  │ hp-tourism    │ default     │ 1.0.0   │ fork    │ 30676    │ 0s     │ 1    │ online    │ 0%       │ 25.9mb   │ sub… │ disabled │
+│ 0  │ questform     │ default     │ N/A     │ fork    │ 980      │ 2h     │ 0    │ online    │ 0%       │ 46.0mb   │ sub… │ disabled │
+└────┴───────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 10 lines for [hp-tourism] process (change the value with --lines option)
+/home/subhash.thakur.india/.pm2/logs/hp-tourism-error.log last 10 lines:
+4|hp-touri | memory, and will not scale past a single process.
+4|hp-touri | Warning: connect.session() MemoryStore is not
+4|hp-touri | designed for a production environment, as it will leak
+4|hp-touri | memory, and will not scale past a single process.
+4|hp-touri | Warning: connect.session() MemoryStore is not
+4|hp-touri | designed for a production environment, as it will leak
+4|hp-touri | memory, and will not scale past a single process.
+4|hp-touri | Warning: connect.session() MemoryStore is not
+4|hp-touri | designed for a production environment, as it will leak
+4|hp-touri | memory, and will not scale past a single process.
+
+/home/subhash.thakur.india/.pm2/logs/hp-tourism-out.log last 10 lines:
+4|hp-touri | 6:10:57 AM [express] GET /api/public/properties 500 in 12ms :: {"message":"Failed to fetch propertie…
+4|hp-touri | 6:10:57 AM [express] GET /api/public/properties 500 in 17ms :: {"message":"Failed to fetch propertie…
+4|hp-touri | 6:11:01 AM [express] serving on port 5000
+4|hp-touri | 6:11:09 AM [express] GET /api/public/properties 500 in 83ms :: {"message":"Failed to fetch propertie…
+4|hp-touri | 6:14:57 AM [express] serving on port 5000
+4|hp-touri | 6:15:31 AM [express] GET /api/public/properties 500 in 161ms :: {"message":"Failed to fetch properti…
+4|hp-touri | 6:16:20 AM [express] GET /api/public/properties 500 in 25ms :: {"message":"Failed to fetch propertie…
+4|hp-touri | 6:18:53 AM [express] GET /api/public/properties 500 in 29ms :: {"message":"Failed to fetch propertie…
+4|hp-touri | 6:18:55 AM [express] GET /api/public/properties 500 in 8ms :: {"message":"Failed to fetch properties…
+4|hp-touri | 6:18:56 AM [express] GET /api/public/properties 500 in 13ms :: {"message":"Failed to fetch propertie…
+
+4|hp-tourism  | Warning: connect.session() MemoryStore is not
+4|hp-tourism  | designed for a production environment, as it will leak
+4|hp-tourism  | memory, and will not scale past a single process.
+4|hp-tourism  | 6:19:00 AM [express] serving on port 5000
+4|hp-tourism  | 6:19:02 AM [express] GET /api/public/properties 500 in 81ms :: {"message":"Failed to fetch propertie…
