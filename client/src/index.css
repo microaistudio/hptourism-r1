@@ -400,100 +400,100 @@
   [data-icon-style="colorful"] .property-amenity-icon .emoji-icon {
     font-size: 1.25rem;
   }
+}
 
-  /* Theme: Modern Bold - Professional & Sleek */
-  [data-theme="modern"] {
-    --background: 220 15% 96%;
-    --foreground: 220 15% 10%;
-    
-    --card: 220 10% 98%;
-    --card-foreground: 220 15% 10%;
-    --card-border: 220 12% 88%;
-    
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    
-    --secondary: 220 13% 85%;
-    --secondary-foreground: 220 15% 15%;
-    
-    --muted: 220 10% 90%;
-    --muted-foreground: 220 12% 35%;
-    
-    --accent: 217 60% 92%;
-    --accent-foreground: 217 91% 30%;
-    
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    
-    --border: 220 12% 85%;
-    --input: 220 12% 80%;
-    --ring: 217 91% 60%;
-    
-    --chart-1: 217 91% 60%;
-    --chart-2: 142 76% 36%;
-    --chart-3: 340 82% 52%;
-    --chart-4: 47 96% 53%;
-    --chart-5: 280 73% 48%;
-  }
+/* Theme: Modern Bold - Professional & Sleek */
+[data-theme="modern"] {
+  --background: 220 15% 96%;
+  --foreground: 220 15% 10%;
+  
+  --card: 220 10% 98%;
+  --card-foreground: 220 15% 10%;
+  --card-border: 220 12% 88%;
+  
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 220 13% 85%;
+  --secondary-foreground: 220 15% 15%;
+  
+  --muted: 220 10% 90%;
+  --muted-foreground: 220 12% 35%;
+  
+  --accent: 217 60% 92%;
+  --accent-foreground: 217 91% 30%;
+  
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --border: 220 12% 85%;
+  --input: 220 12% 80%;
+  --ring: 217 91% 60%;
+  
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 76% 36%;
+  --chart-3: 340 82% 52%;
+  --chart-4: 47 96% 53%;
+  --chart-5: 280 73% 48%;
+}
 
-  /* Theme: Vibrant HP - Energetic & Colorful */
-  [data-theme="vibrant"] {
-    --background: 40 40% 97%;
-    --foreground: 280 20% 12%;
-    
-    --card: 0 0% 100%;
-    --card-foreground: 280 20% 12%;
-    --card-border: 40 20% 88%;
-    
-    --primary: 280 70% 55%;
-    --primary-foreground: 0 0% 100%;
-    
-    --secondary: 180 60% 85%;
-    --secondary-foreground: 180 80% 15%;
-    
-    --muted: 40 30% 92%;
-    --muted-foreground: 40 15% 30%;
-    
-    --accent: 25 95% 92%;
-    --accent-foreground: 25 95% 25%;
-    
-    --destructive: 0 85% 60%;
-    --destructive-foreground: 0 0% 100%;
-    
-    --border: 40 20% 85%;
-    --input: 40 20% 80%;
-    --ring: 280 70% 55%;
-    
-    --chart-1: 280 70% 55%;
-    --chart-2: 180 70% 45%;
-    --chart-3: 25 95% 53%;
-    --chart-4: 120 60% 45%;
-    --chart-5: 340 82% 52%;
-  }
+/* Theme: Vibrant HP - Energetic & Colorful */
+[data-theme="vibrant"] {
+  --background: 40 40% 97%;
+  --foreground: 280 20% 12%;
+  
+  --card: 0 0% 100%;
+  --card-foreground: 280 20% 12%;
+  --card-border: 40 20% 88%;
+  
+  --primary: 280 70% 55%;
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 180 60% 85%;
+  --secondary-foreground: 180 80% 15%;
+  
+  --muted: 40 30% 92%;
+  --muted-foreground: 40 15% 30%;
+  
+  --accent: 25 95% 92%;
+  --accent-foreground: 25 95% 25%;
+  
+  --destructive: 0 85% 60%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --border: 40 20% 85%;
+  --input: 40 20% 80%;
+  --ring: 280 70% 55%;
+  
+  --chart-1: 280 70% 55%;
+  --chart-2: 180 70% 45%;
+  --chart-3: 25 95% 53%;
+  --chart-4: 120 60% 45%;
+  --chart-5: 340 82% 52%;
+}
 
-  /* Theme: Classic Portal - Traditional Government Style (default) */
-  [data-theme="classic"] {
-    /* Uses the default :root colors */
-  }
+/* Theme: Classic Portal - Traditional Government Style (default) */
+[data-theme="classic"] {
+  /* Uses the default :root colors */
+}
 
-  /* Smooth transitions for theme changes */
-  * {
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-  }
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
 
-  /* Enhanced card hover effects for modern themes */
-  [data-theme="modern"] .hover-elevate:hover,
-  [data-theme="vibrant"] .hover-elevate:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  }
+/* Enhanced card hover effects for modern themes */
+[data-theme="modern"] .hover-elevate:hover,
+[data-theme="vibrant"] .hover-elevate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
 
-  /* Gradient overlays for hero section based on theme */
-  [data-theme="modern"] .hero-gradient {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-  }
+/* Gradient overlays for hero section based on theme */
+[data-theme="modern"] .hero-gradient {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+}
 
-  [data-theme="vibrant"] .hero-gradient {
-    background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(234, 179, 8, 0.1) 100%);
-  }
+[data-theme="vibrant"] .hero-gradient {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(234, 179, 8, 0.1) 100%);
 }
