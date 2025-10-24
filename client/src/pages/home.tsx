@@ -457,7 +457,7 @@ export default function HomePage() {
             © 2025 Government of Himachal Pradesh. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
-            Developed under Digital Himachal Initiative | Powered by Outline and Agentryx
+            Developed under Digital Himachal Initiative | Powered by Outline
           </p>
         </div>
       </footer>
