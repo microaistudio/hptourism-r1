@@ -15,7 +15,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Mountain, ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee } from "lucide-react";
+import { NavigationHeader } from "@/components/navigation-header";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee } from "lucide-react";
 import type { User } from "@shared/schema";
 
 const HP_DISTRICTS = [
@@ -177,23 +178,10 @@ export default function NewApplication() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Mountain className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">New Homestay Application</h1>
-              <p className="text-sm text-muted-foreground">Step {step} of {totalSteps}</p>
-            </div>
-          </div>
-          <Button variant="outline" onClick={() => setLocation("/dashboard")} data-testid="button-back-dashboard">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-      </header>
+      <NavigationHeader 
+        title="New Homestay Application"
+        backTo="/dashboard"
+      />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-8">

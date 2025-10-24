@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText } from "lucide-react";
+import { NavigationHeader } from "@/components/navigation-header";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText } from "lucide-react";
 import type { HomestayApplication, User as UserType } from "@shared/schema";
 import { useState } from "react";
 
@@ -76,7 +77,6 @@ export default function ApplicationDetail() {
           </CardHeader>
           <CardContent>
             <Button onClick={() => setLocation("/dashboard")} data-testid="button-back-dashboard">
-              <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
             </Button>
           </CardContent>
@@ -117,17 +117,12 @@ export default function ApplicationDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => setLocation("/dashboard")} data-testid="button-back">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">Application Details</h1>
-              <p className="text-sm text-muted-foreground">{app.applicationNumber || `Application #${app.id.slice(0, 8)}`}</p>
-            </div>
-          </div>
+      <NavigationHeader 
+        title={`Application #${app.applicationNumber}`}
+        backTo="/dashboard"
+      />
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Badge {...getStatusBadge(app.status || 'draft')} data-testid="badge-status">
               {getStatusBadge(app.status || 'draft').label}
@@ -137,9 +132,7 @@ export default function ApplicationDetail() {
             </Badge>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
             {/* Property Information */}
@@ -430,7 +423,7 @@ export default function ApplicationDetail() {
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

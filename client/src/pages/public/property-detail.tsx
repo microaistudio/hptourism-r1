@@ -3,9 +3,10 @@ import { useParams, useLocation, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NavigationHeader } from "@/components/navigation-header";
 import { 
   Mountain, MapPin, Bed, Star, Phone, Mail, 
-  CheckCircle2, ArrowLeft, Home 
+  CheckCircle2, ArrowLeft, Home
 } from "lucide-react";
 import type { HomestayApplication } from "@shared/schema";
 
@@ -80,17 +81,10 @@ export default function PublicPropertyDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-gradient-to-r from-primary/10 via-primary/5 to-background">
-        <div className="container mx-auto px-4 py-6">
-          <Link href="/properties">
-            <Button variant="ghost" className="mb-4" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Properties
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <NavigationHeader 
+        title={property.propertyName}
+        backTo="/properties"
+      />
 
       {/* Property Details */}
       <div className="container mx-auto px-4 py-8">
