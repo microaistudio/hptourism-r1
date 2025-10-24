@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { NavigationHeader } from "@/components/navigation-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AnimatedCounter } from "@/components/animated-counter";
 import heroImage from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 
 const BASE_STATS = {
@@ -206,7 +207,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-3xl font-bold" data-testid="stat-total">
-                  {stats.total.toLocaleString()}
+                  <AnimatedCounter value={stats.total} />
                 </p>
               </CardContent>
             </Card>
@@ -222,7 +223,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-3xl font-bold" data-testid="stat-approved">
-                  {stats.approved.toLocaleString()}
+                  <AnimatedCounter value={stats.approved} />
                 </p>
               </CardContent>
             </Card>
@@ -238,7 +239,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-3xl font-bold" data-testid="stat-rejected">
-                  {stats.rejected.toLocaleString()}
+                  <AnimatedCounter value={stats.rejected} />
                 </p>
               </CardContent>
             </Card>
@@ -254,7 +255,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-3xl font-bold" data-testid="stat-pending">
-                  {stats.pending.toLocaleString()}
+                  <AnimatedCounter value={stats.pending} />
                 </p>
               </CardContent>
             </Card>

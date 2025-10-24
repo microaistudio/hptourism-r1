@@ -475,4 +475,25 @@
   [data-theme="classic"] {
     /* Uses the default :root colors */
   }
+
+  /* Smooth transitions for theme changes */
+  * {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+
+  /* Enhanced card hover effects for modern themes */
+  [data-theme="modern"] .hover-elevate:hover,
+  [data-theme="vibrant"] .hover-elevate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Gradient overlays for hero section based on theme */
+  [data-theme="modern"] .hero-gradient {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  }
+
+  [data-theme="vibrant"] .hero-gradient {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(234, 179, 8, 0.1) 100%);
+  }
 }
