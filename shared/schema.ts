@@ -248,3 +248,19 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: tru
 export const selectAuditLogSchema = createSelectSchema(auditLogs);
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Production Statistics Table (scraped from production portal)
+export const productionStats = pgTable("production_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  totalApplications: integer("total_applications").notNull(),
+  approvedApplications: integer("approved_applications").notNull(),
+  rejectedApplications: integer("rejected_applications").notNull(),
+  pendingApplications: integer("pending_applications").notNull(),
+  scrapedAt: timestamp("scraped_at").defaultNow(),
+  sourceUrl: text("source_url"),
+});
+
+export const insertProductionStatsSchema = createInsertSchema(productionStats).omit({ id: true, scrapedAt: true });
+export const selectProductionStatsSchema = createSelectSchema(productionStats);
+export type InsertProductionStats = z.infer<typeof insertProductionStatsSchema>;
+export type ProductionStats = typeof productionStats.$inferSelect;
