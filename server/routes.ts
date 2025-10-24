@@ -412,6 +412,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Analytics Routes (Officers Only)
   
+  // Get production portal statistics (scraped from official portal)
+  app.get("/api/analytics/production-stats", requireRole("district_officer", "state_officer"), async (req, res) => {
+    try {
+      const stats = await storage.getLatestProductionStats();
+      res.json({ stats });
+    } catch (error) {
+      console.error('Production stats error:', error);
+      res.status(500).json({ message: "Failed to fetch production stats" });
+    }
+  });
+  
   // Get analytics dashboard data
   app.get("/api/analytics/dashboard", requireRole("district_officer", "state_officer"), async (req, res) => {
     try {
