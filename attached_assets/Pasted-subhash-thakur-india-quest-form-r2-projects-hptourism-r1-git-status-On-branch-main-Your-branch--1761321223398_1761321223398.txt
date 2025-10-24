@@ -1,0 +1,53 @@
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        .env
+        ecosystem.config.cjs
+
+nothing added to commit but untracked files present (use "git add" to track)
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1$ cd ~/projects/hptourism-r1
+git pull origin main
+pm2 restart ecosystem.config.cjs
+remote: Enumerating objects: 85, done.
+remote: Counting objects: 100% (85/85), done.
+remote: Compressing objects: 100% (20/20), done.
+remote: Total 76 (delta 63), reused 69 (delta 56), pack-reused 0 (from 0)
+Unpacking objects: 100% (76/76), 974.50 KiB | 5.30 MiB/s, done.
+From https://github.com/microaistudio/hptourism-r1
+ * branch            main       -> FETCH_HEAD
+   b7c703a..30527e8  main       -> origin/main
+Updating b7c703a..30527e8
+Fast-forward
+ attached_assets/Screenshot 2025-10-24 172605_1761306972993.png | Bin 0 -> 85052 bytes
+ attached_assets/Screenshot 2025-10-24 172809_1761307098236.png | Bin 0 -> 54132 bytes
+ attached_assets/Screenshot 2025-10-24 173159_1761307326550.png | Bin 0 -> 55345 bytes
+ attached_assets/Screenshot 2025-10-24 173317_1761307403512.png | Bin 0 -> 52784 bytes
+ attached_assets/Screenshot 2025-10-24 173554_1761307591119.png | Bin 0 -> 56279 bytes
+ client/src/components/navigation-header.tsx                    |  24 +++++++++++++++++++-----
+ client/src/pages/home.tsx                                      |  10 +++++-----
+ header-clip.png                                                | Bin 0 -> 8344 bytes
+ header-with-subtitle.png                                       | Bin 0 -> 241823 bytes
+ mobile-wider-tagline.png                                       | Bin 0 -> 261834 bytes
+ wider-tagline.png                                              | Bin 0 -> 238399 bytes
+ 11 files changed, 24 insertions(+), 10 deletions(-)
+ create mode 100644 attached_assets/Screenshot 2025-10-24 172605_1761306972993.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 172809_1761307098236.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 173159_1761307326550.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 173317_1761307403512.png
+ create mode 100644 attached_assets/Screenshot 2025-10-24 173554_1761307591119.png
+ create mode 100644 header-clip.png
+ create mode 100644 header-with-subtitle.png
+ create mode 100644 mobile-wider-tagline.png
+ create mode 100644 wider-tagline.png
+[PM2] Applying action restartProcessId on app [hp-tourism](ids: [ 4 ])
+[PM2] [hp-tourism](4) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 4  │ hp-tourism         │ fork     │ 10   │ online    │ 0%       │ 27.4mb   │
+│ 0  │ questform          │ fork     │ 2    │ online    │ 0%       │ 48.8mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1$ 
