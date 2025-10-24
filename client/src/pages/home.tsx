@@ -16,6 +16,7 @@ import {
   Award
 } from "lucide-react";
 import { NavigationHeader } from "@/components/navigation-header";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import heroImage from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 
 const BASE_STATS = {
@@ -73,6 +74,7 @@ export default function HomePage() {
         showHome={false}
         actions={
           <div className="flex gap-2">
+            <ThemeSwitcher />
             <Button variant="outline" onClick={() => setLocation("/login")} data-testid="button-login">
               Sign In
             </Button>
