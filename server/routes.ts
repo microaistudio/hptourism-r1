@@ -6,6 +6,7 @@ import { pool } from "./db";
 import { storage } from "./storage";
 import { insertUserSchema, type User, type HomestayApplication } from "@shared/schema";
 import { z } from "zod";
+import { startScraperScheduler } from "./scraper";
 
 // Extend express-session types
 declare module 'express-session' {
@@ -609,6 +610,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+
+  // Start production stats scraper (runs on boot and hourly)
+  startScraperScheduler();
+  console.log('[scraper] Production stats scraper initialized');
 
   const httpServer = createServer(app);
   return httpServer;
