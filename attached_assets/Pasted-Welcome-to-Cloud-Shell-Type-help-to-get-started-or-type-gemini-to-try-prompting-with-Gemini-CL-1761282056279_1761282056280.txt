@@ -1,0 +1,113 @@
+Welcome to Cloud Shell! Type "help" to get started, or type "gemini" to try prompting with Gemini CLI.
+Your Cloud Platform project in this session is set to hp-govt-projects.
+Use `gcloud config set project [PROJECT_ID]` to change to a different project.
+agentryx2025@cloudshell:~ (hp-govt-projects)$ git clone https://github.com/microaistudio/hptourism-r1.git
+cd hptourism-r1
+Cloning into 'hptourism-r1'...
+remote: Enumerating objects: 339, done.
+remote: Counting objects: 100% (339/339), done.
+remote: Compressing objects: 100% (172/172), done.
+remote: Total 339 (delta 156), reused 339 (delta 156), pack-reused 0 (from 0)
+Receiving objects: 100% (339/339), 11.08 MiB | 15.98 MiB/s, done.
+Resolving deltas: 100% (156/156), done.
+agentryx2025@cloudshell:~/hptourism-r1 (hp-govt-projects)$ gcloud config set project hp-govt-projects
+Updated property [core/project].
+agentryx2025@cloudshell:~/hptourism-r1 (hp-govt-projects)$ gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com
+Operation "operations/acf.p2-398352511736-58a9bc1e-7489-4f49-ad8a-687afd52bde1" finished successfully.
+agentryx2025@cloudshell:~/hptourism-r1 (hp-govt-projects)$ gcloud run deploy hp-tourism-ecosystem \
+  --source . \
+  --platform managed \
+  --region asia-south1 \
+  --allow-unauthenticated \
+  --set-env-vars "NODE_ENV=production" \
+  --memory 512Mi \
+  --timeout 300
+Deploying from source requires an Artifact Registry Docker repository to store built containers. A repository named 
+[cloud-run-source-deploy] in region [asia-south1] will be created.
+
+Do you want to continue (Y/n)?  y
+
+Building using Dockerfile and deploying container to Cloud Run service [hp-tourism-ecosystem] in project [hp-govt-projects] region [asia-south1]
+agentryx2025@cloudshell:~/hptourism-r1/hptourism-r1 (hp-govt-projects)$ PROJECT_NUMBER=$(gcloud projects describe hp-govt-projects --format="value(projectNumber)")
+echo "Project Number: $PROJECT_NUMBER"
+Project Number: 398352511736
+agentryx2025@cloudshell:~/hptourism-r1/hptourism-r1 (hp-govt-projects)$ gcloud projects add-iam-policy-binding hp-govt-projects \
+  --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+  --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding hp-govt-projects \
+  --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+Updated IAM policy for project [hp-govt-projects].
+bindings:
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-aiplatform.iam.gserviceaccount.com
+  role: roles/aiplatform.serviceAgent
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-artifactregistry.iam.gserviceaccount.com
+  role: roles/artifactregistry.serviceAgent
+- members:
+  - serviceAccount:398352511736@cloudbuild.gserviceaccount.com
+  role: roles/cloudbuild.builds.builder
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-cloudbuild.iam.gserviceaccount.com
+  role: roles/cloudbuild.serviceAgent
+- members:
+  - serviceAccount:service-398352511736@compute-system.iam.gserviceaccount.com
+  role: roles/compute.serviceAgent
+- members:
+  - serviceAccount:service-398352511736@containerregistry.iam.gserviceaccount.com
+  role: roles/containerregistry.ServiceAgent
+- members:
+  - serviceAccount:service-398352511736@dataflow-service-producer-prod.iam.gserviceaccount.com
+  role: roles/dataflow.serviceAgent
+- members:
+  - serviceAccount:398352511736-compute@developer.gserviceaccount.com
+  - serviceAccount:398352511736@cloudservices.gserviceaccount.com
+  role: roles/editor
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-notebooks.iam.gserviceaccount.com
+  role: roles/notebooks.serviceAgent
+- members:
+  - user:agentryx2025@gmail.com
+  role: roles/owner
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-pubsub.iam.gserviceaccount.com
+  role: roles/pubsub.serviceAgent
+- members:
+  - serviceAccount:398352511736@cloudbuild.gserviceaccount.com
+  role: roles/run.admin
+- members:
+  - serviceAccount:service-398352511736@serverless-robot-prod.iam.gserviceaccount.com
+  role: roles/run.serviceAgent
+etag: BwZB4FR7sBI=
+version: 1
+Updated IAM policy for project [hp-govt-projects].
+bindings:
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-aiplatform.iam.gserviceaccount.com
+  role: roles/aiplatform.serviceAgent
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-artifactregistry.iam.gserviceaccount.com
+  role: roles/artifactregistry.serviceAgent
+- members:
+  - serviceAccount:398352511736@cloudbuild.gserviceaccount.com
+  role: roles/cloudbuild.builds.builder
+- members:
+  - serviceAccount:service-398352511736@gcp-sa-cloudbuild.iam.gserviceaccount.com
+  role: roles/cloudbuild.serviceAgent
+- members:
+  - serviceAccount:service-398352511736@compute-system.iam.gserviceaccount.com
+  role: roles/compute.serviceAgent
+- members:
+  - serviceAccount:service-398352511736@containerregistry.iam.gserviceaccount.com
+  role: roles/containerregistry.ServiceAgent
+- members:
+  - serviceAccount:service-398352511736@dataflow-service-producer-prod.iam.gserviceaccount.com
+  role: roles/dataflow.serviceAgent
+- members:
+  - serviceAccount:398352511736-compute@developer.gserviceaccount.com
+agentryx2025@cloudshell:~/hptourism-r1/hptourism-r1 (hp-govt-projects)$ gcloud builds list --limit=1
+Listed 0 items.
+agentryx2025@cloudshell:~/hptourism-r1/hptourism-r1 (hp-govt-projects)$ gcloud builds log $(gcloud builds list --limit=1 --format="value(id)")
+ERROR: (gcloud.builds.log) argument BUILD: Must be specified.
