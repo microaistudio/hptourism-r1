@@ -11,6 +11,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Mountain, Loader2 } from "lucide-react";
+import { NavigationHeader } from "@/components/navigation-header";
 
 const registerSchema = z.object({
   fullName: z.string().min(3, "Name must be at least 3 characters"),
@@ -80,9 +81,15 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="space-y-1 text-center">
+    <div className="min-h-screen bg-background">
+      <NavigationHeader 
+        title="HP Tourism Portal"
+        showBack={false}
+        showHome={true}
+      />
+      <div className="flex items-center justify-center p-4 pt-8">
+        <Card className="w-full max-w-2xl">
+          <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
               <Mountain className="w-7 h-7 text-primary-foreground" />
@@ -278,6 +285,7 @@ export default function Register() {
           </Form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -353,29 +353,32 @@
     inset: -1px;
   }
 
-  /* Colorful Icon Styles - Clean solid colors */
+  /* Colorful Icon Styles - Circular with solid colors */
   [data-icon-style="colorful"] .amenity-icon {
     padding: 0.5rem;
-    border-radius: 0.5rem;
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   [data-icon-style="colorful"] .amenity-icon svg {
     stroke-width: 2;
   }
 
-  /* Specific amenity colors - clean solid backgrounds */
+  /* Specific amenity colors - circular solid backgrounds */
   [data-icon-style="colorful"] .amenity-wifi {
-    background: #3b82f6;
+    background: #5b7fff;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-parking {
-    background: #8b5cf6;
+    background: #a78bfa;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-ac {
-    background: #06b6d4;
+    background: #22d3ee;
     color: white;
   }
 
@@ -385,41 +388,48 @@
   }
 
   [data-icon-style="colorful"] .amenity-restaurant {
-    background: #f97316;
+    background: #fb923c;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-water {
-    background: #0ea5e9;
+    background: #38bdf8;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-garden {
-    background: #84cc16;
+    background: #a3e635;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-tv {
-    background: #6366f1;
+    background: #818cf8;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-breakfast {
-    background: #f59e0b;
+    background: #fbbf24;
     color: white;
   }
 
   [data-icon-style="colorful"] .amenity-heater {
-    background: #ef4444;
+    background: #f87171;
     color: white;
   }
 
   [data-icon-style="colorful"] .property-amenity-icon {
+    width: 2rem;
+    height: 2rem;
     padding: 0.375rem;
     border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   [data-icon-style="colorful"] .property-amenity-icon svg {
     stroke-width: 2;
+    width: 1rem;
+    height: 1rem;
   }
 }
