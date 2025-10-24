@@ -96,6 +96,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message, errors: error.errors });
       }
+      
+      // Handle duplicate Aadhaar number error
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+        if ('constraint' in error && error.constraint === 'users_aadhaar_number_unique') {
+          return res.status(400).json({ 
+            message: "This Aadhaar number is already registered. Please login or use a different Aadhaar number." 
+          });
+        }
+      }
+      
       res.status(500).json({ message: "Registration failed", error: error instanceof Error ? error.message : String(error) });
     }
   });
