@@ -96,8 +96,8 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
         )}
         
-        <div className={`${theme !== 'classic-clean' ? 'relative' : ''} max-w-4xl mx-auto text-center px-4`}>
-          <h1 className={`text-4xl md:text-5xl font-bold mb-6 ${theme !== 'classic-clean' ? 'text-white' : 'text-foreground'}`}>
+        <div className={`${theme !== 'classic-clean' ? 'relative' : ''} max-w-6xl mx-auto text-center px-4`}>
+          <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-6 whitespace-nowrap ${theme !== 'classic-clean' ? 'text-white' : 'text-foreground'}`}>
             Welcome to HP Tourism Digital Ecosystem
           </h1>
           <p className={`text-base md:text-lg mb-8 max-w-2xl mx-auto ${theme !== 'classic-clean' ? 'text-white/90' : 'text-muted-foreground'}`}>
