@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, Users, FileText, CheckCircle, Clock, 
-  AlertCircle, BarChart3, MapPin
+  AlertCircle, BarChart3, MapPin, Globe
 } from "lucide-react";
 
 interface AnalyticsData {
@@ -33,6 +33,14 @@ interface AnalyticsData {
   recentApplications: any[];
 }
 
+interface ProductionStats {
+  totalApplications: number;
+  approvedApplications: number;
+  rejectedApplications: number;
+  pendingApplications: number;
+  scrapedAt: Date;
+}
+
 const STATUS_COLORS = {
   pending: "#f59e0b",
   district_review: "#3b82f6",
@@ -50,6 +58,10 @@ const CATEGORY_COLORS = {
 export default function AnalyticsPage() {
   const { data, isLoading } = useQuery<AnalyticsData>({
     queryKey: ["/api/analytics/dashboard"],
+  });
+  
+  const { data: productionData } = useQuery<{ stats: ProductionStats | null }>({
+    queryKey: ["/api/analytics/production-stats"],
   });
 
   if (isLoading) {
@@ -131,6 +143,54 @@ export default function AnalyticsPage() {
         backTo="/dashboard"
       />
       <div className="max-w-7xl mx-auto p-8">
+
+        {/* Production Portal Statistics (Live from eservices.himachaltourism.gov.in) */}
+        {productionData?.stats && (
+          <Card className="mb-8 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-primary" />
+                Live Production Portal Statistics
+              </CardTitle>
+              <CardDescription>
+                Real-time data from eservices.himachaltourism.gov.in
+                {productionData.stats.scrapedAt && (
+                  <span className="ml-2 text-xs">
+                    • Last updated: {new Date(productionData.stats.scrapedAt).toLocaleString('en-IN')}
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Total Applications</p>
+                  <p className="text-3xl font-bold" data-testid="prod-stat-total">
+                    {productionData.stats.totalApplications.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Approved</p>
+                  <p className="text-3xl font-bold text-green-600" data-testid="prod-stat-approved">
+                    {productionData.stats.approvedApplications.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Rejected</p>
+                  <p className="text-3xl font-bold text-red-600" data-testid="prod-stat-rejected">
+                    {productionData.stats.rejectedApplications.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Pending</p>
+                  <p className="text-3xl font-bold text-orange-600" data-testid="prod-stat-pending">
+                    {productionData.stats.pendingApplications.toLocaleString('en-IN')}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Overview Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
