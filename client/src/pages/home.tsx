@@ -96,11 +96,11 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
         )}
         
-        <div className={`${theme !== 'classic-clean' ? 'relative' : ''} max-w-7xl mx-auto text-center px-4`}>
+        <div className={`${theme !== 'classic-clean' ? 'relative' : ''} max-w-4xl mx-auto text-center px-4`}>
           <h1 className={`text-4xl md:text-5xl font-bold mb-6 ${theme !== 'classic-clean' ? 'text-white' : 'text-foreground'}`}>
             Welcome to HP Tourism Digital Ecosystem
           </h1>
-          <p className={`text-sm md:text-base mb-8 whitespace-nowrap ${theme !== 'classic-clean' ? 'text-white/90' : 'text-muted-foreground'}`}>
+          <p className={`text-base md:text-lg mb-8 ${theme !== 'classic-clean' ? 'text-white/90' : 'text-muted-foreground'}`}>
             Streamlined homestay registration system implementing the 2025 Homestay Rules. Get your property registered in 7-15 days instead of 105 days.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
