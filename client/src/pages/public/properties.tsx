@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NavigationHeader } from "@/components/navigation-header";
+import { IconStyleToggle } from "@/components/icon-style-toggle";
 import { 
   Mountain, MapPin, Bed, Star, Search, Filter, 
   Wifi, Car, AirVent, Eye, UtensilsCrossed, Droplet,
@@ -96,6 +97,7 @@ export default function PublicProperties() {
         title="Discover Himachal Pradesh"
         showBack={false}
         showHome={true}
+        actions={<IconStyleToggle />}
       />
 
       {/* Hero Section */}
@@ -190,7 +192,9 @@ export default function PublicProperties() {
                             data-testid={`checkbox-${amenity.id}`}
                           />
                           <label htmlFor={amenity.id} className="flex items-center gap-2 text-sm cursor-pointer flex-1">
-                            <Icon className="w-4 h-4 text-primary" />
+                            <div className="amenity-icon">
+                              <Icon className="w-4 h-4 text-primary" />
+                            </div>
                             <span className="line-clamp-1">{amenity.label}</span>
                           </label>
                         </div>
@@ -290,7 +294,7 @@ export default function PublicProperties() {
                             return (
                               <div 
                                 key={amenity.id}
-                                className="flex items-center gap-1 text-xs text-muted-foreground"
+                                className="property-amenity-icon"
                                 title={amenity.label}
                               >
                                 <AmenityIcon className="w-4 h-4" />

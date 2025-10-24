@@ -352,4 +352,31 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  /* Bold Icon Styles */
+  [data-icon-style="bold"] .amenity-icon {
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    background: hsl(var(--primary) / 0.1);
+  }
+
+  [data-icon-style="bold"] .amenity-icon svg {
+    color: hsl(var(--primary));
+    stroke-width: 2.5;
+  }
+
+  [data-icon-style="bold"] .category-badge-icon {
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.5));
+  }
+
+  [data-icon-style="bold"] .property-amenity-icon {
+    padding: 0.375rem;
+    border-radius: 0.375rem;
+    background: hsl(var(--primary) / 0.15);
+  }
+
+  [data-icon-style="bold"] .property-amenity-icon svg {
+    color: hsl(var(--primary));
+    stroke-width: 2.5;
+  }
 }
