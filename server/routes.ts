@@ -92,10 +92,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { password, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error) {
+      console.error('[registration] Error during registration:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message, errors: error.errors });
       }
-      res.status(500).json({ message: "Registration failed" });
+      res.status(500).json({ message: "Registration failed", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
