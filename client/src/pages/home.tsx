@@ -33,15 +33,20 @@ export default function HomePage() {
 
   useEffect(() => {
     const incrementStats = () => {
-      setStats(prev => ({
-        total: prev.total + Math.floor(Math.random() * 3) + 1,
-        approved: prev.approved + Math.floor(Math.random() * 2) + 1,
-        rejected: prev.rejected + (Math.random() > 0.8 ? 1 : 0),
-        pending: prev.pending + Math.floor(Math.random() * 2)
-      }));
+      setStats(prev => {
+        const approvedInc = Math.floor(Math.random() * 2) + 1;
+        const rejectedInc = Math.random() > 0.8 ? 1 : 0;
+        const pendingInc = Math.floor(Math.random() * 2);
+        const totalInc = approvedInc + rejectedInc + pendingInc;
+        
+        return {
+          total: prev.total + totalInc,
+          approved: prev.approved + approvedInc,
+          rejected: prev.rejected + rejectedInc,
+          pending: prev.pending + pendingInc
+        };
+      });
     };
-
-    incrementStats();
 
     const interval = setInterval(incrementStats, 10 * 60 * 1000);
 
