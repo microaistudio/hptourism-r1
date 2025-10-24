@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* LIGHT MODE - Clean HP Tourism Design */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -14,63 +14,63 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 98%;
+  --background: 0 0% 100%;
 
-  --foreground: 150 8% 15%;
+  --foreground: 0 0% 15%;
 
-  --border: 0 0% 88%;
+  --border: 0 0% 92%;
 
-  --card: 0 0% 96%;
+  --card: 0 0% 98%;
 
-  --card-foreground: 150 8% 15%;
+  --card-foreground: 0 0% 15%;
 
-  --card-border: 0 0% 90%;
+  --card-border: 0 0% 94%;
 
-  --sidebar: 0 0% 94%;
+  --sidebar: 0 0% 97%;
 
-  --sidebar-foreground: 150 8% 15%;
+  --sidebar-foreground: 0 0% 15%;
 
-  --sidebar-border: 0 0% 88%;
+  --sidebar-border: 0 0% 92%;
 
-  --sidebar-primary: 150 45% 35%;
+  --sidebar-primary: 160 84% 39%;
 
-  --sidebar-primary-foreground: 150 45% 98%;
+  --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent: 0 0% 88%;
+  --sidebar-accent: 0 0% 94%;
 
-  --sidebar-accent-foreground: 150 8% 15%;
+  --sidebar-accent-foreground: 0 0% 15%;
 
-  --sidebar-ring: 150 45% 35%;
+  --sidebar-ring: 160 84% 39%;
 
-  --popover: 0 0% 92%;
+  --popover: 0 0% 100%;
 
-  --popover-foreground: 150 8% 15%;
+  --popover-foreground: 0 0% 15%;
 
-  --popover-border: 0 0% 86%;
+  --popover-border: 0 0% 90%;
 
-  --primary: 150 45% 35%;
+  --primary: 160 84% 39%;
 
-  --primary-foreground: 150 45% 98%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 86%;
+  --secondary: 0 0% 96%;
 
-  --secondary-foreground: 150 8% 15%;
+  --secondary-foreground: 0 0% 15%;
 
-  --muted: 150 4% 89%;
+  --muted: 0 0% 96%;
 
-  --muted-foreground: 150 8% 30%;
+  --muted-foreground: 0 0% 45%;
 
-  --accent: 150 6% 90%;
+  --accent: 160 84% 97%;
 
-  --accent-foreground: 150 8% 20%;
+  --accent-foreground: 160 84% 25%;
 
-  --destructive: 0 72% 45%;
+  --destructive: 0 72% 50%;
 
-  --destructive-foreground: 0 72% 98%;
+  --destructive-foreground: 0 0% 100%;
 
-  --input: 0 0% 75%;
-  --ring: 150 45% 35%;
-  --chart-1: 150 50% 40%;
+  --input: 0 0% 88%;
+  --ring: 160 84% 39%;
+  --chart-1: 160 84% 39%;
   --chart-2: 210 85% 50%;
   --chart-3: 25 95% 53%;
   --chart-4: 280 65% 55%;
