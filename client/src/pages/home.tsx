@@ -16,6 +16,7 @@ import {
 import { NavigationHeader } from "@/components/navigation-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AnimatedCounter } from "@/components/animated-counter";
+import heroImage from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 
 const BASE_STATS = {
   total: 16673,
@@ -82,13 +83,19 @@ export default function HomePage() {
         }
       />
 
-      {/* Hero Section */}
-      <section className="py-20 px-4 bg-gradient-to-b from-background to-muted/20">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
+      {/* Hero Section with Image */}
+      <section 
+        className="relative py-32 px-4 bg-cover bg-center"
+        style={{ backgroundImage: `url(${heroImage})` }}
+      >
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
+        
+        <div className="relative max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">
             Welcome to HP Tourism Digital Ecosystem
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto">
             Streamlined homestay registration system implementing the 2025 Homestay Rules. 
             Get your property registered in 7-15 days instead of 105 days.
           </p>
@@ -103,6 +110,7 @@ export default function HomePage() {
             <Button 
               size="lg" 
               variant="outline"
+              className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20"
               onClick={() => setLocation("/properties")} 
               data-testid="button-browse-properties"
             >
