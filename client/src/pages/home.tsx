@@ -8,6 +8,7 @@ import {
   CheckCircle
 } from "lucide-react";
 import { NavigationHeader } from "@/components/navigation-header";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -20,6 +21,7 @@ export default function HomePage() {
         showHome={false}
         actions={
           <div className="flex gap-3">
+            <ThemeSwitcher />
             <Button variant="outline" onClick={() => setLocation("/login")} data-testid="button-login">
               Sign In
             </Button>

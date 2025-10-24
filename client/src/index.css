@@ -402,74 +402,75 @@
   }
 }
 
-/* Theme: Modern Bold - Professional & Sleek */
+/* Theme: Modern Bold - EXPERIMENTAL Dark & Dramatic */
 [data-theme="modern"] {
-  --background: 220 15% 96%;
-  --foreground: 220 15% 10%;
+  --background: 220 26% 14%;
+  --foreground: 0 0% 98%;
   
-  --card: 220 10% 98%;
-  --card-foreground: 220 15% 10%;
-  --card-border: 220 12% 88%;
+  --card: 220 20% 18%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 220 20% 25%;
   
   --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 220 13% 85%;
-  --secondary-foreground: 220 15% 15%;
+  --secondary: 220 17% 32%;
+  --secondary-foreground: 0 0% 98%;
   
-  --muted: 220 10% 90%;
-  --muted-foreground: 220 12% 35%;
+  --muted: 220 15% 25%;
+  --muted-foreground: 220 10% 70%;
   
-  --accent: 217 60% 92%;
-  --accent-foreground: 217 91% 30%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
   
-  --destructive: 0 72% 55%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
   
-  --border: 220 12% 85%;
-  --input: 220 12% 80%;
+  --border: 220 20% 25%;
+  --input: 220 17% 28%;
   --ring: 217 91% 60%;
   
   --chart-1: 217 91% 60%;
-  --chart-2: 142 76% 36%;
-  --chart-3: 340 82% 52%;
-  --chart-4: 47 96% 53%;
-  --chart-5: 280 73% 48%;
+  --chart-2: 142 76% 50%;
+  --chart-3: 340 82% 60%;
+  --chart-4: 47 96% 60%;
+  --chart-5: 280 73% 58%;
 }
 
-/* Theme: Vibrant HP - Energetic & Colorful */
+/* Theme: Vibrant HP - EXPERIMENTAL Colorful & Energetic */
 [data-theme="vibrant"] {
-  --background: 40 40% 97%;
-  --foreground: 280 20% 12%;
+  --background: linear-gradient(135deg, #FFF5F7 0%, #FFF9E6 100%);
+  --background: 350 100% 98%;
+  --foreground: 280 60% 25%;
   
   --card: 0 0% 100%;
-  --card-foreground: 280 20% 12%;
-  --card-border: 40 20% 88%;
+  --card-foreground: 280 60% 25%;
+  --card-border: 280 30% 85%;
   
-  --primary: 280 70% 55%;
+  --primary: 280 85% 55%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 180 60% 85%;
-  --secondary-foreground: 180 80% 15%;
+  --secondary: 33 100% 50%;
+  --secondary-foreground: 0 0% 100%;
   
-  --muted: 40 30% 92%;
-  --muted-foreground: 40 15% 30%;
+  --muted: 280 20% 95%;
+  --muted-foreground: 280 30% 40%;
   
-  --accent: 25 95% 92%;
-  --accent-foreground: 25 95% 25%;
+  --accent: 180 75% 45%;
+  --accent-foreground: 0 0% 100%;
   
-  --destructive: 0 85% 60%;
+  --destructive: 350 90% 60%;
   --destructive-foreground: 0 0% 100%;
   
-  --border: 40 20% 85%;
-  --input: 40 20% 80%;
-  --ring: 280 70% 55%;
+  --border: 280 20% 88%;
+  --input: 280 15% 92%;
+  --ring: 280 85% 55%;
   
-  --chart-1: 280 70% 55%;
-  --chart-2: 180 70% 45%;
-  --chart-3: 25 95% 53%;
-  --chart-4: 120 60% 45%;
-  --chart-5: 340 82% 52%;
+  --chart-1: 280 85% 55%;
+  --chart-2: 180 75% 45%;
+  --chart-3: 33 100% 50%;
+  --chart-4: 350 90% 60%;
+  --chart-5: 260 90% 65%;
 }
 
 /* Theme: Classic Portal - Traditional Government Style (default) */
@@ -482,18 +483,41 @@
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* Enhanced card hover effects for modern themes */
-[data-theme="modern"] .hover-elevate:hover,
+/* Modern Bold Theme - Dark & Dramatic Effects */
+[data-theme="modern"] .hover-elevate:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="modern"] body {
+  background: linear-gradient(180deg, hsl(220, 26%, 14%) 0%, hsl(220, 30%, 10%) 100%);
+}
+
+[data-theme="modern"] .bg-gradient-to-b {
+  background: linear-gradient(to bottom, hsl(220, 26%, 14%), hsl(220, 26%, 18%)) !important;
+}
+
+/* Vibrant HP Theme - Colorful & Energetic Effects */
 [data-theme="vibrant"] .hover-elevate:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px) rotate(-1deg);
+  box-shadow: 0 15px 50px rgba(168, 85, 247, 0.4);
 }
 
-/* Gradient overlays for hero section based on theme */
-[data-theme="modern"] .hero-gradient {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+[data-theme="vibrant"] body {
+  background: linear-gradient(135deg, #FFF5F7 0%, #FFF9E6 50%, #F0FDFA 100%);
 }
 
-[data-theme="vibrant"] .hero-gradient {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(234, 179, 8, 0.1) 100%);
+[data-theme="vibrant"] .bg-gradient-to-b {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(251, 146, 60, 0.1) 50%, rgba(6, 182, 212, 0.1) 100%) !important;
+}
+
+/* Vibrant theme card glow effect */
+[data-theme="vibrant"] .bg-accent {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%) !important;
+}
+
+/* Modern theme neon accents */
+[data-theme="modern"] .bg-accent {
+  background: hsl(217, 91%, 60%) !important;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
 }
