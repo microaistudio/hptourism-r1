@@ -70,6 +70,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <NavigationHeader 
         title="HP Tourism eServices"
+        subtitle="Himachal Pradesh Government"
         showBack={false}
         showHome={false}
         actions={

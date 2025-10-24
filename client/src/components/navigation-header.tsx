@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Home, ArrowLeft } from "lucide-react";
+import { Home, ArrowLeft, Mountain } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface NavigationHeaderProps {
   title?: string;
+  subtitle?: string;
   showHome?: boolean;
   showBack?: boolean;
   backTo?: string;
@@ -12,6 +13,7 @@ interface NavigationHeaderProps {
 
 export function NavigationHeader({ 
   title, 
+  subtitle,
   showHome = true, 
   showBack = true, 
   backTo,
@@ -31,7 +33,7 @@ export function NavigationHeader({
     <div className="border-b bg-background sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {showBack && (
               <Button
                 variant="ghost"
@@ -53,9 +55,21 @@ export function NavigationHeader({
               </Button>
             )}
             {title && (
-              <h1 className="text-xl font-semibold ml-2" data-testid="text-page-title">
-                {title}
-              </h1>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
+                  <Mountain className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold leading-tight" data-testid="text-page-title">
+                    {title}
+                  </h1>
+                  {subtitle && (
+                    <p className="text-sm text-muted-foreground leading-tight" data-testid="text-page-subtitle">
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
           {actions && (
