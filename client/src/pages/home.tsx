@@ -86,21 +86,21 @@ export default function HomePage() {
         }
       />
 
-      {/* Hero Section - Image on all themes except Classic Clean */}
+      {/* Hero Section - Image on all themes except Classic Clean and Official Dual Logo */}
       <section 
-        className={`relative ${theme === 'classic-clean' ? 'py-20' : 'py-32'} px-4 ${theme === 'classic-clean' ? 'bg-gradient-to-b from-background to-muted/20' : 'bg-cover bg-center'}`}
-        style={theme !== 'classic-clean' ? { backgroundImage: `url(${heroImage})` } : undefined}
+        className={`relative ${(theme === 'classic-clean' || theme === 'official-dual-logo') ? 'py-20' : 'py-32'} px-4 ${(theme === 'classic-clean' || theme === 'official-dual-logo') ? 'bg-gradient-to-b from-background to-muted/20' : 'bg-cover bg-center'}`}
+        style={(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? { backgroundImage: `url(${heroImage})` } : undefined}
       >
         {/* Dark overlay for text readability - all themes with hero image */}
-        {theme !== 'classic-clean' && (
+        {(theme !== 'classic-clean' && theme !== 'official-dual-logo') && (
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
         )}
         
-        <div className={`${theme !== 'classic-clean' ? 'relative' : ''} max-w-6xl mx-auto text-center px-4`}>
-          <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-6 whitespace-nowrap ${theme !== 'classic-clean' ? 'text-white' : 'text-foreground'}`}>
+        <div className={`${(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'relative' : ''} max-w-6xl mx-auto text-center px-4`}>
+          <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-6 whitespace-nowrap ${(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'text-white' : 'text-foreground'}`}>
             Welcome to HP Tourism Digital Ecosystem
           </h1>
-          <p className={`text-base md:text-lg mb-8 max-w-2xl mx-auto ${theme !== 'classic-clean' ? 'text-white/90' : 'text-muted-foreground'}`}>
+          <p className={`text-base md:text-lg mb-8 max-w-2xl mx-auto ${(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'text-white/90' : 'text-muted-foreground'}`}>
             Streamlined homestay registration system implementing the 2025 Homestay Rules. Get your property registered in 7-15 days instead of 105 days.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
@@ -114,7 +114,7 @@ export default function HomePage() {
             <Button 
               size="lg" 
               variant="outline"
-              className={theme !== 'classic-clean' ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
+              className={(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
               onClick={() => setLocation("/properties")} 
               data-testid="button-browse-properties"
             >
