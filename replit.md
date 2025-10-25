@@ -24,7 +24,7 @@ Three core pillars have been implemented:
 - Minimal shadows and borders for modern, professional appearance
 - Professional footer with government branding
 
-**7-Theme System**: Comprehensive theme options for different use cases:
+**8-Theme System**: Comprehensive theme options for different use cases:
 1. **Classic Clean** (Default): No hero image, VM-matching design, HP Pine green accents
 2. **Classic Portal**: With hero image, traditional HP government style
 3. **Professional Blue**: Traditional government blue theme with hero
@@ -32,6 +32,7 @@ Three core pillars have been implemented:
 5. **Heritage Gold**: Warm golden/amber cultural tones
 6. **Forest Green**: Deep emerald green nature theme
 7. **Vibrant HP**: Experimental colorful multi-gradient theme
+8. **Official Dual Logo** (NEW): Clean professional design with official HP Tourism and HP Government logos displayed side-by-side in header
 
 **Technical Features**:
 - Theme switcher dropdown in header with localStorage persistence
