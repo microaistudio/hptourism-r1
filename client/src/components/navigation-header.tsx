@@ -61,26 +61,19 @@ export function NavigationHeader({
             {title && (
               <div className="flex items-center gap-3">
                 {theme === "official-dual-logo" ? (
-                  <>
-                    <img 
-                      src={himachalTourismLogo} 
-                      alt="Himachal Tourism" 
-                      className="h-12 w-auto object-contain"
-                      data-testid="img-hp-tourism-logo"
-                    />
-                    <div className="border-l h-12 border-border"></div>
-                    <img 
-                      src={hpGovtLogo} 
-                      alt="Himachal Government" 
-                      className="h-10 w-auto object-contain"
-                      data-testid="img-hp-govt-logo"
-                    />
-                    <div className="border-l h-12 border-border ml-2"></div>
-                  </>
+                  <img 
+                    src={himachalTourismLogo} 
+                    alt="Himachal Tourism" 
+                    className="h-12 w-auto object-contain"
+                    data-testid="img-hp-tourism-logo"
+                  />
                 ) : (
                   <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
                     <Mountain className="h-6 w-6 text-white" />
                   </div>
+                )}
+                {theme === "official-dual-logo" && (
+                  <div className="border-l h-12 border-border"></div>
                 )}
                 <div>
                   <h1 className="text-lg font-semibold leading-tight" data-testid="text-page-title">
@@ -96,7 +89,18 @@ export function NavigationHeader({
             )}
           </div>
           {actions && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {theme === "official-dual-logo" && (
+                <>
+                  <img 
+                    src={hpGovtLogo} 
+                    alt="Himachal Government" 
+                    className="h-10 w-auto object-contain"
+                    data-testid="img-hp-govt-logo"
+                  />
+                  <div className="border-l h-10 border-border"></div>
+                </>
+              )}
               {actions}
             </div>
           )}
