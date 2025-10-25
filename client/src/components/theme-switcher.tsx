@@ -16,6 +16,7 @@ const THEMES = [
   { id: "heritage-gold", name: "Heritage Gold", description: "Warm cultural tones" },
   { id: "forest-green", name: "Forest Green", description: "Deep emerald green" },
   { id: "vibrant", name: "Vibrant HP", description: "Colorful & energetic" },
+  { id: "official-dual-logo", name: "Official Dual Logo", description: "With official HP Tourism logos" },
 ] as const;
 
 export function ThemeSwitcher() {

@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Home, ArrowLeft, Mountain } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTheme } from "@/contexts/theme-context";
+import himachalTourismLogo from "@assets/WhatsApp Image 2025-10-25 at 07.59.16_5c0e8739_1761362811579.jpg";
+import hpGovtLogo from "@assets/WhatsApp Image 2025-10-25 at 08.03.16_1cdc4198_1761362811579.jpg";
 
 interface NavigationHeaderProps {
   title?: string;
@@ -20,6 +23,7 @@ export function NavigationHeader({
   actions 
 }: NavigationHeaderProps) {
   const [, setLocation] = useLocation();
+  const { theme } = useTheme();
 
   const handleBack = () => {
     if (backTo) {
@@ -56,9 +60,28 @@ export function NavigationHeader({
             )}
             {title && (
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
-                  <Mountain className="h-6 w-6 text-white" />
-                </div>
+                {theme === "official-dual-logo" ? (
+                  <>
+                    <img 
+                      src={himachalTourismLogo} 
+                      alt="Himachal Tourism" 
+                      className="h-12 w-auto object-contain"
+                      data-testid="img-hp-tourism-logo"
+                    />
+                    <div className="border-l h-12 border-border"></div>
+                    <img 
+                      src={hpGovtLogo} 
+                      alt="Himachal Government" 
+                      className="h-10 w-auto object-contain"
+                      data-testid="img-hp-govt-logo"
+                    />
+                    <div className="border-l h-12 border-border ml-2"></div>
+                  </>
+                ) : (
+                  <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
+                    <Mountain className="h-6 w-6 text-white" />
+                  </div>
+                )}
                 <div>
                   <h1 className="text-lg font-semibold leading-tight" data-testid="text-page-title">
                     {title}
