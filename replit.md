@@ -6,6 +6,22 @@ The HP Tourism Digital Ecosystem is a digital transformation platform aimed at m
 
 ## Recent Changes (October 26, 2025)
 
+**Document Upload System Complete**:
+- Implemented ObjectUploader component for seamless file uploads to Replit object storage
+- Component uses React refs (not IDs) to trigger file selection dialog, supporting multiple instances per page
+- Uploads directly to object storage via presigned URLs from GET /api/upload-url endpoint
+- Tracks upload progress and provides real-time feedback to users
+- New application form now uses ObjectUploader for all document types:
+  - Property Ownership Proof (required)
+  - Aadhaar Card (required)
+  - PAN Card (optional)
+  - GST Certificate (optional)
+  - Property Photos (minimum 5 required)
+- Backend POST /api/applications endpoint saves document metadata to documents table
+- Each document record stores: applicationId, documentType, fileName, filePath, fileSize, mimeType, uploadedAt
+- Officers can view all uploaded documents on application detail page with "View" buttons to open files in new tabs
+- Complete end-to-end flow: upload → object storage → database metadata → officer viewing
+
 **Send-Back Workflow Implementation Complete**:
 - Property owners can now see sent-back applications on their dashboard with a prominent red "Action Required" alert banner
 - Dashboard displays a red "Sent Back" stat card showing count of applications needing attention
@@ -16,15 +32,6 @@ The HP Tourism Digital Ecosystem is a digital transformation platform aimed at m
 - Resubmission clears clarificationRequested field and resets status to "submitted"
 - Fixed infinite re-render bug in Update page by moving form.reset() into useEffect
 - Officer endpoints (send-back, move-to-inspection, complete-inspection) fixed by removing references to non-existent tables
-
-**Document Viewing for Officers**:
-- Added document display section to application detail page
-- Officers can now view all uploaded documents and photos before making decisions
-- Documents fetched from `/api/applications/:id/documents` endpoint
-- Each document shows filename, type, size, and "View" button to open in new tab
-- Different icons for images vs documents
-- Document count displayed in card header
-- Closes critical gap where officers couldn't see documents when reviewing applications
 
 ## User Preferences
 
