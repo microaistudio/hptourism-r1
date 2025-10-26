@@ -260,6 +260,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get ALL applications for workflow monitoring (officers only)
+  app.get("/api/applications/all", requireRole('district_officer', 'state_officer', 'admin'), async (req, res) => {
+    try {
+      const applications = await storage.getAllApplications();
+      res.json(applications);
+    } catch (error) {
+      console.error('[workflow-monitoring] Error fetching all applications:', error);
+      res.status(500).json({ message: "Failed to fetch applications for monitoring" });
+    }
+  });
+
   // Get single application
   app.get("/api/applications/:id", requireAuth, async (req, res) => {
     try {

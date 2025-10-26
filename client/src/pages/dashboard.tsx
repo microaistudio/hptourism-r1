@@ -95,14 +95,24 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</p>
             </div>
             {(user.role === 'district_officer' || user.role === 'state_officer') && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLocation('/analytics')}
-                data-testid="button-analytics"
-              >
-                Analytics
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation('/workflow-monitoring')}
+                  data-testid="button-workflow-monitoring"
+                >
+                  Workflow Monitoring
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation('/analytics')}
+                  data-testid="button-analytics"
+                >
+                  Analytics
+                </Button>
+              </>
             )}
             <Button
               variant="outline"

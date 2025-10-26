@@ -15,6 +15,7 @@ import ApplicationDetail from "@/pages/applications/detail";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
+import WorkflowMonitoring from "@/pages/workflow-monitoring";
 import TestAPI from "@/pages/test-api";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/analytics" component={AnalyticsPage} />
+      <Route path="/workflow-monitoring" component={WorkflowMonitoring} />
       <Route path="/applications/new" component={NewApplication} />
       <Route path="/applications/:id" component={ApplicationDetail} />
       <Route component={NotFound} />
