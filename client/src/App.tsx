@@ -1,11 +1,12 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DevConsole } from "@/components/dev-console";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthLayout } from "@/components/auth-layout";
+import { getDefaultRouteForRole } from "@/config/navigation";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
 import Login from "@/pages/auth/login";
@@ -18,8 +19,43 @@ import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
 import WorkflowMonitoring from "@/pages/workflow-monitoring";
 import TestAPI from "@/pages/test-api";
+import type { User } from "@shared/schema";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+interface ProtectedRouteProps {
+  component: React.ComponentType;
+  allowedRoles?: string[];
+}
+
+function ProtectedRoute({ component: Component, allowedRoles }: ProtectedRouteProps) {
+  const [, setLocation] = useLocation();
+  const { data: userData, isLoading } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  // If still loading, show nothing (AuthLayout will show loading state)
+  if (isLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  // If not logged in, redirect to login
+  if (!userData?.user) {
+    setLocation("/login");
+    return null;
+  }
+
+  // If role restrictions exist and user doesn't have required role, redirect to their home
+  if (allowedRoles && !allowedRoles.includes(userData.user.role)) {
+    const homeRoute = getDefaultRouteForRole(userData.user.role);
+    setLocation(homeRoute);
+    return null;
+  }
+
   return (
     <AuthLayout>
       <Component />
@@ -39,20 +75,23 @@ function Router() {
       <Route path="/register" component={Register} />
       
       {/* Protected Routes - All wrapped in AuthLayout */}
+      {/* Property Owner Routes */}
       <Route path="/dashboard">
         {() => <ProtectedRoute component={Dashboard} />}
       </Route>
-      <Route path="/analytics">
-        {() => <ProtectedRoute component={AnalyticsPage} />}
-      </Route>
-      <Route path="/workflow-monitoring">
-        {() => <ProtectedRoute component={WorkflowMonitoring} />}
-      </Route>
       <Route path="/applications/new">
-        {() => <ProtectedRoute component={NewApplication} />}
+        {() => <ProtectedRoute component={NewApplication} allowedRoles={['property_owner']} />}
       </Route>
       <Route path="/applications/:id">
         {() => <ProtectedRoute component={ApplicationDetail} />}
+      </Route>
+      
+      {/* Officer-Only Routes */}
+      <Route path="/analytics">
+        {() => <ProtectedRoute component={AnalyticsPage} allowedRoles={['district_officer', 'state_officer']} />}
+      </Route>
+      <Route path="/workflow-monitoring">
+        {() => <ProtectedRoute component={WorkflowMonitoring} allowedRoles={['district_officer', 'state_officer']} />}
       </Route>
       
       <Route component={NotFound} />

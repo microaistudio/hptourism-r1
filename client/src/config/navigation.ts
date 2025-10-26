@@ -24,24 +24,9 @@ export const ownerNavigation: NavSection[] = [
         icon: Home,
       },
       {
-        title: "My Applications",
-        url: "/applications",
-        icon: FileText,
-      },
-      {
         title: "New Application",
         url: "/applications/new",
         icon: ClipboardList,
-      },
-    ],
-  },
-  {
-    title: "Updates",
-    items: [
-      {
-        title: "Notifications",
-        url: "/notifications",
-        icon: Bell,
       },
     ],
   },
@@ -58,24 +43,9 @@ export const officerNavigation: NavSection[] = [
         icon: BarChart3,
       },
       {
-        title: "Applications Queue",
-        url: "/applications/queue",
-        icon: ClipboardList,
-      },
-      {
         title: "Analytics",
         url: "/analytics",
         icon: BarChart3,
-      },
-    ],
-  },
-  {
-    title: "Updates",
-    items: [
-      {
-        title: "Notifications",
-        url: "/notifications",
-        icon: Bell,
       },
     ],
   },
