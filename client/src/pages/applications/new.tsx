@@ -64,7 +64,14 @@ export default function NewApplication() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
-  const totalSteps = 5;
+  const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, File | null>>({
+    ownershipProof: null,
+    aadhaarCard: null,
+    panCard: null,
+    gstCertificate: null,
+  });
+  const [propertyPhotos, setPropertyPhotos] = useState<File[]>([]);
+  const totalSteps = 6;
 
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -154,6 +161,18 @@ export default function NewApplication() {
   };
 
   const nextStep = () => {
+    // Validate Step 4 (Documents) before moving forward
+    if (step === 4) {
+      if (!uploadedDocuments.ownershipProof || !uploadedDocuments.aadhaarCard || propertyPhotos.length < 5) {
+        toast({
+          title: "Required documents missing",
+          description: "Please upload all mandatory documents before proceeding.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
     if (step < totalSteps) setStep(step + 1);
   };
 
@@ -434,6 +453,185 @@ export default function NewApplication() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <CardTitle>Upload Documents</CardTitle>
+                  </div>
+                  <CardDescription>Upload required documents for verification (Max 5MB per file)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Property Ownership Proof */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Property Ownership Proof <span className="text-destructive">*</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Sale deed, mutation certificate, or property tax receipt
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && file.size <= 5 * 1024 * 1024) {
+                          setUploadedDocuments(prev => ({ ...prev, ownershipProof: file }));
+                        } else if (file) {
+                          toast({
+                            title: "File too large",
+                            description: "Maximum file size is 5MB",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      data-testid="input-ownership-proof"
+                    />
+                    {uploadedDocuments.ownershipProof && (
+                      <p className="text-sm text-green-600">✓ {uploadedDocuments.ownershipProof.name}</p>
+                    )}
+                  </div>
+
+                  {/* Aadhaar Card */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Aadhaar Card <span className="text-destructive">*</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Owner's Aadhaar card (both sides if applicable)
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && file.size <= 5 * 1024 * 1024) {
+                          setUploadedDocuments(prev => ({ ...prev, aadhaarCard: file }));
+                        } else if (file) {
+                          toast({
+                            title: "File too large",
+                            description: "Maximum file size is 5MB",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      data-testid="input-aadhaar-card"
+                    />
+                    {uploadedDocuments.aadhaarCard && (
+                      <p className="text-sm text-green-600">✓ {uploadedDocuments.aadhaarCard.name}</p>
+                    )}
+                  </div>
+
+                  {/* PAN Card (Optional) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      PAN Card <span className="text-muted-foreground">(Optional)</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Required if annual revenue exceeds ₹2.5 lakhs
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && file.size <= 5 * 1024 * 1024) {
+                          setUploadedDocuments(prev => ({ ...prev, panCard: file }));
+                        } else if (file) {
+                          toast({
+                            title: "File too large",
+                            description: "Maximum file size is 5MB",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      data-testid="input-pan-card"
+                    />
+                    {uploadedDocuments.panCard && (
+                      <p className="text-sm text-green-600">✓ {uploadedDocuments.panCard.name}</p>
+                    )}
+                  </div>
+
+                  {/* GST Certificate (Optional) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      GST Certificate <span className="text-muted-foreground">(Optional)</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Required if registered under GST
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && file.size <= 5 * 1024 * 1024) {
+                          setUploadedDocuments(prev => ({ ...prev, gstCertificate: file }));
+                        } else if (file) {
+                          toast({
+                            title: "File too large",
+                            description: "Maximum file size is 5MB",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      data-testid="input-gst-certificate"
+                    />
+                    {uploadedDocuments.gstCertificate && (
+                      <p className="text-sm text-green-600">✓ {uploadedDocuments.gstCertificate.name}</p>
+                    )}
+                  </div>
+
+                  {/* Property Photos */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Property Photos <span className="text-destructive">*</span> (Minimum 5 photos)
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Clear photos of exterior, rooms, bathrooms, and key amenities
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      multiple
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        const validFiles = files.filter(f => f.size <= 5 * 1024 * 1024);
+                        if (validFiles.length < files.length) {
+                          toast({
+                            title: "Some files were too large",
+                            description: "Maximum file size is 5MB per photo",
+                            variant: "destructive"
+                          });
+                        }
+                        setPropertyPhotos(validFiles);
+                      }}
+                      data-testid="input-property-photos"
+                    />
+                    {propertyPhotos.length > 0 && (
+                      <p className="text-sm text-green-600">
+                        ✓ {propertyPhotos.length} photo{propertyPhotos.length > 1 ? 's' : ''} selected
+                        {propertyPhotos.length < 5 && <span className="text-orange-600"> (need {5 - propertyPhotos.length} more)</span>}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Validation Messages */}
+                  {(!uploadedDocuments.ownershipProof || !uploadedDocuments.aadhaarCard || propertyPhotos.length < 5) && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mt-4">
+                      <p className="text-sm text-orange-800 font-medium mb-2">Required documents missing:</p>
+                      <ul className="text-sm text-orange-700 list-disc list-inside space-y-1">
+                        {!uploadedDocuments.ownershipProof && <li>Property Ownership Proof</li>}
+                        {!uploadedDocuments.aadhaarCard && <li>Aadhaar Card</li>}
+                        {propertyPhotos.length < 5 && <li>At least 5 property photos ({propertyPhotos.length}/5)</li>}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {step === 5 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2 mb-2">
                     <Wifi className="w-5 h-5 text-primary" />
                     <CardTitle>Amenities</CardTitle>
                   </div>
@@ -467,7 +665,7 @@ export default function NewApplication() {
               </Card>
             )}
 
-            {step === 5 && (
+            {step === 6 && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-2 mb-2">
