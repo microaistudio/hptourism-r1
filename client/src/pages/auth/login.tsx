@@ -4,6 +4,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { getDefaultRouteForRole } from "@/config/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -11,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Mountain, Loader2 } from "lucide-react";
 import { NavigationHeader } from "@/components/navigation-header";
+import type { User } from "@shared/schema";
 
 const loginSchema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
@@ -36,12 +38,13 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/auth/login", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { user: User }) => {
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
-      setLocation("/dashboard");
+      const defaultRoute = getDefaultRouteForRole(data.user.role);
+      setLocation(defaultRoute);
     },
     onError: (error: any) => {
       toast({

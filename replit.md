@@ -18,12 +18,15 @@ The platform uses a clean, professional design with HP Government branding, incl
 
 The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui (Radix UI) for components, Tailwind CSS for mobile-first styling, TanStack Query for server state, React Hook Form with Zod for form management, and Wouter for routing. The backend uses Node.js and Express.js with TypeScript, following a RESTful API design. Session management is handled by Express sessions with PostgreSQL storage.
 
+**Navigation Architecture**: Role-based sidebar navigation using Shadcn Sidebar component with persistent layout across protected pages. Property owners see Dashboard and New Application links; Officers see Workflow Monitoring and Analytics links. Route guards prevent unauthorized access using ProtectedRoute component with role validation.
+
 ### Feature Specifications
 
 - **Public Tourism Discovery Platform**: Allows browsing and filtering of approved homestays with detailed property pages.
-- **Smart Compliance Hub**: Enables property owners to register homestays, submit applications, and track status.
+- **Smart Compliance Hub**: Enables property owners to register homestays, submit applications, and track status. Features role-specific navigation with persistent sidebar showing Dashboard and New Application links.
 - **Analytics Dashboard**: Provides government officers with insights into application trends, status distributions, category breakdowns, and processing times via Recharts visualizations.
 - **Workflow Monitoring Dashboard**: Offers a real-time, visual pipeline of applications through six stages, with SLA tracking, smart notifications, bottleneck detection, and district performance analytics.
+- **Role-Based Access Control**: ProtectedRoute component validates user roles before rendering, redirects unauthorized users to their role-appropriate home page. Officer-only routes (/workflow-monitoring, /analytics) restricted to district_officer and state_officer roles. Property owner routes (/applications/new) restricted to property_owner role.
 
 ### System Design Choices
 
