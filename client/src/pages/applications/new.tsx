@@ -148,14 +148,17 @@ export default function NewApplication() {
   });
 
   const onSubmit = (data: ApplicationForm) => {
+    console.log("onSubmit called - Step:", step, "Total Steps:", totalSteps);
+    console.log("Form data:", data);
+    console.log("Form errors:", form.formState.errors);
+    
     // Only allow submission on the final step
     if (step !== totalSteps) {
-      if (import.meta.env.MODE === "development") {
-        console.warn("Form submission blocked - not on final step");
-      }
+      console.warn("Form submission blocked - not on final step");
       return;
     }
     
+    console.log("Submitting application...");
     createApplicationMutation.mutate(data);
   };
 
@@ -737,6 +740,10 @@ export default function NewApplication() {
                   type="submit" 
                   disabled={createApplicationMutation.isPending}
                   data-testid="button-submit-application"
+                  onClick={() => {
+                    console.log("Submit button clicked");
+                    console.log("Form errors:", form.formState.errors);
+                  }}
                 >
                   <Send className="w-4 h-4 mr-2" />
                   {createApplicationMutation.isPending ? "Submitting..." : "Submit Application"}
