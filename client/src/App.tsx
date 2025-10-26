@@ -15,11 +15,13 @@ import ApplicationDetail from "@/pages/applications/detail";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
+import TestAPI from "@/pages/test-api";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      <Route path="/test-api" component={TestAPI} />
       <Route path="/properties" component={PublicProperties} />
       <Route path="/properties/:id" component={PublicPropertyDetail} />
       <Route path="/login" component={Login} />
