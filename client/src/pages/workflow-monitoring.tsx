@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,7 @@ const SLA_THRESHOLDS = {
 };
 
 export default function WorkflowMonitoringPage() {
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("pipeline");
 
   // Fetch all applications for monitoring with real-time updates
@@ -96,7 +98,7 @@ export default function WorkflowMonitoringPage() {
                 Property owners can track their individual applications through the main dashboard.
               </p>
               <Button 
-                onClick={() => window.location.href = '/dashboard'}
+                onClick={() => setLocation('/dashboard')}
                 data-testid="button-back-to-dashboard"
               >
                 Go to Dashboard
@@ -122,7 +124,7 @@ export default function WorkflowMonitoringPage() {
               Unable to load the workflow monitoring dashboard. Please try refreshing the page.
             </p>
             <Button 
-              onClick={() => window.location.reload()}
+              onClick={() => setLocation('/workflow-monitoring')}
               data-testid="button-retry"
             >
               Retry
@@ -148,7 +150,7 @@ export default function WorkflowMonitoringPage() {
         <div className="flex gap-3">
           <NotificationPanel />
           <Button 
-            onClick={() => window.location.reload()} 
+            onClick={() => setLocation('/workflow-monitoring')} 
             data-testid="button-refresh"
           >
             <Activity className="h-4 w-4 mr-2" />

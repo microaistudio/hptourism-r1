@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { NavigationHeader } from "@/components/navigation-header";
 import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText } from "lucide-react";
 import type { HomestayApplication, User as UserType } from "@shared/schema";
 import { useState } from "react";
@@ -116,12 +115,8 @@ export default function ApplicationDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <NavigationHeader 
-        title={`Application #${app.applicationNumber}`}
-        backTo="/dashboard"
-      />
-      <div className="max-w-6xl mx-auto px-4 py-4">
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Badge {...getStatusBadge(app.status || 'draft')} data-testid="badge-status">

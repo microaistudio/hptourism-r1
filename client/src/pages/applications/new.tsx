@@ -15,7 +15,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { NavigationHeader } from "@/components/navigation-header";
 import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee } from "lucide-react";
 import type { User } from "@shared/schema";
 
@@ -196,13 +195,8 @@ export default function NewApplication() {
   const fees = calculateFee();
 
   return (
-    <div className="min-h-screen bg-background">
-      <NavigationHeader 
-        title="New Homestay Application"
-        backTo="/dashboard"
-      />
-
-      <main className="max-w-5xl mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <Progress value={(step / totalSteps) * 100} className="h-2" />
         </div>
@@ -751,7 +745,7 @@ export default function NewApplication() {
             </div>
           </form>
         </Form>
-      </main>
+      </div>
     </div>
   );
 }
