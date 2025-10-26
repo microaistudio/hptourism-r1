@@ -352,7 +352,7 @@ function ApplicationsTable({ applications }: { applications: HomestayApplication
                 <Badge variant="outline" className="capitalize">
                   {app.category}
                 </Badge>
-                <StatusBadge status={app.status} />
+                <StatusBadge status={app.status || 'draft'} />
                 <SLAIndicator app={app} />
               </div>
             </div>
@@ -721,10 +721,11 @@ function calculatePipelineStats(applications: HomestayApplication[]) {
 
 function identifyBottlenecks(applications: HomestayApplication[]) {
   const stageGroups = applications.reduce((acc, app) => {
-    if (!acc[app.status]) {
-      acc[app.status] = [];
+    const status = app.status || 'draft';
+    if (!acc[status]) {
+      acc[status] = [];
     }
-    acc[app.status].push(app);
+    acc[status].push(app);
     return acc;
   }, {} as Record<string, HomestayApplication[]>);
 
