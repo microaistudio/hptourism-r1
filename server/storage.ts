@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type HomestayApplication, type InsertHomestayApplication, type Document, type InsertDocument, type Payment, type InsertPayment } from "@shared/schema";
+import { type User, type InsertUser, type HomestayApplication, type InsertHomestayApplication, type Document, type InsertDocument, type Payment, type InsertPayment, type Notification, type InsertNotification, type ApplicationAction, type InsertApplicationAction } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -26,6 +26,15 @@ export interface IStorage {
   updatePayment(id: string, payment: Partial<Payment>): Promise<Payment | undefined>;
   getPaymentsByApplication(applicationId: string): Promise<Payment[]>;
   
+  // Notification methods
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getNotificationsByUser(userId: string): Promise<Notification[]>;
+  markNotificationAsRead(id: string): Promise<void>;
+  
+  // Application Action methods
+  createApplicationAction(action: InsertApplicationAction): Promise<ApplicationAction>;
+  getApplicationActions(applicationId: string): Promise<ApplicationAction[]>;
+  
   // Production Stats methods
   saveProductionStats(stats: { totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; sourceUrl: string }): Promise<void>;
   getLatestProductionStats(): Promise<{ totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; scrapedAt: Date } | null>;
@@ -40,12 +49,16 @@ export class MemStorage implements IStorage {
   private applications: Map<string, HomestayApplication>;
   private documents: Map<string, Document>;
   private payments: Map<string, Payment>;
+  private notifications: Map<string, Notification>;
+  private applicationActions: Map<string, ApplicationAction>;
 
   constructor() {
     this.users = new Map();
     this.applications = new Map();
     this.documents = new Map();
     this.payments = new Map();
+    this.notifications = new Map();
+    this.applicationActions = new Map();
   }
 
   // User methods
@@ -228,6 +241,65 @@ export class MemStorage implements IStorage {
     return Array.from(this.payments.values()).filter(payment => payment.applicationId === applicationId);
   }
 
+  // Notification methods
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const id = randomUUID();
+    const now = new Date();
+    
+    const notification: Notification = {
+      ...insertNotification,
+      id,
+      applicationId: insertNotification.applicationId || null,
+      channels: insertNotification.channels || { inapp: true, email: false, sms: false, whatsapp: false },
+      isRead: false,
+      readAt: null,
+      createdAt: now,
+    };
+    
+    this.notifications.set(id, notification);
+    return notification;
+  }
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return Array.from(this.notifications.values())
+      .filter(notif => notif.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    const notification = this.notifications.get(id);
+    if (notification) {
+      notification.isRead = true;
+      notification.readAt = new Date();
+      this.notifications.set(id, notification);
+    }
+  }
+
+  // Application Action methods
+  async createApplicationAction(insertAction: InsertApplicationAction): Promise<ApplicationAction> {
+    const id = randomUUID();
+    const now = new Date();
+    
+    const action: ApplicationAction = {
+      ...insertAction,
+      id,
+      previousStatus: insertAction.previousStatus || null,
+      newStatus: insertAction.newStatus || null,
+      feedback: insertAction.feedback || null,
+      issuesFound: insertAction.issuesFound || null,
+      createdAt: now,
+    };
+    
+    this.applicationActions.set(id, action);
+    return action;
+  }
+
+  async getApplicationActions(applicationId: string): Promise<ApplicationAction[]> {
+    return Array.from(this.applicationActions.values())
+      .filter(action => action.applicationId === applicationId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
   // Production Stats methods (stub for MemStorage - not used in production)
   async saveProductionStats(stats: { totalApplications: number; approvedApplications: number; rejectedApplications: number; pendingApplications: number; sourceUrl: string }): Promise<void> {
     // No-op for MemStorage
@@ -252,6 +324,8 @@ export class MemStorage implements IStorage {
     this.applications.clear();
     this.documents.clear();
     this.payments.clear();
+    this.notifications.clear();
+    this.applicationActions.clear();
   }
 }
 

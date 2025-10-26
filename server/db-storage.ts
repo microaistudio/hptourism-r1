@@ -1,11 +1,13 @@
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from './db';
 import {
-  users, homestayApplications, documents, payments, productionStats,
+  users, homestayApplications, documents, payments, productionStats, notifications, applicationActions,
   type User, type InsertUser,
   type HomestayApplication, type InsertHomestayApplication,
   type Document, type InsertDocument,
-  type Payment, type InsertPayment
+  type Payment, type InsertPayment,
+  type Notification, type InsertNotification,
+  type ApplicationAction, type InsertApplicationAction
 } from '../shared/schema';
 import type { IStorage } from './storage';
 import bcrypt from 'bcrypt';
@@ -127,6 +129,36 @@ export class DbStorage implements IStorage {
       .orderBy(desc(payments.initiatedAt));
   }
 
+  // Notification methods
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const result = await db.insert(notifications).values([notification]).returning();
+    return result[0];
+  }
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(notifications.id, id));
+  }
+
+  // Application Action methods
+  async createApplicationAction(action: InsertApplicationAction): Promise<ApplicationAction> {
+    const result = await db.insert(applicationActions).values([action]).returning();
+    return result[0];
+  }
+
+  async getApplicationActions(applicationId: string): Promise<ApplicationAction[]> {
+    return await db.select().from(applicationActions)
+      .where(eq(applicationActions.applicationId, applicationId))
+      .orderBy(applicationActions.createdAt);
+  }
+
   // Dev methods
   async getStats() {
     const { sql, count } = await import('drizzle-orm');
@@ -148,6 +180,8 @@ export class DbStorage implements IStorage {
 
   async clearAll(): Promise<void> {
     // Delete in reverse order of dependencies
+    await db.delete(applicationActions);
+    await db.delete(notifications);
     await db.delete(payments);
     await db.delete(documents);
     await db.delete(homestayApplications);

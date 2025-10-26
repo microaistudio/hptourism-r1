@@ -373,6 +373,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Officer Actions - Send Back for Corrections
+  app.post("/api/applications/:id/send-back", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { feedback, issuesFound } = req.body;
+
+      if (!feedback || feedback.trim().length < 10) {
+        return res.status(400).json({ message: "Feedback is required (minimum 10 characters)" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || (user.role !== "district_officer" && user.role !== "state_officer")) {
+        return res.status(403).json({ message: "Only officers can send back applications" });
+      }
+
+      const application = await storage.getApplication(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Record the action
+      await storage.createApplicationAction({
+        applicationId: id,
+        officerId: user.id,
+        action: 'sent_back_for_corrections',
+        previousStatus: application.status,
+        newStatus: 'clarification_requested',
+        feedback,
+        issuesFound: issuesFound || [],
+      });
+
+      // Update application status
+      const updated = await storage.updateApplication(id, {
+        status: 'clarification_requested',
+        clarificationRequested: feedback,
+      });
+
+      // Create notification for applicant
+      await storage.createNotification({
+        userId: application.userId,
+        applicationId: id,
+        type: 'clarification_requested',
+        title: 'Application Sent Back for Corrections',
+        message: `Your application for ${application.propertyName} requires corrections. Officer feedback: ${feedback}`,
+        channels: { inapp: true, email: true, sms: false, whatsapp: false },
+      });
+
+      res.json({ application: updated, message: "Application sent back to applicant" });
+    } catch (error) {
+      console.error("Send back error:", error);
+      res.status(500).json({ message: "Failed to send back application" });
+    }
+  });
+
+  // Officer Actions - Move to Site Inspection
+  app.post("/api/applications/:id/move-to-inspection", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { scheduledDate, notes } = req.body;
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || (user.role !== "district_officer" && user.role !== "state_officer")) {
+        return res.status(403).json({ message: "Only officers can schedule inspections" });
+      }
+
+      const application = await storage.getApplication(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Record the action
+      await storage.createApplicationAction({
+        applicationId: id,
+        officerId: user.id,
+        action: 'site_inspection_scheduled',
+        previousStatus: application.status,
+        newStatus: 'site_inspection_scheduled',
+        feedback: notes || `Site inspection scheduled for ${scheduledDate}`,
+      });
+
+      // Update application
+      const updated = await storage.updateApplication(id, {
+        status: 'site_inspection_scheduled',
+        currentStage: 'site_inspection',
+        siteInspectionScheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
+        siteInspectionOfficerId: user.id,
+        siteInspectionNotes: notes,
+      });
+
+      // Notify applicant
+      await storage.createNotification({
+        userId: application.userId,
+        applicationId: id,
+        type: 'inspection_scheduled',
+        title: 'Site Inspection Scheduled',
+        message: `Site inspection scheduled for ${application.propertyName}. ${notes || 'Our team will visit your property soon.'}`,
+        channels: { inapp: true, email: true, sms: true, whatsapp: false },
+      });
+
+      res.json({ application: updated, message: "Site inspection scheduled" });
+    } catch (error) {
+      console.error("Move to inspection error:", error);
+      res.status(500).json({ message: "Failed to schedule inspection" });
+    }
+  });
+
+  // Officer Actions - Mark Inspection Complete
+  app.post("/api/applications/:id/complete-inspection", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { findings, notes } = req.body;
+
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || (user.role !== "district_officer" && user.role !== "state_officer")) {
+        return res.status(403).json({ message: "Only officers can complete inspections" });
+      }
+
+      const application = await storage.getApplication(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Record the action
+      await storage.createApplicationAction({
+        applicationId: id,
+        officerId: user.id,
+        action: 'site_inspection_scheduled',
+        previousStatus: application.status,
+        newStatus: 'site_inspection_complete',
+        feedback: notes || 'Site inspection completed',
+      });
+
+      // Update application
+      const updated = await storage.updateApplication(id, {
+        status: 'site_inspection_complete',
+        siteInspectionCompletedDate: new Date(),
+        siteInspectionFindings: findings || {},
+        siteInspectionNotes: notes,
+      });
+
+      // Notify applicant
+      await storage.createNotification({
+        userId: application.userId,
+        applicationId: id,
+        type: 'inspection_complete',
+        title: 'Site Inspection Completed',
+        message: `Site inspection completed for ${application.propertyName}. Your application is now under review.`,
+        channels: { inapp: true, email: true, sms: false, whatsapp: false },
+      });
+
+      res.json({ application: updated, message: "Inspection marked as complete" });
+    } catch (error) {
+      console.error("Complete inspection error:", error);
+      res.status(500).json({ message: "Failed to complete inspection" });
+    }
+  });
+
+  // Get Application Action History
+  app.get("/api/applications/:id/actions", requireAuth, async (req, res) => {
+    try {
+      const actions = await storage.getApplicationActions(req.params.id);
+      res.json({ actions });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch application history" });
+    }
+  });
+
   // Document Routes
   
   // Get documents for application
