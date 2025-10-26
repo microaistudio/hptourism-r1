@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { insertUserSchema, type User, type HomestayApplication } from "@shared/schema";
 import { z } from "zod";
 import { startScraperScheduler } from "./scraper";
+import { ObjectStorageService } from "./objectStorage";
 
 // Extend express-session types
 declare module 'express-session' {
@@ -172,6 +173,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Homestay Application Routes
   
+  // File Upload - Get presigned upload URL
+  app.post("/api/upload/document", requireAuth, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getUploadURL("document");
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ message: "Failed to get upload URL" });
+    }
+  });
+  
   // Create application
   app.post("/api/applications", requireAuth, async (req, res) => {
     try {
@@ -199,6 +212,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         perRoomFee: z.string(),
         gstAmount: z.string(),
         totalFee: z.string(),
+        // Document URLs
+        ownershipProofUrl: z.string().optional(),
+        aadhaarCardUrl: z.string().optional(),
+        panCardUrl: z.string().optional(),
+        gstCertificateUrl: z.string().optional(),
+        propertyPhotosUrls: z.array(z.string()).optional(),
       });
       
       // Validate and extract only whitelisted fields
@@ -225,8 +244,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalFee: validatedData.totalFee,
         latitude: validatedData.latitude,
         longitude: validatedData.longitude,
+        ownershipProofUrl: validatedData.ownershipProofUrl,
+        aadhaarCardUrl: validatedData.aadhaarCardUrl,
+        panCardUrl: validatedData.panCardUrl,
+        gstCertificateUrl: validatedData.gstCertificateUrl,
+        propertyPhotosUrls: validatedData.propertyPhotosUrls,
         userId,
-        status: 'pending',
+        status: 'submitted',
         submittedAt: new Date(),
       }, { trusted: true });
       
