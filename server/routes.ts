@@ -772,7 +772,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           garden: true,
           tv: true,
           ac: true,
-          heater: true,
         },
         rooms: [
           { roomType: "Deluxe", size: 350, count: 6 },
@@ -817,7 +816,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           parking: true,
           hotWater: true,
           tv: true,
-          breakfast: true,
           garden: true,
           mountainView: true,
         },
@@ -948,8 +946,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           garden: true,
           tv: true,
           ac: true,
-          heater: true,
-          breakfast: true,
         },
         rooms: [
           { roomType: "Deluxe", size: 330, count: 5 },
