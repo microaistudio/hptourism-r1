@@ -16,8 +16,12 @@ import {
 import { NavigationHeader } from "@/components/navigation-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AnimatedCounter } from "@/components/animated-counter";
+import { HeroCarousel } from "@/components/hero-carousel";
 import { useTheme } from "@/contexts/theme-context";
-import heroImage from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
+import heroImage1 from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
+import heroImage2 from "@assets/stock_images/beautiful_scenic_him_3e373e25.jpg";
+import heroImage3 from "@assets/stock_images/beautiful_scenic_him_799557d0.jpg";
+import heroImage4 from "@assets/stock_images/beautiful_scenic_him_10b034ba.jpg";
 import agentryxLogo from "@assets/agentryx-logo.png";
 
 const BASE_STATS = {
@@ -67,6 +71,9 @@ export default function HomePage() {
     }
   };
 
+  const heroImages = [heroImage1, heroImage2, heroImage3, heroImage4];
+  const showCarousel = (theme !== 'classic-clean' && theme !== 'official-dual-logo');
+
   return (
     <div className="min-h-screen bg-background">
       <NavigationHeader 
@@ -87,21 +94,22 @@ export default function HomePage() {
         }
       />
 
-      {/* Hero Section - Image on all themes except Classic Clean and Official Dual Logo */}
+      {/* Hero Section - Carousel on themes with images, simple gradient on others */}
       <section 
-        className={`relative ${(theme === 'classic-clean' || theme === 'official-dual-logo') ? 'py-20' : 'py-32'} px-4 ${(theme === 'classic-clean' || theme === 'official-dual-logo') ? 'bg-gradient-to-b from-background to-muted/20' : 'bg-cover bg-center'}`}
-        style={(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? { backgroundImage: `url(${heroImage})` } : undefined}
+        className={`relative ${!showCarousel ? 'py-20' : 'py-32'} px-4 ${!showCarousel ? 'bg-gradient-to-b from-background to-muted/20' : ''}`}
       >
-        {/* Dark overlay for text readability - all themes with hero image */}
-        {(theme !== 'classic-clean' && theme !== 'official-dual-logo') && (
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60"></div>
+        {/* Hero Carousel for themes with images */}
+        {showCarousel && (
+          <div className="absolute inset-0">
+            <HeroCarousel images={heroImages} interval={5000} />
+          </div>
         )}
         
-        <div className={`${(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'relative' : ''} max-w-6xl mx-auto text-center px-4`}>
-          <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-6 whitespace-nowrap ${(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'text-white' : 'text-foreground'}`}>
+        <div className={`${showCarousel ? 'relative z-10' : ''} max-w-6xl mx-auto text-center px-4`}>
+          <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-6 whitespace-nowrap ${showCarousel ? 'text-white' : 'text-foreground'}`}>
             Welcome to HP Tourism Digital Ecosystem
           </h1>
-          <p className={`text-base md:text-lg mb-8 max-w-2xl mx-auto ${(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'text-white/90' : 'text-muted-foreground'}`}>
+          <p className={`text-base md:text-lg mb-8 max-w-2xl mx-auto ${showCarousel ? 'text-white/90' : 'text-muted-foreground'}`}>
             Streamlined homestay registration system implementing the 2025 Homestay Rules. Get your property registered in 7-15 days instead of 105 days.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
@@ -115,7 +123,7 @@ export default function HomePage() {
             <Button 
               size="lg" 
               variant="outline"
-              className={(theme !== 'classic-clean' && theme !== 'official-dual-logo') ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
+              className={showCarousel ? 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20' : ''}
               onClick={() => setLocation("/properties")} 
               data-testid="button-browse-properties"
             >

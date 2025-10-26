@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Home, ArrowLeft, Mountain } from "lucide-react";
+import { Home, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTheme } from "@/contexts/theme-context";
 import himachalTourismLogo from "@assets/WhatsApp Image 2025-10-25 at 07.59.16_5c0e8739_1761362811579.jpg";
 import hpGovtLogo from "@assets/WhatsApp Image 2025-10-25 at 08.03.16_1cdc4198_1761362811579.jpg";
+import agentryxLogo from "@assets/agentryx-logo.png";
 
 interface NavigationHeaderProps {
   title?: string;
@@ -68,9 +69,12 @@ export function NavigationHeader({
                     data-testid="img-hp-tourism-logo"
                   />
                 ) : (
-                  <div className="w-10 h-10 bg-primary rounded-md flex items-center justify-center">
-                    <Mountain className="h-6 w-6 text-white" />
-                  </div>
+                  <img 
+                    src={agentryxLogo} 
+                    alt="Agentryx AI Labs" 
+                    className="h-10 w-auto object-contain"
+                    data-testid="img-agentryx-logo"
+                  />
                 )}
                 {theme === "official-dual-logo" && (
                   <div className="border-l h-12 border-border"></div>
