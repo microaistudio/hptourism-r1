@@ -226,6 +226,32 @@ export const selectNotificationSchema = createSelectSchema(notifications);
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
+// Application Action History Table
+export const applicationActions = pgTable("application_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
+  officerId: varchar("officer_id").notNull().references(() => users.id),
+  
+  action: varchar("action", { length: 50 }).notNull(), // 'approved', 'rejected', 'sent_back_for_corrections', 'clarification_requested', 'site_inspection_scheduled', etc.
+  previousStatus: varchar("previous_status", { length: 50 }),
+  newStatus: varchar("new_status", { length: 50 }),
+  
+  // Feedback and Comments
+  feedback: text("feedback"), // Officer's comments explaining the action
+  issuesFound: jsonb("issues_found").$type<Array<string>>(), // List of issues if sending back for corrections
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertApplicationActionSchema = createInsertSchema(applicationActions, {
+  action: z.enum(['approved', 'rejected', 'sent_back_for_corrections', 'clarification_requested', 'site_inspection_scheduled', 'document_verified', 'payment_verified']),
+  feedback: z.string().min(10, "Feedback must be at least 10 characters"),
+}).omit({ id: true, createdAt: true });
+
+export const selectApplicationActionSchema = createSelectSchema(applicationActions);
+export type InsertApplicationAction = z.infer<typeof insertApplicationActionSchema>;
+export type ApplicationAction = typeof applicationActions.$inferSelect;
+
 // Reviews Table (for Discovery Platform)
 export const reviews = pgTable("reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
