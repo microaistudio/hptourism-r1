@@ -363,36 +363,37 @@ export default function ApplicationDetail() {
                     {documentsData?.documents && documentsData.documents.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-muted-foreground mb-2">Uploaded Files</p>
-                        {documentsData.documents.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded-md hover-elevate">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-primary/10 rounded">
-                                {doc.mimeType.startsWith('image/') ? (
-                                  <FileImage className="w-5 h-5 text-primary" />
-                                ) : (
-                                  <FileText className="w-5 h-5 text-primary" />
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">{doc.fileName}</p>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span className="capitalize">{doc.documentType.replace(/_/g, ' ')}</span>
-                                  <span>•</span>
-                                  <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {documentsData.documents.map((doc) => (
+                            <div key={doc.id} className="flex flex-col p-3 border rounded-md hover-elevate">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 bg-primary/10 rounded flex-shrink-0">
+                                  {doc.mimeType.startsWith('image/') ? (
+                                    <FileImage className="w-5 h-5 text-primary" />
+                                  ) : (
+                                    <FileText className="w-5 h-5 text-primary" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">{doc.fileName}</p>
+                                  <p className="text-xs text-muted-foreground capitalize">{doc.documentType.replace(/_/g, ' ')}</p>
                                 </div>
                               </div>
+                              <div className="flex items-center justify-between mt-auto pt-2 border-t">
+                                <span className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => window.open(doc.filePath, '_blank')}
+                                  data-testid={`button-view-document-${doc.id}`}
+                                >
+                                  <Download className="w-4 h-4 mr-1" />
+                                  View
+                                </Button>
+                              </div>
                             </div>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => window.open(doc.filePath, '_blank')}
-                              data-testid={`button-view-document-${doc.id}`}
-                            >
-                              <Download className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                     {/* Ownership Proof */}

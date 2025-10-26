@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee } from "lucide-react";
 import type { User } from "@shared/schema";
-import { ObjectUploader } from "@/components/ObjectUploader";
+import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 
 const HP_DISTRICTS = [
   "Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu",
@@ -64,13 +64,13 @@ export default function NewApplication() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
-  const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, string[]>>({
+  const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, UploadedFileMetadata[]>>({
     ownershipProof: [],
     aadhaarCard: [],
     panCard: [],
     gstCertificate: [],
   });
-  const [propertyPhotos, setPropertyPhotos] = useState<string[]>([]);
+  const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
   const totalSteps = 6;
 
   const { data: userData } = useQuery<{ user: User }>({
@@ -126,14 +126,14 @@ export default function NewApplication() {
         totalFee: fees.totalFee.toFixed(2),
         status: 'pending',
         submittedAt: new Date().toISOString(),
-        // Include uploaded documents
-        documents: {
-          ownershipProof: uploadedDocuments.ownershipProof,
-          aadhaarCard: uploadedDocuments.aadhaarCard,
-          panCard: uploadedDocuments.panCard,
-          gstCertificate: uploadedDocuments.gstCertificate,
-          propertyPhotos: propertyPhotos,
-        },
+        // Include uploaded documents with metadata
+        documents: [
+          ...uploadedDocuments.ownershipProof.map(f => ({ ...f, documentType: 'ownership_proof' })),
+          ...uploadedDocuments.aadhaarCard.map(f => ({ ...f, documentType: 'aadhaar_card' })),
+          ...uploadedDocuments.panCard.map(f => ({ ...f, documentType: 'pan_card' })),
+          ...uploadedDocuments.gstCertificate.map(f => ({ ...f, documentType: 'gst_certificate' })),
+          ...propertyPhotos.map(f => ({ ...f, documentType: 'property_photo' })),
+        ],
       };
 
       const response = await apiRequest("POST", "/api/applications", payload);

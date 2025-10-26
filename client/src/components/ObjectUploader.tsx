@@ -3,14 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Upload, X, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+export interface UploadedFileMetadata {
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}
+
 interface ObjectUploaderProps {
   label: string;
   accept?: string;
   multiple?: boolean;
   maxFiles?: number;
   fileType?: string;
-  onUploadComplete: (filePaths: string[]) => void;
-  existingFiles?: string[];
+  onUploadComplete: (files: UploadedFileMetadata[]) => void;
+  existingFiles?: UploadedFileMetadata[];
   className?: string;
 }
 
@@ -27,7 +34,7 @@ export function ObjectUploader({
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>(existingFiles);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileMetadata[]>(existingFiles);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -46,7 +53,7 @@ export function ObjectUploader({
     setUploading(true);
 
     try {
-      const uploadedPaths: string[] = [];
+      const uploadedMetadata: UploadedFileMetadata[] = [];
 
       for (const file of files) {
         // Get signed upload URL from server
@@ -70,10 +77,16 @@ export function ObjectUploader({
           throw new Error(`Failed to upload ${file.name}`);
         }
 
-        uploadedPaths.push(filePath);
+        // Capture file metadata
+        uploadedMetadata.push({
+          filePath,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type || "application/octet-stream",
+        });
       }
 
-      const newFiles = [...uploadedFiles, ...uploadedPaths];
+      const newFiles = [...uploadedFiles, ...uploadedMetadata];
       setUploadedFiles(newFiles);
       onUploadComplete(newFiles);
 
@@ -100,9 +113,12 @@ export function ObjectUploader({
     onUploadComplete(newFiles);
   };
 
-  const getFileName = (path: string) => {
-    const parts = path.split("/");
-    return parts[parts.length - 1];
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
@@ -151,9 +167,12 @@ export function ObjectUploader({
                 key={index}
                 className="flex items-center justify-between p-2 border rounded-md bg-muted/50"
               >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm truncate max-w-[200px]">{getFileName(file)}</span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm truncate block">{file.fileName}</span>
+                    <span className="text-xs text-muted-foreground">{formatFileSize(file.fileSize)}</span>
+                  </div>
                 </div>
                 <Button
                   type="button"
@@ -161,6 +180,7 @@ export function ObjectUploader({
                   size="sm"
                   onClick={() => removeFile(index)}
                   data-testid={`button-remove-file-${index}`}
+                  className="flex-shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </Button>

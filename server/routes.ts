@@ -220,14 +220,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         panCardUrl: z.string().optional(),
         gstCertificateUrl: z.string().optional(),
         propertyPhotosUrls: z.array(z.string()).optional(),
-        // New documents structure
-        documents: z.object({
-          ownershipProof: z.array(z.string()).optional(),
-          aadhaarCard: z.array(z.string()).optional(),
-          panCard: z.array(z.string()).optional(),
-          gstCertificate: z.array(z.string()).optional(),
-          propertyPhotos: z.array(z.string()).optional(),
-        }).optional(),
+        // New documents structure with metadata
+        documents: z.array(z.object({
+          filePath: z.string(),
+          fileName: z.string(),
+          fileSize: z.number(),
+          mimeType: z.string(),
+          documentType: z.string(),
+        })).optional(),
       });
       
       // Validate and extract only whitelisted fields
@@ -264,84 +264,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submittedAt: new Date(),
       }, { trusted: true });
       
-      // Save documents if provided
-      if (validatedData.documents) {
-        const docs = validatedData.documents;
-        const documentsToCreate = [];
-        
-        // Ownership Proof
-        if (docs.ownershipProof?.length) {
-          for (const filePath of docs.ownershipProof) {
-            documentsToCreate.push({
-              applicationId: application.id,
-              documentType: 'ownership_proof',
-              fileName: filePath.split('/').pop() || 'ownership-proof',
-              filePath,
-              fileSize: 0, // Size unknown from path
-              mimeType: 'application/octet-stream',
-            });
-          }
-        }
-        
-        // Aadhaar Card
-        if (docs.aadhaarCard?.length) {
-          for (const filePath of docs.aadhaarCard) {
-            documentsToCreate.push({
-              applicationId: application.id,
-              documentType: 'aadhaar_card',
-              fileName: filePath.split('/').pop() || 'aadhaar-card',
-              filePath,
-              fileSize: 0,
-              mimeType: 'application/octet-stream',
-            });
-          }
-        }
-        
-        // PAN Card
-        if (docs.panCard?.length) {
-          for (const filePath of docs.panCard) {
-            documentsToCreate.push({
-              applicationId: application.id,
-              documentType: 'pan_card',
-              fileName: filePath.split('/').pop() || 'pan-card',
-              filePath,
-              fileSize: 0,
-              mimeType: 'application/octet-stream',
-            });
-          }
-        }
-        
-        // GST Certificate
-        if (docs.gstCertificate?.length) {
-          for (const filePath of docs.gstCertificate) {
-            documentsToCreate.push({
-              applicationId: application.id,
-              documentType: 'gst_certificate',
-              fileName: filePath.split('/').pop() || 'gst-certificate',
-              filePath,
-              fileSize: 0,
-              mimeType: 'application/octet-stream',
-            });
-          }
-        }
-        
-        // Property Photos
-        if (docs.propertyPhotos?.length) {
-          for (const filePath of docs.propertyPhotos) {
-            documentsToCreate.push({
-              applicationId: application.id,
-              documentType: 'property_photo',
-              fileName: filePath.split('/').pop() || 'property-photo',
-              filePath,
-              fileSize: 0,
-              mimeType: 'image/jpeg',
-            });
-          }
-        }
-        
-        // Create all documents
-        for (const doc of documentsToCreate) {
-          await storage.createDocument(doc);
+      // Save documents with actual metadata if provided
+      if (validatedData.documents && validatedData.documents.length > 0) {
+        for (const doc of validatedData.documents) {
+          await storage.createDocument({
+            applicationId: application.id,
+            documentType: doc.documentType,
+            fileName: doc.fileName,
+            filePath: doc.filePath,
+            fileSize: doc.fileSize,
+            mimeType: doc.mimeType,
+          });
         }
       }
       
