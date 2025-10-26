@@ -42,8 +42,10 @@ export default function PublicProperties() {
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data, isLoading } = useQuery<{ properties: HomestayApplication[] }>({
+  const { data, isLoading, refetch } = useQuery<{ properties: HomestayApplication[] }>({
     queryKey: ["/api/public/properties"],
+    staleTime: 0, // Override global staleTime to always fetch fresh data
+    refetchOnMount: true, // Always refetch when component mounts
   });
 
   const properties = data?.properties || [];
