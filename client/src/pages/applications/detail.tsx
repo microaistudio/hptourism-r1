@@ -39,8 +39,8 @@ export default function ApplicationDetail() {
     enabled: !!applicationId,
   });
 
-  const { data: documentsData } = useQuery<{ documents: Document[] }>({
-    queryKey: [`/api/applications/${applicationId}/documents`],
+  const { data: documentsData, isLoading: isLoadingDocuments } = useQuery<{ documents: Document[] }>({
+    queryKey: ['/api/applications', applicationId, 'documents'],
     enabled: !!applicationId,
   });
 
@@ -338,13 +338,20 @@ export default function ApplicationDetail() {
                   <CardTitle>Uploaded Documents</CardTitle>
                 </div>
                 <CardDescription>
-                  {documentsData?.documents && documentsData.documents.length > 0 
+                  {isLoadingDocuments 
+                    ? "Loading documents..."
+                    : documentsData?.documents && documentsData.documents.length > 0 
                     ? `${documentsData.documents.length} document(s) uploaded`
                     : "No documents uploaded yet"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {!app.ownershipProofUrl && !app.aadhaarCardUrl && !app.propertyPhotosUrls?.length && (!documentsData?.documents || documentsData.documents.length === 0) ? (
+                {isLoadingDocuments ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm">Loading documents...</p>
+                  </div>
+                ) : !app.ownershipProofUrl && !app.aadhaarCardUrl && !app.propertyPhotosUrls?.length && (!documentsData?.documents || documentsData.documents.length === 0) ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileImage className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p className="text-sm">No documents uploaded yet</p>

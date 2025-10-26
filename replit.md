@@ -17,6 +17,15 @@ The HP Tourism Digital Ecosystem is a digital transformation platform aimed at m
 - Fixed infinite re-render bug in Update page by moving form.reset() into useEffect
 - Officer endpoints (send-back, move-to-inspection, complete-inspection) fixed by removing references to non-existent tables
 
+**Document Viewing for Officers**:
+- Added document display section to application detail page
+- Officers can now view all uploaded documents and photos before making decisions
+- Documents fetched from `/api/applications/:id/documents` endpoint
+- Each document shows filename, type, size, and "View" button to open in new tab
+- Different icons for images vs documents
+- Document count displayed in card header
+- Closes critical gap where officers couldn't see documents when reviewing applications
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
