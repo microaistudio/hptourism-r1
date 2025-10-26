@@ -49,10 +49,6 @@ export default function PublicProperties() {
   });
 
   const properties = data?.properties || [];
-  
-  console.log('DEBUG - Raw data:', data);
-  console.log('DEBUG - Properties array:', properties);
-  console.log('DEBUG - Properties length:', properties.length);
 
   // Filter properties
   const filteredProperties = properties.filter((property) => {
