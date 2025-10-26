@@ -740,9 +740,19 @@ export default function NewApplication() {
                   type="submit" 
                   disabled={createApplicationMutation.isPending}
                   data-testid="button-submit-application"
-                  onClick={() => {
+                  onClick={async () => {
                     console.log("Submit button clicked");
+                    const isValid = await form.trigger();
+                    console.log("Form is valid:", isValid);
                     console.log("Form errors:", form.formState.errors);
+                    
+                    if (!isValid) {
+                      toast({
+                        title: "Form validation failed",
+                        description: "Please check all fields are filled correctly.",
+                        variant: "destructive",
+                      });
+                    }
                   }}
                 >
                   <Send className="w-4 h-4 mr-2" />
