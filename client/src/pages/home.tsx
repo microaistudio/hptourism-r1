@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,40 +24,39 @@ import heroImage2 from "@assets/stock_images/beautiful_scenic_him_3e373e25.jpg";
 import heroImage3 from "@assets/stock_images/beautiful_scenic_him_799557d0.jpg";
 import heroImage4 from "@assets/stock_images/beautiful_scenic_him_10b034ba.jpg";
 
-const BASE_STATS = {
-  total: 16673,
-  approved: 16213,
+// Fallback stats if API fails
+const FALLBACK_STATS = {
+  total: 19583,
+  approved: 16222,
   rejected: 1137,
-  pending: 2223
+  pending: 2224
 };
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
   const { theme } = useTheme();
-  const [stats, setStats] = useState(BASE_STATS);
   const [applicationNumber, setApplicationNumber] = useState("");
   const [certificateNumber, setCertificateNumber] = useState("");
 
-  useEffect(() => {
-    const incrementStats = () => {
-      setStats(prev => {
-        const approvedInc = Math.floor(Math.random() * 2) + 1;
-        const rejectedInc = Math.random() > 0.8 ? 1 : 0;
-        const pendingInc = Math.floor(Math.random() * 2);
-        const totalInc = approvedInc + rejectedInc + pendingInc;
-        
-        return {
-          total: prev.total + totalInc,
-          approved: prev.approved + approvedInc,
-          rejected: prev.rejected + rejectedInc,
-          pending: prev.pending + pendingInc
-        };
-      });
-    };
+  // Fetch live production stats from scraper
+  const { data: productionStats } = useQuery<{
+    totalApplications: number;
+    approvedApplications: number;
+    rejectedApplications: number;
+    pendingApplications: number;
+    scrapedAt: string;
+  }>({
+    queryKey: ["/api/stats/production"],
+    refetchInterval: 60000, // Refetch every minute
+    retry: 1,
+  });
 
-    const interval = setInterval(incrementStats, 10 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const stats = productionStats ? {
+    total: productionStats.totalApplications,
+    approved: productionStats.approvedApplications,
+    rejected: productionStats.rejectedApplications,
+    pending: productionStats.pendingApplications
+  } : FALLBACK_STATS;
 
   const handleTrackApplication = () => {
     if (applicationNumber.trim()) {
