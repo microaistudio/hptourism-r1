@@ -4,6 +4,19 @@
 
 The HP Tourism Digital Ecosystem is a digital transformation platform aimed at modernizing Himachal Pradesh's tourism registration and management. It functions as both a public-facing tourism discovery portal and an administrative system for tourism operators. The platform focuses on managing various tourism registration types, particularly implementing the "Himachal Pradesh Homestay Rules 2025" with its three-tier categorization (Diamond, Gold, Silver). Its core objective is to significantly reduce application processing times through automation and streamlined user experiences. Key capabilities include a Public Tourism Discovery Platform, a Smart Compliance Hub for property owners, and an Analytics Dashboard for government officers. A notable feature is the Workflow Monitoring Dashboard, providing real-time application pipeline tracking and intelligent alerting.
 
+## Recent Changes (October 26, 2025)
+
+**Send-Back Workflow Implementation Complete**:
+- Property owners can now see sent-back applications on their dashboard with a prominent red "Action Required" alert banner
+- Dashboard displays a red "Sent Back" stat card showing count of applications needing attention
+- Application cards show inline officer feedback and an "Update Application" button when status is "sent_back_for_corrections"
+- Created new Update Application page at `/applications/:id/update` where owners can edit all fields and resubmit
+- Update page displays officer feedback in a red alert, pre-populates form with existing data using useEffect hook
+- Backend PATCH `/api/applications/:id` endpoint secured with role validation, only allows updates when status is "sent_back_for_corrections"
+- Resubmission clears clarificationRequested field and resets status to "submitted"
+- Fixed infinite re-render bug in Update page by moving form.reset() into useEffect
+- Officer endpoints (send-back, move-to-inspection, complete-inspection) fixed by removing references to non-existent tables
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

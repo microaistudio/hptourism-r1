@@ -3,6 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -59,21 +60,23 @@ export default function UpdateApplication() {
   });
 
   // Update form when data loads
-  if (data?.application && !form.formState.isDirty) {
-    const app = data.application;
-    form.reset({
-      propertyName: app.propertyName,
-      category: app.category as "diamond" | "gold" | "silver",
-      totalRooms: app.totalRooms,
-      address: app.address,
-      district: app.district,
-      pincode: app.pincode,
-      ownerName: app.ownerName,
-      ownerMobile: app.ownerMobile,
-      ownerEmail: app.ownerEmail || "",
-      ownerAadhaar: app.ownerAadhaar,
-    });
-  }
+  useEffect(() => {
+    if (data?.application) {
+      const app = data.application;
+      form.reset({
+        propertyName: app.propertyName,
+        category: app.category as "diamond" | "gold" | "silver",
+        totalRooms: app.totalRooms,
+        address: app.address,
+        district: app.district,
+        pincode: app.pincode,
+        ownerName: app.ownerName,
+        ownerMobile: app.ownerMobile,
+        ownerEmail: app.ownerEmail || "",
+        ownerAadhaar: app.ownerAadhaar,
+      });
+    }
+  }, [data?.application, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (formData: UpdateFormData) => {
