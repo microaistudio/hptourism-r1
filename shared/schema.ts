@@ -81,8 +81,8 @@ export const homestayApplications = pgTable("homestay_applications", {
   totalFee: decimal("total_fee", { precision: 10, scale: 2 }).notNull(),
   
   // Workflow
-  status: varchar("status", { length: 50 }).default('draft'), // 'draft', 'submitted', 'district_review', 'state_review', 'approved', 'rejected', 'clarification_requested'
-  currentStage: varchar("current_stage", { length: 50 }), // 'district', 'state', 'final'
+  status: varchar("status", { length: 50 }).default('draft'), // 'draft', 'submitted', 'document_verification', 'clarification_requested', 'site_inspection_scheduled', 'site_inspection_complete', 'payment_pending', 'approved', 'rejected'
+  currentStage: varchar("current_stage", { length: 50 }), // 'document_upload', 'document_verification', 'site_inspection', 'payment', 'approved'
   
   // Approval Details
   districtOfficerId: varchar("district_officer_id").references(() => users.id),
@@ -95,6 +95,19 @@ export const homestayApplications = pgTable("homestay_applications", {
   
   rejectionReason: text("rejection_reason"),
   clarificationRequested: text("clarification_requested"),
+  
+  // Site Inspection (2025 Rules)
+  siteInspectionScheduledDate: timestamp("site_inspection_scheduled_date"),
+  siteInspectionCompletedDate: timestamp("site_inspection_completed_date"),
+  siteInspectionOfficerId: varchar("site_inspection_officer_id").references(() => users.id),
+  siteInspectionNotes: text("site_inspection_notes"),
+  siteInspectionFindings: jsonb("site_inspection_findings").$type<{
+    roomCountVerified?: boolean;
+    amenitiesVerified?: boolean;
+    fireSafetyVerified?: boolean;
+    categoryRecommendation?: string;
+    overallSatisfactory?: boolean;
+  }>(),
   
   // Certificate
   certificateNumber: varchar("certificate_number", { length: 50 }).unique(),
@@ -163,6 +176,11 @@ export const payments = pgTable("payments", {
   gatewayTransactionId: varchar("gateway_transaction_id", { length: 255 }).unique(),
   paymentMethod: varchar("payment_method", { length: 50 }), // 'upi', 'netbanking', 'card', 'wallet'
   paymentStatus: varchar("payment_status", { length: 50 }).default('pending'), // 'pending', 'success', 'failed', 'refunded'
+  
+  // Payment Link & QR Code (2025 Rules - payment after approval)
+  paymentLink: text("payment_link"),
+  qrCodeUrl: text("qr_code_url"),
+  paymentLinkExpiryDate: timestamp("payment_link_expiry_date"),
   
   // Timestamps
   initiatedAt: timestamp("initiated_at").defaultNow(),
