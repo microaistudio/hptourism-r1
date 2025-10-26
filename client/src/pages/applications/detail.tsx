@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download } from "lucide-react";
 import type { HomestayApplication, User as UserType } from "@shared/schema";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -324,6 +324,149 @@ export default function ApplicationDetail() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Uploaded Documents */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <FileImage className="w-5 h-5 text-primary" />
+                  <CardTitle>Uploaded Documents</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!app.ownershipProofUrl && !app.aadhaarCardUrl && !app.propertyPhotosUrls?.length ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileImage className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm">No documents uploaded yet</p>
+                    <p className="text-xs mt-1">Documents will appear here once the applicant uploads them</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Ownership Proof */}
+                    {app.ownershipProofUrl && (
+                      <div className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded">
+                            <FileText className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">Property Ownership Proof</p>
+                            <p className="text-xs text-muted-foreground">Sale deed / Mutation certificate</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => window.open(app.ownershipProofUrl!, '_blank')}
+                          data-testid="button-view-ownership"
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Aadhaar Card */}
+                    {app.aadhaarCardUrl && (
+                      <div className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded">
+                            <FileText className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">Aadhaar Card</p>
+                            <p className="text-xs text-muted-foreground">Owner identification</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => window.open(app.aadhaarCardUrl!, '_blank')}
+                          data-testid="button-view-aadhaar"
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* PAN Card */}
+                    {app.panCardUrl && (
+                      <div className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded">
+                            <FileText className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">PAN Card</p>
+                            <p className="text-xs text-muted-foreground">Tax identification</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => window.open(app.panCardUrl!, '_blank')}
+                          data-testid="button-view-pan"
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* GST Certificate */}
+                    {app.gstCertificateUrl && (
+                      <div className="flex items-center justify-between p-3 border rounded-md">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded">
+                            <FileText className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">GST Certificate</p>
+                            <p className="text-xs text-muted-foreground">Business registration</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => window.open(app.gstCertificateUrl!, '_blank')}
+                          data-testid="button-view-gst"
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Property Photos */}
+                    {app.propertyPhotosUrls && app.propertyPhotosUrls.length > 0 && (
+                      <div className="border rounded-md p-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <FileImage className="w-5 h-5 text-primary" />
+                          <p className="font-medium text-sm">Property Photos ({app.propertyPhotosUrls.length})</p>
+                        </div>
+                        <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                          {app.propertyPhotosUrls.map((url, index) => (
+                            <div 
+                              key={index} 
+                              className="aspect-square border rounded overflow-hidden cursor-pointer hover:opacity-75 transition-opacity"
+                              onClick={() => window.open(url, '_blank')}
+                              data-testid={`image-property-${index}`}
+                            >
+                              <img 
+                                src={url} 
+                                alt={`Property photo ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Officer Review Section */}
             {canReview && (

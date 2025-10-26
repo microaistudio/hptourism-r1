@@ -109,6 +109,13 @@ export const homestayApplications = pgTable("homestay_applications", {
     overallSatisfactory?: boolean;
   }>(),
   
+  // Uploaded Documents (URLs stored as JSON array for photos)
+  ownershipProofUrl: text("ownership_proof_url"),
+  aadhaarCardUrl: text("aadhaar_card_url"),
+  panCardUrl: text("pan_card_url"),
+  gstCertificateUrl: text("gst_certificate_url"),
+  propertyPhotosUrls: jsonb("property_photos_urls").$type<string[]>(),
+  
   // Certificate
   certificateNumber: varchar("certificate_number", { length: 50 }).unique(),
   certificateIssuedDate: timestamp("certificate_issued_date"),
