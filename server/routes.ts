@@ -374,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Officer Actions - Send Back for Corrections
-  app.post("/api/applications/:id/send-back", requireAuth, async (req, res) => {
+  app.post("/api/applications/:id/send-back", requireRole('district_officer', 'state_officer'), async (req, res) => {
     try {
       const { id } = req.params;
       const { feedback, issuesFound } = req.body;
@@ -428,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Officer Actions - Move to Site Inspection
-  app.post("/api/applications/:id/move-to-inspection", requireAuth, async (req, res) => {
+  app.post("/api/applications/:id/move-to-inspection", requireRole('district_officer', 'state_officer'), async (req, res) => {
     try {
       const { id } = req.params;
       const { scheduledDate, notes } = req.body;
@@ -480,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Officer Actions - Mark Inspection Complete
-  app.post("/api/applications/:id/complete-inspection", requireAuth, async (req, res) => {
+  app.post("/api/applications/:id/complete-inspection", requireRole('district_officer', 'state_officer'), async (req, res) => {
     try {
       const { id } = req.params;
       const { findings, notes } = req.body;
@@ -531,7 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get Application Action History
-  app.get("/api/applications/:id/actions", requireAuth, async (req, res) => {
+  app.get("/api/applications/:id/actions", requireRole('district_officer', 'state_officer', 'property_owner'), async (req, res) => {
     try {
       const actions = await storage.getApplicationActions(req.params.id);
       res.json({ actions });

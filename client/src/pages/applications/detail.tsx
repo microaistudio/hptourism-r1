@@ -8,15 +8,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock } from "lucide-react";
 import type { HomestayApplication, User as UserType } from "@shared/schema";
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 export default function ApplicationDetail() {
   const [, params] = useRoute("/applications/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [officerComments, setOfficerComments] = useState("");
+  
+  // New officer action states
+  const [sendBackFeedback, setSendBackFeedback] = useState("");
+  const [sendBackIssues, setSendBackIssues] = useState("");
+  const [inspectionDate, setInspectionDate] = useState("");
+  const [inspectionNotes, setInspectionNotes] = useState("");
+  const [inspectionFindings, setInspectionFindings] = useState("");
+  const [inspectionCompletionNotes, setInspectionCompletionNotes] = useState("");
 
   const applicationId = params?.id;
 
@@ -50,6 +60,90 @@ export default function ApplicationDetail() {
       toast({
         title: "Review failed",
         description: "Failed to process review. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send Back Mutation
+  const sendBackMutation = useMutation({
+    mutationFn: async ({ feedback, issuesFound }: { feedback: string; issuesFound: string }) => {
+      const response = await apiRequest("POST", `/api/applications/${applicationId}/send-back`, {
+        feedback,
+        issuesFound,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      toast({
+        title: "Application Sent Back",
+        description: "The application has been sent back to the applicant for corrections.",
+      });
+      setSendBackFeedback("");
+      setSendBackIssues("");
+    },
+    onError: () => {
+      toast({
+        title: "Action failed",
+        description: "Failed to send back application. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Move to Inspection Mutation
+  const moveToInspectionMutation = useMutation({
+    mutationFn: async ({ scheduledDate, notes }: { scheduledDate: string; notes: string }) => {
+      const response = await apiRequest("POST", `/api/applications/${applicationId}/move-to-inspection`, {
+        scheduledDate,
+        notes,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      toast({
+        title: "Inspection Scheduled",
+        description: "The site inspection has been scheduled successfully.",
+      });
+      setInspectionDate("");
+      setInspectionNotes("");
+    },
+    onError: () => {
+      toast({
+        title: "Action failed",
+        description: "Failed to schedule inspection. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Complete Inspection Mutation
+  const completeInspectionMutation = useMutation({
+    mutationFn: async ({ findings, notes }: { findings: string; notes: string }) => {
+      const response = await apiRequest("POST", `/api/applications/${applicationId}/complete-inspection`, {
+        findings,
+        notes,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      toast({
+        title: "Inspection Completed",
+        description: "The site inspection has been marked as complete.",
+      });
+      setInspectionFindings("");
+      setInspectionCompletionNotes("");
+    },
+    onError: () => {
+      toast({
+        title: "Action failed",
+        description: "Failed to complete inspection. Please try again.",
         variant: "destructive",
       });
     },
@@ -324,6 +418,186 @@ export default function ApplicationDetail() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* New Officer Workflow Actions */}
+            {(isDistrictOfficer || isStateOfficer) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Officer Actions</CardTitle>
+                  <CardDescription>
+                    Available actions for this application (Status: {app.status?.replace(/_/g, ' ')})
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Send Back for Corrections */}
+                  {(app.status === 'submitted' || app.status === 'document_verification') && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full" data-testid="button-send-back">
+                          <ArrowLeftCircle className="w-4 h-4 mr-2" />
+                          Send Back for Corrections
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Send Application Back</DialogTitle>
+                          <DialogDescription>
+                            Return this application to the applicant for corrections or additional information.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="feedback">Feedback to Applicant</Label>
+                            <Textarea
+                              id="feedback"
+                              placeholder="Explain what needs to be corrected..."
+                              value={sendBackFeedback}
+                              onChange={(e) => setSendBackFeedback(e.target.value)}
+                              rows={4}
+                              data-testid="input-sendback-feedback"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="issues">Issues Found</Label>
+                            <Textarea
+                              id="issues"
+                              placeholder="List specific issues that need to be addressed..."
+                              value={sendBackIssues}
+                              onChange={(e) => setSendBackIssues(e.target.value)}
+                              rows={3}
+                              data-testid="input-sendback-issues"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={() => sendBackMutation.mutate({ feedback: sendBackFeedback, issuesFound: sendBackIssues })}
+                            disabled={sendBackMutation.isPending || !sendBackFeedback || sendBackFeedback.length < 10}
+                            data-testid="button-confirm-sendback"
+                          >
+                            Send Back
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
+                  {/* Schedule Site Inspection */}
+                  {(app.status === 'document_verification' || app.status === 'submitted') && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full" data-testid="button-schedule-inspection">
+                          <CalendarClock className="w-4 h-4 mr-2" />
+                          Schedule Site Inspection
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Schedule Site Inspection</DialogTitle>
+                          <DialogDescription>
+                            Set a date for the on-site inspection of this property.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="inspectionDate">Inspection Date</Label>
+                            <Input
+                              id="inspectionDate"
+                              type="date"
+                              value={inspectionDate}
+                              onChange={(e) => setInspectionDate(e.target.value)}
+                              data-testid="input-inspection-date"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="inspectionNotes">Notes</Label>
+                            <Textarea
+                              id="inspectionNotes"
+                              placeholder="Add any special instructions or notes about the inspection..."
+                              value={inspectionNotes}
+                              onChange={(e) => setInspectionNotes(e.target.value)}
+                              rows={3}
+                              data-testid="input-inspection-notes"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={() => moveToInspectionMutation.mutate({ scheduledDate: inspectionDate, notes: inspectionNotes })}
+                            disabled={moveToInspectionMutation.isPending || !inspectionDate}
+                            data-testid="button-confirm-schedule-inspection"
+                          >
+                            Schedule Inspection
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
+                  {/* Complete Inspection */}
+                  {app.status === 'site_inspection_scheduled' && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full" data-testid="button-complete-inspection">
+                          <ClipboardCheck className="w-4 h-4 mr-2" />
+                          Complete Inspection
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Mark Inspection as Complete</DialogTitle>
+                          <DialogDescription>
+                            Record the findings from the site inspection.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="findings">Inspection Findings</Label>
+                            <Textarea
+                              id="findings"
+                              placeholder="Document your findings from the site inspection..."
+                              value={inspectionFindings}
+                              onChange={(e) => setInspectionFindings(e.target.value)}
+                              rows={4}
+                              data-testid="input-inspection-findings"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="completionNotes">Additional Notes</Label>
+                            <Textarea
+                              id="completionNotes"
+                              placeholder="Any additional observations or recommendations..."
+                              value={inspectionCompletionNotes}
+                              onChange={(e) => setInspectionCompletionNotes(e.target.value)}
+                              rows={3}
+                              data-testid="input-inspection-completion-notes"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            onClick={() => completeInspectionMutation.mutate({ findings: inspectionFindings, notes: inspectionCompletionNotes })}
+                            disabled={completeInspectionMutation.isPending || !inspectionFindings || inspectionFindings.length < 10}
+                            data-testid="button-confirm-complete-inspection"
+                          >
+                            Complete Inspection
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
+                  {/* Info message if no actions available */}
+                  {app.status !== 'submitted' && 
+                   app.status !== 'document_verification' && 
+                   app.status !== 'site_inspection_scheduled' && (
+                    <div className="text-sm text-muted-foreground p-4 border rounded-md">
+                      No workflow actions available for current status. Use the Review section above to approve or reject.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

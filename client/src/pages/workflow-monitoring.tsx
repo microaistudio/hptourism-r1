@@ -331,18 +331,22 @@ function VisualPipelineFlow({ applications }: { applications: HomestayApplicatio
 
 // Applications Table Component
 function ApplicationsTable({ applications }: { applications: HomestayApplication[] }) {
+  const [, setLocation] = useLocation();
+  
   return (
     <Card>
       <CardHeader>
         <CardTitle>Recent Applications</CardTitle>
-        <CardDescription>Last 10 applications with SLA status</CardDescription>
+        <CardDescription>Last 10 applications with SLA status - Click to review</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           {applications.slice(0, 10).map((app) => (
             <div
               key={app.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              onClick={() => setLocation(`/applications/${app.id}`)}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 hover:border-primary/50 transition-colors cursor-pointer"
+              data-testid={`application-row-${app.id}`}
             >
               <div className="flex items-center gap-4 flex-1">
                 <div className="flex-1">
