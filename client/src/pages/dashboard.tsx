@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mountain, LogOut, Plus, FileText, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Mountain, LogOut, Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
 
 export default function Dashboard() {
@@ -59,7 +59,8 @@ export default function Dashboard() {
   const stats = {
     total: applications.length,
     draft: applications.filter(a => a.status === 'draft').length,
-    pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review').length,
+    sentBack: applications.filter(a => a.status === 'sent_back_for_corrections').length,
+    pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review' || a.status === 'inspection_scheduled' || a.status === 'inspection_completed').length,
     approved: applications.filter(a => a.status === 'approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
   };
@@ -67,8 +68,12 @@ export default function Dashboard() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
       draft: { variant: "outline", label: "Draft" },
-      pending: { variant: "secondary", label: "District Review" },
+      submitted: { variant: "secondary", label: "Submitted" },
+      district_review: { variant: "secondary", label: "District Review" },
       state_review: { variant: "secondary", label: "State Review" },
+      sent_back_for_corrections: { variant: "destructive", label: "Sent Back for Corrections" },
+      inspection_scheduled: { variant: "secondary", label: "Inspection Scheduled" },
+      inspection_completed: { variant: "secondary", label: "Inspection Completed" },
       approved: { variant: "default", label: "Approved" },
       rejected: { variant: "destructive", label: "Rejected" },
     };
@@ -144,6 +149,38 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Action Required Alert */}
+        {user.role === 'property_owner' && stats.sentBack > 0 && (
+          <Card className="mb-6 border-destructive">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-destructive" />
+                <CardTitle className="text-destructive">Action Required</CardTitle>
+              </div>
+              <CardDescription>
+                You have {stats.sentBack} application{stats.sentBack > 1 ? 's' : ''} sent back for corrections
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm mb-3">
+                Your application{stats.sentBack > 1 ? 's have' : ' has'} been reviewed and require{stats.sentBack > 1 ? '' : 's'} corrections. 
+                Please update and resubmit to continue processing.
+              </p>
+              <Button 
+                variant="destructive"
+                onClick={() => {
+                  const sentBackApp = applications.find(a => a.status === 'sent_back_for_corrections');
+                  if (sentBackApp) setLocation(`/applications/${sentBackApp.id}`);
+                }}
+                data-testid="button-view-sent-back"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                View and Update Application
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-3">
@@ -158,18 +195,35 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Draft</CardDescription>
-              <CardTitle className="text-3xl text-muted-foreground" data-testid="stat-draft">{stats.draft}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center text-xs text-muted-foreground">
-                <Clock className="w-4 h-4 mr-1" />
-                Not submitted
-              </div>
-            </CardContent>
-          </Card>
+          {user.role === 'property_owner' && stats.sentBack > 0 && (
+            <Card className="border-destructive">
+              <CardHeader className="pb-3">
+                <CardDescription>Sent Back</CardDescription>
+                <CardTitle className="text-3xl text-destructive" data-testid="stat-sent-back">{stats.sentBack}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  Needs correction
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!(user.role === 'property_owner' && stats.sentBack > 0) && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Draft</CardDescription>
+                <CardTitle className="text-3xl text-muted-foreground" data-testid="stat-draft">{stats.draft}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="w-4 h-4 mr-1" />
+                  Not submitted
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3">
@@ -246,10 +300,31 @@ export default function Dashboard() {
                       <p className="text-sm text-muted-foreground">
                         {app.applicationNumber} • {app.district} • {app.totalRooms} rooms
                       </p>
+                      {app.status === 'sent_back_for_corrections' && app.officerFeedback && (
+                        <p className="text-sm text-destructive mt-1">
+                          <AlertCircle className="w-3 h-3 inline mr-1" />
+                          {app.officerFeedback}
+                        </p>
+                      )}
                     </div>
-                    <Button variant="ghost" size="sm" data-testid={`button-view-${app.id}`}>
-                      View Details
-                    </Button>
+                    {app.status === 'sent_back_for_corrections' ? (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/applications/${app.id}/update`);
+                        }}
+                        data-testid={`button-update-${app.id}`}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Update Application
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" data-testid={`button-view-${app.id}`}>
+                        View Details
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
