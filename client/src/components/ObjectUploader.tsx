@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, X, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,7 @@ export function ObjectUploader({
   className = "",
 }: ObjectUploaderProps) {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>(existingFiles);
 
@@ -111,7 +112,7 @@ export function ObjectUploader({
           <Button
             type="button"
             variant="outline"
-            onClick={() => document.getElementById(`file-input-${label}`)?.click()}
+            onClick={() => fileInputRef.current?.click()}
             disabled={uploading || uploadedFiles.length >= maxFiles}
             data-testid={`button-upload-${label.toLowerCase().replace(/\s+/g, "-")}`}
           >
@@ -135,7 +136,7 @@ export function ObjectUploader({
         </div>
 
         <input
-          id={`file-input-${label}`}
+          ref={fileInputRef}
           type="file"
           accept={accept}
           multiple={multiple}
