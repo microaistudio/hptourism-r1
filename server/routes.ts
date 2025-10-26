@@ -174,11 +174,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Homestay Application Routes
   
   // File Upload - Get presigned upload URL
-  app.post("/api/upload/document", requireAuth, async (req, res) => {
+  app.get("/api/upload-url", requireAuth, async (req, res) => {
     try {
+      const fileType = (req.query.fileType as string) || "document";
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getUploadURL("document");
-      res.json({ uploadURL });
+      const uploadURL = await objectStorageService.getUploadURL(fileType);
+      const filePath = objectStorageService.normalizeObjectPath(uploadURL);
+      res.json({ uploadUrl: uploadURL, filePath });
     } catch (error) {
       console.error("Error getting upload URL:", error);
       res.status(500).json({ message: "Failed to get upload URL" });
@@ -212,12 +214,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         perRoomFee: z.string(),
         gstAmount: z.string(),
         totalFee: z.string(),
-        // Document URLs
+        // Document URLs (legacy)
         ownershipProofUrl: z.string().optional(),
         aadhaarCardUrl: z.string().optional(),
         panCardUrl: z.string().optional(),
         gstCertificateUrl: z.string().optional(),
         propertyPhotosUrls: z.array(z.string()).optional(),
+        // New documents structure
+        documents: z.object({
+          ownershipProof: z.array(z.string()).optional(),
+          aadhaarCard: z.array(z.string()).optional(),
+          panCard: z.array(z.string()).optional(),
+          gstCertificate: z.array(z.string()).optional(),
+          propertyPhotos: z.array(z.string()).optional(),
+        }).optional(),
       });
       
       // Validate and extract only whitelisted fields
@@ -253,6 +263,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'submitted',
         submittedAt: new Date(),
       }, { trusted: true });
+      
+      // Save documents if provided
+      if (validatedData.documents) {
+        const docs = validatedData.documents;
+        const documentsToCreate = [];
+        
+        // Ownership Proof
+        if (docs.ownershipProof?.length) {
+          for (const filePath of docs.ownershipProof) {
+            documentsToCreate.push({
+              applicationId: application.id,
+              documentType: 'ownership_proof',
+              fileName: filePath.split('/').pop() || 'ownership-proof',
+              filePath,
+              fileSize: 0, // Size unknown from path
+              mimeType: 'application/octet-stream',
+            });
+          }
+        }
+        
+        // Aadhaar Card
+        if (docs.aadhaarCard?.length) {
+          for (const filePath of docs.aadhaarCard) {
+            documentsToCreate.push({
+              applicationId: application.id,
+              documentType: 'aadhaar_card',
+              fileName: filePath.split('/').pop() || 'aadhaar-card',
+              filePath,
+              fileSize: 0,
+              mimeType: 'application/octet-stream',
+            });
+          }
+        }
+        
+        // PAN Card
+        if (docs.panCard?.length) {
+          for (const filePath of docs.panCard) {
+            documentsToCreate.push({
+              applicationId: application.id,
+              documentType: 'pan_card',
+              fileName: filePath.split('/').pop() || 'pan-card',
+              filePath,
+              fileSize: 0,
+              mimeType: 'application/octet-stream',
+            });
+          }
+        }
+        
+        // GST Certificate
+        if (docs.gstCertificate?.length) {
+          for (const filePath of docs.gstCertificate) {
+            documentsToCreate.push({
+              applicationId: application.id,
+              documentType: 'gst_certificate',
+              fileName: filePath.split('/').pop() || 'gst-certificate',
+              filePath,
+              fileSize: 0,
+              mimeType: 'application/octet-stream',
+            });
+          }
+        }
+        
+        // Property Photos
+        if (docs.propertyPhotos?.length) {
+          for (const filePath of docs.propertyPhotos) {
+            documentsToCreate.push({
+              applicationId: application.id,
+              documentType: 'property_photo',
+              fileName: filePath.split('/').pop() || 'property-photo',
+              filePath,
+              fileSize: 0,
+              mimeType: 'image/jpeg',
+            });
+          }
+        }
+        
+        // Create all documents
+        for (const doc of documentsToCreate) {
+          await storage.createDocument(doc);
+        }
+      }
       
       res.json({ application });
     } catch (error) {

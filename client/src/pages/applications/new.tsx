@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee } from "lucide-react";
 import type { User } from "@shared/schema";
+import { ObjectUploader } from "@/components/ObjectUploader";
 
 const HP_DISTRICTS = [
   "Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu",
@@ -63,13 +64,13 @@ export default function NewApplication() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
-  const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, File | null>>({
-    ownershipProof: null,
-    aadhaarCard: null,
-    panCard: null,
-    gstCertificate: null,
+  const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, string[]>>({
+    ownershipProof: [],
+    aadhaarCard: [],
+    panCard: [],
+    gstCertificate: [],
   });
-  const [propertyPhotos, setPropertyPhotos] = useState<File[]>([]);
+  const [propertyPhotos, setPropertyPhotos] = useState<string[]>([]);
   const totalSteps = 6;
 
   const { data: userData } = useQuery<{ user: User }>({
@@ -125,6 +126,14 @@ export default function NewApplication() {
         totalFee: fees.totalFee.toFixed(2),
         status: 'pending',
         submittedAt: new Date().toISOString(),
+        // Include uploaded documents
+        documents: {
+          ownershipProof: uploadedDocuments.ownershipProof,
+          aadhaarCard: uploadedDocuments.aadhaarCard,
+          panCard: uploadedDocuments.panCard,
+          gstCertificate: uploadedDocuments.gstCertificate,
+          propertyPhotos: propertyPhotos,
+        },
       };
 
       const response = await apiRequest("POST", "/api/applications", payload);
@@ -165,7 +174,7 @@ export default function NewApplication() {
   const nextStep = () => {
     // Validate Step 4 (Documents) before moving forward
     if (step === 4) {
-      if (!uploadedDocuments.ownershipProof || !uploadedDocuments.aadhaarCard || propertyPhotos.length < 5) {
+      if (uploadedDocuments.ownershipProof.length === 0 || uploadedDocuments.aadhaarCard.length === 0 || propertyPhotos.length < 5) {
         toast({
           title: "Required documents missing",
           description: "Please upload all mandatory documents before proceeding.",
@@ -453,7 +462,7 @@ export default function NewApplication() {
                     <FileText className="w-5 h-5 text-primary" />
                     <CardTitle>Upload Documents</CardTitle>
                   </div>
-                  <CardDescription>Upload required documents for verification (Max 5MB per file)</CardDescription>
+                  <CardDescription>Upload required documents for verification</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Property Ownership Proof */}
@@ -464,26 +473,14 @@ export default function NewApplication() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Sale deed, mutation certificate, or property tax receipt
                     </p>
-                    <Input
-                      type="file"
+                    <ObjectUploader
+                      label="Upload Ownership Proof"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && file.size <= 5 * 1024 * 1024) {
-                          setUploadedDocuments(prev => ({ ...prev, ownershipProof: file }));
-                        } else if (file) {
-                          toast({
-                            title: "File too large",
-                            description: "Maximum file size is 5MB",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      data-testid="input-ownership-proof"
+                      maxFiles={1}
+                      fileType="ownership-proof"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, ownershipProof: paths }))}
+                      existingFiles={uploadedDocuments.ownershipProof}
                     />
-                    {uploadedDocuments.ownershipProof && (
-                      <p className="text-sm text-green-600">✓ {uploadedDocuments.ownershipProof.name}</p>
-                    )}
                   </div>
 
                   {/* Aadhaar Card */}
@@ -494,26 +491,14 @@ export default function NewApplication() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Owner's Aadhaar card (both sides if applicable)
                     </p>
-                    <Input
-                      type="file"
+                    <ObjectUploader
+                      label="Upload Aadhaar Card"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && file.size <= 5 * 1024 * 1024) {
-                          setUploadedDocuments(prev => ({ ...prev, aadhaarCard: file }));
-                        } else if (file) {
-                          toast({
-                            title: "File too large",
-                            description: "Maximum file size is 5MB",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      data-testid="input-aadhaar-card"
+                      maxFiles={1}
+                      fileType="aadhaar-card"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, aadhaarCard: paths }))}
+                      existingFiles={uploadedDocuments.aadhaarCard}
                     />
-                    {uploadedDocuments.aadhaarCard && (
-                      <p className="text-sm text-green-600">✓ {uploadedDocuments.aadhaarCard.name}</p>
-                    )}
                   </div>
 
                   {/* PAN Card (Optional) */}
@@ -524,26 +509,14 @@ export default function NewApplication() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Required if annual revenue exceeds ₹2.5 lakhs
                     </p>
-                    <Input
-                      type="file"
+                    <ObjectUploader
+                      label="Upload PAN Card"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && file.size <= 5 * 1024 * 1024) {
-                          setUploadedDocuments(prev => ({ ...prev, panCard: file }));
-                        } else if (file) {
-                          toast({
-                            title: "File too large",
-                            description: "Maximum file size is 5MB",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      data-testid="input-pan-card"
+                      maxFiles={1}
+                      fileType="pan-card"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, panCard: paths }))}
+                      existingFiles={uploadedDocuments.panCard}
                     />
-                    {uploadedDocuments.panCard && (
-                      <p className="text-sm text-green-600">✓ {uploadedDocuments.panCard.name}</p>
-                    )}
                   </div>
 
                   {/* GST Certificate (Optional) */}
@@ -554,26 +527,14 @@ export default function NewApplication() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Required if registered under GST
                     </p>
-                    <Input
-                      type="file"
+                    <ObjectUploader
+                      label="Upload GST Certificate"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file && file.size <= 5 * 1024 * 1024) {
-                          setUploadedDocuments(prev => ({ ...prev, gstCertificate: file }));
-                        } else if (file) {
-                          toast({
-                            title: "File too large",
-                            description: "Maximum file size is 5MB",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      data-testid="input-gst-certificate"
+                      maxFiles={1}
+                      fileType="gst-certificate"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, gstCertificate: paths }))}
+                      existingFiles={uploadedDocuments.gstCertificate}
                     />
-                    {uploadedDocuments.gstCertificate && (
-                      <p className="text-sm text-green-600">✓ {uploadedDocuments.gstCertificate.name}</p>
-                    )}
                   </div>
 
                   {/* Property Photos */}
@@ -584,39 +545,24 @@ export default function NewApplication() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Clear photos of exterior, rooms, bathrooms, and key amenities
                     </p>
-                    <Input
-                      type="file"
+                    <ObjectUploader
+                      label="Upload Property Photos"
                       accept=".jpg,.jpeg,.png"
-                      multiple
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
-                        const validFiles = files.filter(f => f.size <= 5 * 1024 * 1024);
-                        if (validFiles.length < files.length) {
-                          toast({
-                            title: "Some files were too large",
-                            description: "Maximum file size is 5MB per photo",
-                            variant: "destructive"
-                          });
-                        }
-                        setPropertyPhotos(validFiles);
-                      }}
-                      data-testid="input-property-photos"
+                      multiple={true}
+                      maxFiles={10}
+                      fileType="property-photo"
+                      onUploadComplete={(paths) => setPropertyPhotos(paths)}
+                      existingFiles={propertyPhotos}
                     />
-                    {propertyPhotos.length > 0 && (
-                      <p className="text-sm text-green-600">
-                        ✓ {propertyPhotos.length} photo{propertyPhotos.length > 1 ? 's' : ''} selected
-                        {propertyPhotos.length < 5 && <span className="text-orange-600"> (need {5 - propertyPhotos.length} more)</span>}
-                      </p>
-                    )}
                   </div>
 
                   {/* Validation Messages */}
-                  {(!uploadedDocuments.ownershipProof || !uploadedDocuments.aadhaarCard || propertyPhotos.length < 5) && (
+                  {(uploadedDocuments.ownershipProof.length === 0 || uploadedDocuments.aadhaarCard.length === 0 || propertyPhotos.length < 5) && (
                     <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mt-4">
                       <p className="text-sm text-orange-800 font-medium mb-2">Required documents missing:</p>
                       <ul className="text-sm text-orange-700 list-disc list-inside space-y-1">
-                        {!uploadedDocuments.ownershipProof && <li>Property Ownership Proof</li>}
-                        {!uploadedDocuments.aadhaarCard && <li>Aadhaar Card</li>}
+                        {uploadedDocuments.ownershipProof.length === 0 && <li>Property Ownership Proof</li>}
+                        {uploadedDocuments.aadhaarCard.length === 0 && <li>Aadhaar Card</li>}
                         {propertyPhotos.length < 5 && <li>At least 5 property photos ({propertyPhotos.length}/5)</li>}
                       </ul>
                     </div>
