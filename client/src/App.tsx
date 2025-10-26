@@ -14,6 +14,7 @@ import Register from "@/pages/auth/register";
 import Dashboard from "@/pages/dashboard";
 import NewApplication from "@/pages/applications/new";
 import ApplicationDetail from "@/pages/applications/detail";
+import UpdateApplication from "@/pages/applications/update";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
@@ -81,6 +82,9 @@ function Router() {
       </Route>
       <Route path="/applications/new">
         {() => <ProtectedRoute component={NewApplication} allowedRoles={['property_owner']} />}
+      </Route>
+      <Route path="/applications/:id/update">
+        {() => <ProtectedRoute component={UpdateApplication} allowedRoles={['property_owner']} />}
       </Route>
       <Route path="/applications/:id">
         {() => <ProtectedRoute component={ApplicationDetail} />}

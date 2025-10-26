@@ -317,6 +317,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update application (for resubmission after corrections)
+  app.patch("/api/applications/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.userId!;
+      
+      const application = await storage.getApplication(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+      
+      // Only property owner can update their own application
+      if (application.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Can only update if sent back for corrections
+      if (application.status !== 'sent_back_for_corrections') {
+        return res.status(400).json({ message: "Application can only be updated when sent back for corrections" });
+      }
+      
+      // Use same schema as create, but make all fields optional
+      const updateSchema = z.object({
+        propertyName: z.string().optional(),
+        category: z.enum(['diamond', 'gold', 'silver']).optional(),
+        totalRooms: z.coerce.number().optional(),
+        address: z.string().optional(),
+        district: z.string().optional(),
+        pincode: z.string().optional(),
+        latitude: z.string().optional(),
+        longitude: z.string().optional(),
+        ownerName: z.string().optional(),
+        ownerMobile: z.string().optional(),
+        ownerEmail: z.string().optional(),
+        ownerAadhaar: z.string().optional(),
+        amenities: z.any().optional(),
+        rooms: z.any().optional(),
+        baseFee: z.string().optional(),
+        perRoomFee: z.string().optional(),
+        gstAmount: z.string().optional(),
+        totalFee: z.string().optional(),
+        ownershipProofUrl: z.string().optional(),
+        aadhaarCardUrl: z.string().optional(),
+        panCardUrl: z.string().optional(),
+        gstCertificateUrl: z.string().optional(),
+        propertyPhotosUrls: z.array(z.string()).optional(),
+      });
+      
+      const validatedData = updateSchema.parse(req.body);
+      
+      // Update the application and change status back to submitted
+      const updatedApplication = await storage.updateApplication(id, {
+        ...validatedData,
+        status: 'submitted',
+        submittedAt: new Date(),
+        clarificationRequested: null, // Clear feedback after resubmission
+      }, { trusted: true });
+      
+      res.json({ application: updatedApplication });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Error updating application:", error);
+      res.status(500).json({ message: "Failed to update application" });
+    }
+  });
+
   // Review application (approve/reject)
   app.post("/api/applications/:id/review", requireAuth, async (req, res) => {
     try {

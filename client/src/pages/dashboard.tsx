@@ -300,10 +300,10 @@ export default function Dashboard() {
                       <p className="text-sm text-muted-foreground">
                         {app.applicationNumber} • {app.district} • {app.totalRooms} rooms
                       </p>
-                      {app.status === 'sent_back_for_corrections' && app.officerFeedback && (
+                      {app.status === 'sent_back_for_corrections' && app.clarificationRequested && (
                         <p className="text-sm text-destructive mt-1">
                           <AlertCircle className="w-3 h-3 inline mr-1" />
-                          {app.officerFeedback}
+                          {app.clarificationRequested}
                         </p>
                       )}
                     </div>
