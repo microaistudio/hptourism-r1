@@ -38,7 +38,7 @@ export default function UpdateApplication() {
   const applicationId = params?.id;
 
   const { data, isLoading, error } = useQuery<{ application: HomestayApplication }>({
-    queryKey: ["/api/applications", applicationId],
+    queryKey: [`/api/applications/${applicationId}`],
     enabled: !!applicationId,
   });
 
@@ -81,7 +81,7 @@ export default function UpdateApplication() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/applications/${applicationId}`] });
       toast({
         title: "Application Resubmitted",
         description: "Your application has been updated and resubmitted for review.",

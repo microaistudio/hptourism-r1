@@ -485,32 +485,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Application not found" });
       }
 
-      // Record the action
-      await storage.createApplicationAction({
-        applicationId: id,
-        officerId: user.id,
-        action: 'sent_back_for_corrections',
-        previousStatus: application.status,
-        newStatus: 'clarification_requested',
-        feedback,
-        issuesFound: issuesFound || [],
-      });
-
       // Update application status
       const updated = await storage.updateApplication(id, {
-        status: 'clarification_requested',
+        status: 'sent_back_for_corrections',
         clarificationRequested: feedback,
-      });
-
-      // Create notification for applicant
-      await storage.createNotification({
-        userId: application.userId,
-        applicationId: id,
-        type: 'clarification_requested',
-        title: 'Application Sent Back for Corrections',
-        message: `Your application for ${application.propertyName} requires corrections. Officer feedback: ${feedback}`,
-        channels: { inapp: true, email: true, sms: false, whatsapp: false },
-      });
+      }, { trusted: true });
 
       res.json({ application: updated, message: "Application sent back to applicant" });
     } catch (error) {
@@ -535,34 +514,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Application not found" });
       }
 
-      // Record the action
-      await storage.createApplicationAction({
-        applicationId: id,
-        officerId: user.id,
-        action: 'site_inspection_scheduled',
-        previousStatus: application.status,
-        newStatus: 'site_inspection_scheduled',
-        feedback: notes || `Site inspection scheduled for ${scheduledDate}`,
-      });
-
       // Update application
       const updated = await storage.updateApplication(id, {
-        status: 'site_inspection_scheduled',
+        status: 'inspection_scheduled',
         currentStage: 'site_inspection',
         siteInspectionScheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
         siteInspectionOfficerId: user.id,
         siteInspectionNotes: notes,
-      });
-
-      // Notify applicant
-      await storage.createNotification({
-        userId: application.userId,
-        applicationId: id,
-        type: 'inspection_scheduled',
-        title: 'Site Inspection Scheduled',
-        message: `Site inspection scheduled for ${application.propertyName}. ${notes || 'Our team will visit your property soon.'}`,
-        channels: { inapp: true, email: true, sms: true, whatsapp: false },
-      });
+      }, { trusted: true });
 
       res.json({ application: updated, message: "Site inspection scheduled" });
     } catch (error) {
@@ -587,33 +546,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Application not found" });
       }
 
-      // Record the action
-      await storage.createApplicationAction({
-        applicationId: id,
-        officerId: user.id,
-        action: 'site_inspection_scheduled',
-        previousStatus: application.status,
-        newStatus: 'site_inspection_complete',
-        feedback: notes || 'Site inspection completed',
-      });
-
       // Update application
       const updated = await storage.updateApplication(id, {
-        status: 'site_inspection_complete',
+        status: 'inspection_completed',
         siteInspectionCompletedDate: new Date(),
         siteInspectionFindings: findings || {},
         siteInspectionNotes: notes,
-      });
-
-      // Notify applicant
-      await storage.createNotification({
-        userId: application.userId,
-        applicationId: id,
-        type: 'inspection_complete',
-        title: 'Site Inspection Completed',
-        message: `Site inspection completed for ${application.propertyName}. Your application is now under review.`,
-        channels: { inapp: true, email: true, sms: false, whatsapp: false },
-      });
+      }, { trusted: true });
 
       res.json({ application: updated, message: "Inspection marked as complete" });
     } catch (error) {
@@ -622,15 +561,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get Application Action History
-  app.get("/api/applications/:id/actions", requireRole('district_officer', 'state_officer', 'property_owner'), async (req, res) => {
-    try {
-      const actions = await storage.getApplicationActions(req.params.id);
-      res.json({ actions });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch application history" });
-    }
-  });
+  // Get Application Action History (disabled - table doesn't exist yet)
+  // app.get("/api/applications/:id/actions", requireRole('district_officer', 'state_officer', 'property_owner'), async (req, res) => {
+  //   try {
+  //     const actions = await storage.getApplicationActions(req.params.id);
+  //     res.json({ actions });
+  //   } catch (error) {
+  //     res.status(500).json({ message: "Failed to fetch application history" });
+  //   }
+  // });
 
   // Document Routes
   
