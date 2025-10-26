@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Home, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
-import { useTheme } from "@/contexts/theme-context";
 import himachalTourismLogo from "@assets/WhatsApp Image 2025-10-25 at 07.59.16_5c0e8739_1761362811579.jpg";
 import hpGovtLogo from "@assets/WhatsApp Image 2025-10-25 at 08.03.16_1cdc4198_1761362811579.jpg";
-import agentryxLogo from "@assets/agentryx-logo.png";
 
 interface NavigationHeaderProps {
   title?: string;
@@ -24,7 +22,6 @@ export function NavigationHeader({
   actions 
 }: NavigationHeaderProps) {
   const [, setLocation] = useLocation();
-  const { theme } = useTheme();
 
   const handleBack = () => {
     if (backTo) {
@@ -61,24 +58,13 @@ export function NavigationHeader({
             )}
             {title && (
               <div className="flex items-center gap-3">
-                {theme === "official-dual-logo" ? (
-                  <img 
-                    src={himachalTourismLogo} 
-                    alt="Himachal Tourism" 
-                    className="h-12 w-auto object-contain"
-                    data-testid="img-hp-tourism-logo"
-                  />
-                ) : (
-                  <img 
-                    src={agentryxLogo} 
-                    alt="Agentryx AI Labs" 
-                    className="h-10 w-auto object-contain"
-                    data-testid="img-agentryx-logo"
-                  />
-                )}
-                {theme === "official-dual-logo" && (
-                  <div className="border-l h-12 border-border"></div>
-                )}
+                <img 
+                  src={himachalTourismLogo} 
+                  alt="Himachal Tourism" 
+                  className="h-12 w-auto object-contain"
+                  data-testid="img-hp-tourism-logo"
+                />
+                <div className="border-l h-12 border-border"></div>
                 <div>
                   <h1 className="text-lg font-semibold leading-tight" data-testid="text-page-title">
                     {title}
@@ -94,17 +80,13 @@ export function NavigationHeader({
           </div>
           {actions && (
             <div className="flex items-center gap-3">
-              {theme === "official-dual-logo" && (
-                <>
-                  <img 
-                    src={hpGovtLogo} 
-                    alt="Himachal Government" 
-                    className="h-10 w-auto object-contain"
-                    data-testid="img-hp-govt-logo"
-                  />
-                  <div className="border-l h-10 border-border"></div>
-                </>
-              )}
+              <img 
+                src={hpGovtLogo} 
+                alt="Himachal Government" 
+                className="h-10 w-auto object-contain"
+                data-testid="img-hp-govt-logo"
+              />
+              <div className="border-l h-10 border-border"></div>
               {actions}
             </div>
           )}

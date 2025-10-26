@@ -22,7 +22,6 @@ import heroImage1 from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 import heroImage2 from "@assets/stock_images/beautiful_scenic_him_3e373e25.jpg";
 import heroImage3 from "@assets/stock_images/beautiful_scenic_him_799557d0.jpg";
 import heroImage4 from "@assets/stock_images/beautiful_scenic_him_10b034ba.jpg";
-import agentryxLogo from "@assets/agentryx-logo.png";
 
 const BASE_STATS = {
   total: 16673,
@@ -462,18 +461,9 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t bg-background">
         <div className="max-w-6xl mx-auto text-center">
-          <p className="text-sm text-muted-foreground mb-2">
+          <p className="text-sm text-muted-foreground">
             © 2025 Government of Himachal Pradesh. All rights reserved.
           </p>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            <p className="text-xs text-muted-foreground">Powered by</p>
-            <img 
-              src={agentryxLogo} 
-              alt="Agentryx AI Labs" 
-              className="h-5 object-contain"
-              data-testid="img-agentryx-logo"
-            />
-          </div>
         </div>
       </footer>
     </div>

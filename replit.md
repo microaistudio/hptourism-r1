@@ -14,7 +14,22 @@ Three core pillars have been implemented:
 
 3. **Analytics Dashboard** - Government officers (district and state level) can access comprehensive analytics including application statistics, status distributions, category breakdowns, district-wise data, processing time metrics, and recent application tracking.
 
-### Recent Enhancements (October 24, 2025)
+### Recent Enhancements (October 26, 2025)
+
+**Official HP Tourism Branding**: All themes now display official government branding:
+- HP Tourism logo (left side of header) with vertical separator
+- HP Government logo (right side of header, before actions)
+- Consistent official branding across all 8 themes
+- Removed third-party branding for clean government portal appearance
+
+**Accessible Hero Carousel**: Production-ready carousel with WCAG compliance:
+- 4-slide carousel featuring Himachal Pradesh landscapes
+- Visible Pause/Play control (top-right) with aria-pressed state
+- Previous/Next navigation buttons with descriptive aria-labels
+- Pagination indicators with 44×44px touch targets
+- role="region" landmark for assistive technology
+- Respects prefers-reduced-motion accessibility setting
+- Auto-play with 5-second intervals
 
 **Clean Professional Redesign**: Complete homepage redesign matching production quality:
 - Clean white background with HP Government teal-green accents
@@ -32,13 +47,13 @@ Three core pillars have been implemented:
 5. **Heritage Gold**: Warm golden/amber cultural tones
 6. **Forest Green**: Deep emerald green nature theme
 7. **Vibrant HP**: Experimental colorful multi-gradient theme
-8. **Official Dual Logo** (NEW): Clean professional design with official HP Tourism and HP Government logos displayed side-by-side in header
+8. **Official Dual Logo**: Clean professional design with official HP Tourism and HP Government logos (same branding as all other themes)
 
 **Technical Features**:
 - Theme switcher dropdown in header with localStorage persistence
 - Smooth CSS transitions (0.3s ease) for seamless theme changes
 - Theme-specific color schemes and visual effects
-- All themes except Classic Clean feature hero image
+- All themes except Classic Clean feature hero carousel
 - Accessible color contrasts in all themes
 - PostgreSQL-backed sessions for reliable authentication across deployments
 
