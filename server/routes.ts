@@ -553,7 +553,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 1. Mountain View Retreat - Diamond - Approved
       await storage.createApplication({
         userId: owner.id,
-        applicationNumber: `HP-HS-2025-${Date.now()}-001`,
         propertyName: "Mountain View Retreat",
         category: "diamond",
         totalRooms: 8,
@@ -601,7 +600,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Pine Valley Homestay - Gold - State Review
       await storage.createApplication({
         userId: owner.id,
-        applicationNumber: `HP-HS-2025-${Date.now()}-002`,
         propertyName: "Pine Valley Homestay",
         category: "gold",
         totalRooms: 5,
@@ -640,7 +638,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Cedar Wood Cottage - Silver - District Review
       await storage.createApplication({
         userId: owner.id,
-        applicationNumber: `HP-HS-2025-${Date.now()}-003`,
         propertyName: "Cedar Wood Cottage",
         category: "silver",
         totalRooms: 3,
@@ -674,7 +671,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 4. Himalayan Heritage Home - Gold - Approved
       await storage.createApplication({
         userId: owner.id,
-        applicationNumber: `HP-HS-2025-${Date.now()}-004`,
         propertyName: "Himalayan Heritage Home",
         category: "gold",
         totalRooms: 6,
@@ -721,7 +717,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 5. Snowfall Cottage - Silver - Submitted
       await storage.createApplication({
         userId: owner.id,
-        applicationNumber: `HP-HS-2025-${Date.now()}-005`,
         propertyName: "Snowfall Cottage",
         category: "silver",
         totalRooms: 4,

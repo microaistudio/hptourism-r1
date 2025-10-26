@@ -18,6 +18,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { useTheme } from "@/contexts/theme-context";
 import heroImage from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
+import agentryxLogo from "@assets/agentryx-logo.png";
 
 const BASE_STATS = {
   total: 16673,
@@ -456,9 +457,15 @@ export default function HomePage() {
           <p className="text-sm text-muted-foreground mb-2">
             © 2025 Government of Himachal Pradesh. All rights reserved.
           </p>
-          <p className="text-xs text-muted-foreground">
-            Developed under Digital Himachal Initiative | Powered by Outline
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <p className="text-xs text-muted-foreground">Powered by</p>
+            <img 
+              src={agentryxLogo} 
+              alt="Agentryx AI Labs" 
+              className="h-5 object-contain"
+              data-testid="img-agentryx-logo"
+            />
+          </div>
         </div>
       </footer>
     </div>
