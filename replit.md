@@ -6,6 +6,15 @@ The HP Tourism Digital Ecosystem is a digital transformation platform aimed at m
 
 ## Recent Changes (October 26, 2025)
 
+**File Metadata Capture & Grid Layout Enhancement**:
+- Enhanced ObjectUploader to capture complete file metadata using File API (fileName, fileSize, mimeType, filePath)
+- Fixed critical 0-byte file bug by returning UploadedFileMetadata[] array instead of string paths
+- Updated backend validation schema to accept documents as metadata object array instead of nested structure
+- Backend now saves actual file sizes and MIME types to documents table (e.g., "image/jpeg", "application/pdf")
+- Redesigned document display with responsive 2-3 column grid layout (grid-cols-1 md:grid-cols-2 lg:grid-cols-3)
+- Each document card displays file icon, truncated filename, document type, file size, and View button
+- End-to-end testing confirms all 7 test documents saved with correct metadata and displayed in grid
+
 **Document Upload System Complete**:
 - Implemented ObjectUploader component for seamless file uploads to Replit object storage
 - Component uses React refs (not IDs) to trigger file selection dialog, supporting multiple instances per page
