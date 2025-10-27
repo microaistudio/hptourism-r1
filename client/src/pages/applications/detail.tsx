@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { generateCertificatePDF } from "@/lib/certificateGenerator";
 
 export default function ApplicationDetail() {
   const [, params] = useRoute("/applications/:id");
@@ -371,7 +372,11 @@ export default function ApplicationDetail() {
                     </div>
                   )}
                   <div className="flex gap-2 pt-2">
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700" data-testid="button-download-certificate">
+                    <Button 
+                      className="flex-1 bg-green-600 hover:bg-green-700" 
+                      onClick={() => generateCertificatePDF(app)}
+                      data-testid="button-download-certificate"
+                    >
                       <Download className="w-4 h-4 mr-2" />
                       Download Certificate (PDF)
                     </Button>
