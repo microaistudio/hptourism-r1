@@ -4,52 +4,39 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, UserX, Shield, Building2, MapPin, Search } from "lucide-react";
+import { Users, UserCheck, Shield, Building2, MapPin, Search } from "lucide-react";
 import { useState } from "react";
 import type { User } from "@shared/schema";
 
 export default function AdminUsers() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  
-  // Form state for editing
-  const [editFullName, setEditFullName] = useState("");
-  const [editRole, setEditRole] = useState("");
-  const [editDistrict, setEditDistrict] = useState("");
 
   const { data: usersData, isLoading } = useQuery<{ users: User[] }>({
     queryKey: ["/api/admin/users"],
   });
 
-  const updateUserMutation = useMutation({
-    mutationFn: async (data: { userId: string; fullName?: string; role?: string; district?: string }) => {
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async (data: { userId: string; role: string }) => {
       const response = await apiRequest("PATCH", `/api/admin/users/${data.userId}`, {
-        fullName: data.fullName,
         role: data.role,
-        district: data.district,
       });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
-        title: "User Updated",
-        description: "User information has been updated successfully.",
+        title: "Role Updated",
+        description: "User role has been updated successfully.",
       });
-      setIsEditDialogOpen(false);
-      setSelectedUser(null);
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Update Failed",
-        description: "Failed to update user. Please try again.",
+        description: error.message || "Failed to update role. Please try again.",
         variant: "destructive",
       });
     },
@@ -69,10 +56,10 @@ export default function AdminUsers() {
         description: `User has been ${variables.isActive ? 'activated' : 'deactivated'} successfully.`,
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Action Failed",
-        description: "Failed to update user status. Please try again.",
+        description: error.message || "Failed to update user status. Please try again.",
         variant: "destructive",
       });
     },
@@ -113,23 +100,8 @@ export default function AdminUsers() {
     }
   };
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setEditFullName(user.fullName);
-    setEditRole(user.role);
-    setEditDistrict(user.district || '');
-    setIsEditDialogOpen(true);
-  };
-
-  const handleUpdateUser = () => {
-    if (!selectedUser) return;
-    
-    updateUserMutation.mutate({
-      userId: selectedUser.id,
-      fullName: editFullName,
-      role: editRole,
-      district: editDistrict || undefined,
-    });
+  const handleRoleChange = (userId: string, newRole: string) => {
+    updateUserRoleMutation.mutate({ userId, role: newRole });
   };
 
   const userStats = {
@@ -232,8 +204,8 @@ export default function AdminUsers() {
                     <TableHead>Name</TableHead>
                     <TableHead>Mobile</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
                     <TableHead>District</TableHead>
+                    <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -251,40 +223,42 @@ export default function AdminUsers() {
                         <TableCell className="font-medium">{user.fullName}</TableCell>
                         <TableCell>{user.mobile}</TableCell>
                         <TableCell>{user.email || '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant={getRoleBadgeVariant(user.role)}>
-                            {getRoleLabel(user.role)}
-                          </Badge>
-                        </TableCell>
                         <TableCell>{user.district || '-'}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.role}
+                            onValueChange={(newRole) => handleRoleChange(user.id, newRole)}
+                            disabled={updateUserRoleMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[180px]" data-testid={`select-role-${user.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="property_owner">Property Owner</SelectItem>
+                              <SelectItem value="district_officer">District Officer</SelectItem>
+                              <SelectItem value="state_officer">State Officer</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell>
                           <Badge variant={user.isActive ? "default" : "outline"}>
                             {user.isActive ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditUser(user)}
-                              data-testid={`button-edit-user-${user.id}`}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant={user.isActive ? "destructive" : "default"}
-                              onClick={() => toggleUserStatusMutation.mutate({ 
-                                userId: user.id, 
-                                isActive: !user.isActive 
-                              })}
-                              disabled={user.role === 'admin'}
-                              data-testid={`button-toggle-status-${user.id}`}
-                            >
-                              {user.isActive ? 'Deactivate' : 'Activate'}
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant={user.isActive ? "destructive" : "default"}
+                            onClick={() => toggleUserStatusMutation.mutate({ 
+                              userId: user.id, 
+                              isActive: !user.isActive 
+                            })}
+                            disabled={toggleUserStatusMutation.isPending}
+                            data-testid={`button-toggle-status-${user.id}`}
+                          >
+                            {user.isActive ? 'Deactivate' : 'Activate'}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -295,72 +269,6 @@ export default function AdminUsers() {
           </CardContent>
         </Card>
 
-        {/* Edit User Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
-              <DialogDescription>
-                Update user information and role
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-name">Full Name</Label>
-                <Input
-                  id="edit-name"
-                  value={editFullName}
-                  onChange={(e) => setEditFullName(e.target.value)}
-                  data-testid="input-edit-name"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="edit-role">Role</Label>
-                <Select value={editRole} onValueChange={setEditRole}>
-                  <SelectTrigger data-testid="select-edit-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="property_owner">Property Owner</SelectItem>
-                    <SelectItem value="district_officer">District Officer</SelectItem>
-                    <SelectItem value="state_officer">State Officer</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="edit-district">District (Optional)</Label>
-                <Input
-                  id="edit-district"
-                  value={editDistrict}
-                  onChange={(e) => setEditDistrict(e.target.value)}
-                  placeholder="Enter district if applicable"
-                  data-testid="input-edit-district"
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditDialogOpen(false)}
-                data-testid="button-cancel-edit"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleUpdateUser}
-                disabled={updateUserMutation.isPending}
-                data-testid="button-save-edit"
-              >
-                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );

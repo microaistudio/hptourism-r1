@@ -1483,12 +1483,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/users/:id", requireRole('admin'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { fullName, role, district } = req.body;
+      const { role, isActive } = req.body;
       
+      // Fetch target user first to check their role
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Whitelist only safe fields for admin updates
       const updates: Partial<User> = {};
-      if (fullName) updates.fullName = fullName;
-      if (role) updates.role = role;
-      if (district !== undefined) updates.district = district || null;
+      if (role !== undefined) {
+        // Validate role is one of the allowed values
+        const allowedRoles = ['property_owner', 'district_officer', 'state_officer', 'admin'];
+        if (!allowedRoles.includes(role)) {
+          return res.status(400).json({ message: "Invalid role" });
+        }
+        updates.role = role;
+      }
+      if (isActive !== undefined) {
+        updates.isActive = isActive;
+      }
+      
+      // Prevent updates if no valid fields provided
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      // Prevent admins from changing their own role or deactivating themselves
+      if (id === req.user?.id) {
+        if (role && role !== req.user.role) {
+          return res.status(400).json({ message: "Cannot change your own role" });
+        }
+        if (isActive === false) {
+          return res.status(400).json({ message: "Cannot deactivate your own account" });
+        }
+      }
+      
+      // Prevent any admin from changing another admin's role or deactivating them
+      if (targetUser.role === 'admin' && id !== req.user?.id) {
+        if (role && role !== targetUser.role) {
+          return res.status(403).json({ message: "Cannot change another admin's role" });
+        }
+        if (isActive === false) {
+          return res.status(403).json({ message: "Cannot deactivate another admin" });
+        }
+      }
       
       const updatedUser = await storage.updateUser(id, updates);
       if (!updatedUser) {
@@ -1508,14 +1548,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { isActive } = req.body;
       
-      // Prevent deactivating admin users
+      // Prevent admins from deactivating themselves
+      if (id === req.user?.id && isActive === false) {
+        return res.status(400).json({ message: "Cannot deactivate your own account" });
+      }
+      
+      // Prevent deactivating other admin users
       const user = await storage.getUser(id);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      if (user.role === 'admin' && !isActive) {
-        return res.status(400).json({ message: "Cannot deactivate admin users" });
+      if (user.role === 'admin' && !isActive && user.id !== req.user?.id) {
+        return res.status(400).json({ message: "Cannot deactivate other admin users" });
       }
       
       const updatedUser = await storage.updateUser(id, { isActive });
