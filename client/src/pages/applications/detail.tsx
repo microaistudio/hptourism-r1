@@ -367,7 +367,7 @@ export default function ApplicationDetail() {
                     {/* Property Photos Gallery */}
                     {(() => {
                       const propertyPhotos = documentsData?.documents?.filter(
-                        doc => doc.documentType === 'property_photos' && doc.mimeType.startsWith('image/')
+                        doc => doc.documentType === 'property_photo' && doc.mimeType.startsWith('image/')
                       ) || [];
                       
                       if (propertyPhotos.length > 0) {
@@ -419,7 +419,7 @@ export default function ApplicationDetail() {
                     {/* Other Documents */}
                     {(() => {
                       const otherDocs = documentsData?.documents?.filter(
-                        doc => doc.documentType !== 'property_photos'
+                        doc => doc.documentType !== 'property_photo'
                       ) || [];
                       
                       if (otherDocs.length > 0) {
@@ -960,7 +960,7 @@ export default function ApplicationDetail() {
       {/* Image Gallery Modal */}
       {(() => {
         const propertyPhotos = documentsData?.documents?.filter(
-          doc => doc.documentType === 'property_photos' && doc.mimeType.startsWith('image/')
+          doc => doc.documentType === 'property_photo' && doc.mimeType.startsWith('image/')
         ) || [];
         
         return (
