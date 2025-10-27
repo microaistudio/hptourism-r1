@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -15,6 +15,14 @@ interface ImageGalleryProps {
 
 export function ImageGallery({ images, open, onClose, initialIndex = 0 }: ImageGalleryProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  
+  // Reset currentIndex when gallery opens with new initialIndex or images change
+  useEffect(() => {
+    if (open && images.length > 0) {
+      const validIndex = Math.max(0, Math.min(initialIndex, images.length - 1));
+      setCurrentIndex(validIndex);
+    }
+  }, [open, initialIndex, images.length]);
 
   const goToPrevious = () => {
     setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
