@@ -384,7 +384,7 @@ export default function ApplicationDetail() {
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => window.open(doc.filePath, '_blank')}
+                                  onClick={() => window.open(`/api/object-storage/view?path=${encodeURIComponent(doc.filePath)}`, '_blank')}
                                   data-testid={`button-view-document-${doc.id}`}
                                 >
                                   <Download className="w-4 h-4 mr-1" />
