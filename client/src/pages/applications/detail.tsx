@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images } from "lucide-react";
 import type { HomestayApplication, User as UserType, Document } from "@shared/schema";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { ImageGallery } from "@/components/ImageGallery";
 
 export default function ApplicationDetail() {
   const [, params] = useRoute("/applications/:id");
@@ -27,6 +28,10 @@ export default function ApplicationDetail() {
   const [inspectionNotes, setInspectionNotes] = useState("");
   const [inspectionFindings, setInspectionFindings] = useState("");
   const [inspectionCompletionNotes, setInspectionCompletionNotes] = useState("");
+  
+  // Image gallery state
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
 
   const applicationId = params?.id;
 
@@ -359,43 +364,104 @@ export default function ApplicationDetail() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Documents from documents table */}
-                    {documentsData?.documents && documentsData.documents.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Uploaded Files</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {documentsData.documents.map((doc) => (
-                            <div key={doc.id} className="flex flex-col p-3 border rounded-md hover-elevate">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 bg-primary/10 rounded flex-shrink-0">
-                                  {doc.mimeType.startsWith('image/') ? (
-                                    <FileImage className="w-5 h-5 text-primary" />
-                                  ) : (
-                                    <FileText className="w-5 h-5 text-primary" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate">{doc.fileName}</p>
-                                  <p className="text-xs text-muted-foreground capitalize">{doc.documentType.replace(/_/g, ' ')}</p>
-                                </div>
+                    {/* Property Photos Gallery */}
+                    {(() => {
+                      const propertyPhotos = documentsData?.documents?.filter(
+                        doc => doc.documentType === 'property_photos' && doc.mimeType.startsWith('image/')
+                      ) || [];
+                      
+                      if (propertyPhotos.length > 0) {
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Images className="w-5 h-5 text-primary" />
+                                <p className="text-sm font-medium">Property Photos ({propertyPhotos.length})</p>
                               </div>
-                              <div className="flex items-center justify-between mt-auto pt-2 border-t">
-                                <span className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</span>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => window.open(`/api/object-storage/view?path=${encodeURIComponent(doc.filePath)}`, '_blank')}
-                                  data-testid={`button-view-document-${doc.id}`}
-                                >
-                                  <Download className="w-4 h-4 mr-1" />
-                                  View
-                                </Button>
-                              </div>
+                              <Button
+                                data-testid="button-view-gallery"
+                                variant="default"
+                                size="sm"
+                                onClick={() => {
+                                  setGalleryInitialIndex(0);
+                                  setIsGalleryOpen(true);
+                                }}
+                              >
+                                <Images className="w-4 h-4 mr-2" />
+                                View Gallery
+                              </Button>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                              {propertyPhotos.map((photo, index) => (
+                                <div
+                                  key={photo.id}
+                                  className="aspect-square border rounded-md overflow-hidden cursor-pointer hover-elevate active-elevate-2"
+                                  onClick={() => {
+                                    setGalleryInitialIndex(index);
+                                    setIsGalleryOpen(true);
+                                  }}
+                                  data-testid={`thumbnail-property-${index}`}
+                                >
+                                  <img
+                                    src={`/api/object-storage/view?path=${encodeURIComponent(photo.filePath)}`}
+                                    alt={photo.fileName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Other Documents */}
+                    {(() => {
+                      const otherDocs = documentsData?.documents?.filter(
+                        doc => doc.documentType !== 'property_photos'
+                      ) || [];
+                      
+                      if (otherDocs.length > 0) {
+                        return (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-muted-foreground mb-2">Supporting Documents</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {otherDocs.map((doc) => (
+                                <div key={doc.id} className="flex flex-col p-3 border rounded-md hover-elevate">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-primary/10 rounded flex-shrink-0">
+                                      {doc.mimeType.startsWith('image/') ? (
+                                        <FileImage className="w-5 h-5 text-primary" />
+                                      ) : (
+                                        <FileText className="w-5 h-5 text-primary" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm truncate">{doc.fileName}</p>
+                                      <p className="text-xs text-muted-foreground capitalize">{doc.documentType.replace(/_/g, ' ')}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-auto pt-2 border-t">
+                                    <span className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => window.open(`/api/object-storage/view?path=${encodeURIComponent(doc.filePath)}`, '_blank')}
+                                      data-testid={`button-view-document-${doc.id}`}
+                                    >
+                                      <Download className="w-4 h-4 mr-1" />
+                                      View
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     {/* Ownership Proof */}
                     {app.ownershipProofUrl && (
                       <div className="flex items-center justify-between p-3 border rounded-md">
@@ -890,6 +956,25 @@ export default function ApplicationDetail() {
           </div>
         </div>
       </div>
+      
+      {/* Image Gallery Modal */}
+      {(() => {
+        const propertyPhotos = documentsData?.documents?.filter(
+          doc => doc.documentType === 'property_photos' && doc.mimeType.startsWith('image/')
+        ) || [];
+        
+        return (
+          <ImageGallery
+            images={propertyPhotos.map(photo => ({
+              filePath: photo.filePath,
+              fileName: photo.fileName
+            }))}
+            open={isGalleryOpen}
+            onClose={() => setIsGalleryOpen(false)}
+            initialIndex={galleryInitialIndex}
+          />
+        );
+      })()}
     </div>
   );
 }
