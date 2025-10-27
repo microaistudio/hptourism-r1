@@ -186,6 +186,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to get upload URL" });
     }
   });
+
+  // File View - Get presigned view URL and redirect
+  app.get("/api/object-storage/view", requireAuth, async (req, res) => {
+    try {
+      const filePath = req.query.path as string;
+      if (!filePath) {
+        return res.status(400).json({ message: "File path is required" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const viewURL = await objectStorageService.getViewURL(filePath);
+      
+      // Redirect to the signed URL
+      res.redirect(viewURL);
+    } catch (error) {
+      console.error("Error getting view URL:", error);
+      res.status(500).json({ message: "Failed to get view URL" });
+    }
+  });
   
   // Create application
   app.post("/api/applications", requireAuth, async (req, res) => {

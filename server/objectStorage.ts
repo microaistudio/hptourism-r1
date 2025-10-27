@@ -54,6 +54,17 @@ export class ObjectStorageService {
     return url.pathname;
   }
 
+  async getViewURL(filePath: string): Promise<string> {
+    const { bucketName, objectName } = this.parseObjectPath(filePath);
+    
+    return this.signObjectURL({
+      bucketName,
+      objectName,
+      method: "GET",
+      ttlSec: 3600, // 1 hour
+    });
+  }
+
   private parseObjectPath(path: string): { bucketName: string; objectName: string } {
     if (!path.startsWith("/")) {
       path = `/${path}`;
