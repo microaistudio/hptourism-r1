@@ -114,6 +114,15 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setLocation('/payment-verification')}
+                  data-testid="button-payment-verification"
+                >
+                  <CreditCard className="w-4 h-4 mr-1" />
+                  Payments
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setLocation('/analytics')}
                   data-testid="button-analytics"
                 >

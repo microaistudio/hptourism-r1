@@ -20,6 +20,7 @@ import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
 import WorkflowMonitoring from "@/pages/workflow-monitoring";
+import PaymentVerification from "@/pages/payment-verification";
 import TestAPI from "@/pages/test-api";
 import type { User } from "@shared/schema";
 
@@ -100,6 +101,9 @@ function Router() {
       </Route>
       <Route path="/workflow-monitoring">
         {() => <ProtectedRoute component={WorkflowMonitoring} allowedRoles={['district_officer', 'state_officer']} />}
+      </Route>
+      <Route path="/payment-verification">
+        {() => <ProtectedRoute component={PaymentVerification} allowedRoles={['district_officer', 'state_officer']} />}
       </Route>
       
       <Route component={NotFound} />
