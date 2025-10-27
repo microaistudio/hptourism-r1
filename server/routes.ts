@@ -559,7 +559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update application
       const updated = await storage.updateApplication(id, {
-        status: 'inspection_scheduled',
+        status: 'site_inspection_scheduled',
         currentStage: 'site_inspection',
         siteInspectionScheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
         siteInspectionOfficerId: user.id,
@@ -573,11 +573,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Officer Actions - Mark Inspection Complete
+  // Officer Actions - Mark Inspection Complete with Outcome
   app.post("/api/applications/:id/complete-inspection", requireRole('district_officer', 'state_officer'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { findings, notes } = req.body;
+      const { outcome, findings, notes } = req.body;
 
       const user = await storage.getUser(req.session.userId!);
       if (!user || (user.role !== "district_officer" && user.role !== "state_officer")) {
@@ -589,15 +589,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Application not found" });
       }
 
-      // Update application
-      const updated = await storage.updateApplication(id, {
-        status: 'inspection_completed',
+      // Validate outcome
+      if (!['approved', 'corrections_needed', 'rejected'].includes(outcome)) {
+        return res.status(400).json({ message: "Invalid inspection outcome" });
+      }
+
+      // Validate that issuesFound is provided for corrections_needed or rejected outcomes
+      if ((outcome === 'corrections_needed' || outcome === 'rejected') && 
+          !findings?.issuesFound && !notes) {
+        return res.status(400).json({ 
+          message: "Issues description is required when sending back for corrections or rejecting an application" 
+        });
+      }
+
+      // Determine next status based on outcome
+      let newStatus;
+      let clarificationRequested = null;
+      
+      switch (outcome) {
+        case 'approved':
+          newStatus = 'payment_pending';
+          break;
+        case 'corrections_needed':
+          newStatus = 'sent_back_for_corrections';
+          clarificationRequested = findings?.issuesFound || notes || 'Site inspection found issues that need correction';
+          break;
+        case 'rejected':
+          newStatus = 'rejected';
+          break;
+        default:
+          newStatus = 'inspection_completed';
+      }
+
+      // Update application with inspection results and outcome
+      const updateData: any = {
+        status: newStatus,
         siteInspectionCompletedDate: new Date(),
+        siteInspectionOutcome: outcome,
         siteInspectionFindings: findings || {},
         siteInspectionNotes: notes,
-      });
+      };
 
-      res.json({ application: updated, message: "Inspection marked as complete" });
+      // Add rejection reason or clarification if applicable
+      if (outcome === 'rejected') {
+        updateData.rejectionReason = findings?.issuesFound || notes || 'Application rejected after site inspection';
+      } else if (outcome === 'corrections_needed') {
+        updateData.clarificationRequested = clarificationRequested;
+      }
+
+      const updated = await storage.updateApplication(id, updateData);
+
+      res.json({ application: updated, message: "Inspection completed successfully" });
     } catch (error) {
       console.error("Complete inspection error:", error);
       res.status(500).json({ message: "Failed to complete inspection" });

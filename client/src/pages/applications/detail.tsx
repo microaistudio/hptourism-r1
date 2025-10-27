@@ -14,6 +14,8 @@ import type { HomestayApplication, User as UserType, Document } from "@shared/sc
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/ImageGallery";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function ApplicationDetail() {
   const [, params] = useRoute("/applications/:id");
@@ -26,7 +28,17 @@ export default function ApplicationDetail() {
   const [sendBackIssues, setSendBackIssues] = useState("");
   const [inspectionDate, setInspectionDate] = useState("");
   const [inspectionNotes, setInspectionNotes] = useState("");
-  const [inspectionFindings, setInspectionFindings] = useState("");
+  
+  // Inspection completion states
+  const [inspectionOutcome, setInspectionOutcome] = useState<'approved' | 'corrections_needed' | 'rejected'>('approved');
+  const [roomCountVerified, setRoomCountVerified] = useState(false);
+  const [roomCountActual, setRoomCountActual] = useState("");
+  const [amenitiesVerified, setAmenitiesVerified] = useState(false);
+  const [amenitiesIssues, setAmenitiesIssues] = useState("");
+  const [fireSafetyVerified, setFireSafetyVerified] = useState(false);
+  const [fireSafetyIssues, setFireSafetyIssues] = useState("");
+  const [categoryRecommendation, setCategoryRecommendation] = useState("");
+  const [issuesFound, setIssuesFound] = useState("");
   const [inspectionCompletionNotes, setInspectionCompletionNotes] = useState("");
   
   // Image gallery state
@@ -133,21 +145,51 @@ export default function ApplicationDetail() {
 
   // Complete Inspection Mutation
   const completeInspectionMutation = useMutation({
-    mutationFn: async ({ findings, notes }: { findings: string; notes: string }) => {
+    mutationFn: async () => {
+      const findings = {
+        roomCountVerified,
+        roomCountActual: roomCountActual ? parseInt(roomCountActual) : undefined,
+        amenitiesVerified,
+        amenitiesIssues,
+        fireSafetyVerified,
+        fireSafetyIssues,
+        categoryRecommendation,
+        overallSatisfactory: inspectionOutcome === 'approved',
+        issuesFound,
+      };
+      
       const response = await apiRequest("POST", `/api/applications/${applicationId}/complete-inspection`, {
+        outcome: inspectionOutcome,
         findings,
-        notes,
+        notes: inspectionCompletionNotes,
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      
+      const outcomeMessages = {
+        approved: "Application approved and moved to payment pending",
+        corrections_needed: "Application sent back for corrections",
+        rejected: "Application rejected"
+      };
+      
       toast({
         title: "Inspection Completed",
-        description: "The site inspection has been marked as complete.",
+        description: outcomeMessages[inspectionOutcome],
       });
-      setInspectionFindings("");
+      
+      // Reset form
+      setInspectionOutcome('approved');
+      setRoomCountVerified(false);
+      setRoomCountActual("");
+      setAmenitiesVerified(false);
+      setAmenitiesIssues("");
+      setFireSafetyVerified(false);
+      setFireSafetyIssues("");
+      setCategoryRecommendation("");
+      setIssuesFound("");
       setInspectionCompletionNotes("");
     },
     onError: () => {
@@ -809,26 +851,143 @@ export default function ApplicationDetail() {
                           Complete Inspection
                         </Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
-                          <DialogTitle>Mark Inspection as Complete</DialogTitle>
+                          <DialogTitle>Complete Site Inspection</DialogTitle>
                           <DialogDescription>
-                            Record the findings from the site inspection.
+                            Record your findings from the site inspection and choose an outcome
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="findings">Inspection Findings</Label>
-                            <Textarea
-                              id="findings"
-                              placeholder="Document your findings from the site inspection..."
-                              value={inspectionFindings}
-                              onChange={(e) => setInspectionFindings(e.target.value)}
-                              rows={4}
-                              data-testid="input-inspection-findings"
+                        <div className="space-y-6">
+                          {/* Inspection Checklist */}
+                          <div className="space-y-4">
+                            <Label className="text-base font-semibold">Inspection Checklist</Label>
+                            
+                            {/* Room Count Verification */}
+                            <div className="space-y-2 p-3 border rounded-md">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="roomCountVerified"
+                                  checked={roomCountVerified}
+                                  onCheckedChange={(checked) => setRoomCountVerified(!!checked)}
+                                  data-testid="checkbox-room-count"
+                                />
+                                <Label htmlFor="roomCountVerified" className="font-medium cursor-pointer">
+                                  Room count verified (Declared: {app.totalRooms})
+                                </Label>
+                              </div>
+                              <Input
+                                placeholder="Actual room count (if different)"
+                                value={roomCountActual}
+                                onChange={(e) => setRoomCountActual(e.target.value)}
+                                type="number"
+                                data-testid="input-room-count-actual"
+                              />
+                            </div>
+                            
+                            {/* Amenities Verification */}
+                            <div className="space-y-2 p-3 border rounded-md">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="amenitiesVerified"
+                                  checked={amenitiesVerified}
+                                  onCheckedChange={(checked) => setAmenitiesVerified(!!checked)}
+                                  data-testid="checkbox-amenities"
+                                />
+                                <Label htmlFor="amenitiesVerified" className="font-medium cursor-pointer">
+                                  Amenities verified (as per {app.category} category)
+                                </Label>
+                              </div>
+                              <Textarea
+                                placeholder="Issues with amenities (if any)..."
+                                value={amenitiesIssues}
+                                onChange={(e) => setAmenitiesIssues(e.target.value)}
+                                rows={2}
+                                data-testid="input-amenities-issues"
+                              />
+                            </div>
+                            
+                            {/* Fire Safety Verification */}
+                            <div className="space-y-2 p-3 border rounded-md">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="fireSafetyVerified"
+                                  checked={fireSafetyVerified}
+                                  onCheckedChange={(checked) => setFireSafetyVerified(!!checked)}
+                                  data-testid="checkbox-fire-safety"
+                                />
+                                <Label htmlFor="fireSafetyVerified" className="font-medium cursor-pointer">
+                                  Fire safety measures verified
+                                </Label>
+                              </div>
+                              <Textarea
+                                placeholder="Fire safety issues (if any)..."
+                                value={fireSafetyIssues}
+                                onChange={(e) => setFireSafetyIssues(e.target.value)}
+                                rows={2}
+                                data-testid="input-fire-safety-issues"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Category Recommendation */}
+                          <div className="space-y-2">
+                            <Label htmlFor="categoryRec">Category Recommendation (Optional)</Label>
+                            <Input
+                              id="categoryRec"
+                              placeholder="Recommend different category if needed"
+                              value={categoryRecommendation}
+                              onChange={(e) => setCategoryRecommendation(e.target.value)}
+                              data-testid="input-category-recommendation"
                             />
                           </div>
-                          <div>
+                          
+                          {/* Inspection Outcome */}
+                          <div className="space-y-3">
+                            <Label className="text-base font-semibold">Inspection Outcome</Label>
+                            <RadioGroup value={inspectionOutcome} onValueChange={(value: any) => setInspectionOutcome(value)}>
+                              <div className="flex items-center space-x-2 p-3 border rounded-md hover-elevate cursor-pointer">
+                                <RadioGroupItem value="approved" id="outcome-approved" data-testid="radio-approved" />
+                                <Label htmlFor="outcome-approved" className="flex-1 cursor-pointer">
+                                  <span className="font-medium text-green-600">Approve</span>
+                                  <p className="text-sm text-muted-foreground">Site inspection successful, move to payment</p>
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2 p-3 border rounded-md hover-elevate cursor-pointer">
+                                <RadioGroupItem value="corrections_needed" id="outcome-corrections" data-testid="radio-corrections" />
+                                <Label htmlFor="outcome-corrections" className="flex-1 cursor-pointer">
+                                  <span className="font-medium text-orange-600">Send Back for Corrections</span>
+                                  <p className="text-sm text-muted-foreground">Issues found, applicant needs to fix them</p>
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2 p-3 border rounded-md hover-elevate cursor-pointer">
+                                <RadioGroupItem value="rejected" id="outcome-rejected" data-testid="radio-rejected" />
+                                <Label htmlFor="outcome-rejected" className="flex-1 cursor-pointer">
+                                  <span className="font-medium text-destructive">Reject</span>
+                                  <p className="text-sm text-muted-foreground">Property does not meet requirements</p>
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                          
+                          {/* Issues Found (required for corrections/rejection) */}
+                          {(inspectionOutcome === 'corrections_needed' || inspectionOutcome === 'rejected') && (
+                            <div className="space-y-2">
+                              <Label htmlFor="issuesFound" className="text-destructive">Issues Found *</Label>
+                              <Textarea
+                                id="issuesFound"
+                                placeholder="Describe the issues that need to be addressed..."
+                                value={issuesFound}
+                                onChange={(e) => setIssuesFound(e.target.value)}
+                                rows={4}
+                                data-testid="input-issues-found"
+                                className="border-destructive"
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Additional Notes */}
+                          <div className="space-y-2">
                             <Label htmlFor="completionNotes">Additional Notes</Label>
                             <Textarea
                               id="completionNotes"
@@ -842,11 +1001,12 @@ export default function ApplicationDetail() {
                         </div>
                         <DialogFooter>
                           <Button
-                            onClick={() => completeInspectionMutation.mutate({ findings: inspectionFindings, notes: inspectionCompletionNotes })}
-                            disabled={completeInspectionMutation.isPending || !inspectionFindings || inspectionFindings.length < 10}
+                            onClick={() => completeInspectionMutation.mutate()}
+                            disabled={completeInspectionMutation.isPending || 
+                              ((inspectionOutcome === 'corrections_needed' || inspectionOutcome === 'rejected') && !issuesFound)}
                             data-testid="button-confirm-complete-inspection"
                           >
-                            Complete Inspection
+                            {completeInspectionMutation.isPending ? "Processing..." : "Submit Inspection Results"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>

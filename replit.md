@@ -4,6 +4,26 @@
 
 The HP Tourism Digital Ecosystem is a digital transformation platform aimed at modernizing Himachal Pradesh's tourism registration and management. It functions as both a public-facing tourism discovery portal and an administrative system for tourism operators. The platform focuses on managing various tourism registration types, particularly implementing the "Himachal Pradesh Homestay Rules 2025" with its three-tier categorization (Diamond, Gold, Silver). Its core objective is to significantly reduce application processing times through automation and streamlined user experiences. Key capabilities include a Public Tourism Discovery Platform, a Smart Compliance Hub for property owners, and an Analytics Dashboard for government officers. A notable feature is the Workflow Monitoring Dashboard, providing real-time application pipeline tracking and intelligent alerting.
 
+## Recent Changes (October 27, 2025)
+
+**3-Outcome Inspection Workflow Implementation**:
+- Implemented comprehensive site inspection completion workflow with 3 outcomes (Approve, Send Back for Corrections, Reject)
+- Added `siteInspectionOutcome` field to schema to track inspection results
+- Enhanced `siteInspectionFindings` JSONB with structured fields: roomCountVerified, roomCountActual, amenitiesVerified, amenitiesIssues, fireSafetyVerified, fireSafetyIssues, categoryRecommendation, issuesFound
+- Backend `/api/applications/:id/complete-inspection` endpoint redesigned:
+  - Accepts outcome parameter and structured findings object
+  - Validates that issuesFound is required when outcome is corrections_needed or rejected
+  - Routes to appropriate status: approved → payment_pending, corrections_needed → sent_back_for_corrections, rejected → rejected
+  - Auto-populates clarificationRequested or rejectionReason based on outcome
+- Created comprehensive inspection completion dialog with:
+  - Structured checklist (room count verification, amenities, fire safety) using checkboxes
+  - Radio button selection for 3 outcomes with clear descriptions
+  - Conditional "Issues Found" textarea (required for corrections/rejection)
+  - Category recommendation field for reclassification suggestions
+  - Frontend validation prevents submission without issues description for non-approval outcomes
+- Fixed status mismatch: backend now uses 'site_inspection_scheduled' to match workflow monitoring dashboard
+- Workflow monitoring pipeline now correctly displays applications in "Site Inspection" stage
+
 ## Recent Changes (October 26, 2025)
 
 **File Metadata Capture & Grid Layout Enhancement**:
