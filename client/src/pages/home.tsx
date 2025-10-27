@@ -460,10 +460,18 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t bg-background">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-sm text-muted-foreground">
-            © 2025 Government of Himachal Pradesh. All rights reserved.
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              © 2025 Government of Himachal Pradesh. All rights reserved.
+            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="badge-powered-by">
+              <span>Powered by</span>
+              <div className="px-3 py-1 bg-primary/10 border border-primary/20 rounded-md" data-testid="badge-agentryx">
+                <span className="font-semibold text-primary">Agentryx</span>
+              </div>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
