@@ -6,6 +6,21 @@ The HP Tourism Digital Ecosystem is a digital transformation platform aimed at m
 
 ## Recent Changes (October 27, 2025)
 
+**Complete Payment to Certificate Workflow**:
+- Implemented end-to-end payment workflow: property owners make UPI payments → officers verify → certificates auto-generated
+- Created payment page displaying UPI QR code for subhash.thakur.india@oksbi with fee breakdown and transaction ID input
+- Built payment verification dashboard for officers to view pending payments and confirm transactions
+- Backend POST /api/payments/:id/confirm endpoint generates certificates with format HP-HST-YYYY-XXXXX and updates application status to approved
+- Certificate display card on application detail page shows certificate number, issue date, expiry date (1 year validity), and Active badge
+- Payment status flow: payment_pending → owner submits transaction ID → pending_verification → officer confirms → success
+- Application status flow: payment_pending → approved (with certificate)
+- Certificate fields: certificateNumber, certificateIssuedDate, certificateExpiryDate, all auto-populated on payment confirmation
+- Dashboard shows payment buttons for payment_pending applications and certificate indicators for approved applications
+- Added "Payments" navigation button for officers to access verification dashboard
+- End-to-end tested: officer confirmation → certificate generation → immediate owner visibility with proper cache invalidation
+
+## Recent Changes (October 27, 2025) - Earlier
+
 **Workflow Monitoring Dashboard Enhancements**:
 - Implemented clickable pipeline stages for instant filtering - officers can click any stage (Submitted, Document Check, Site Inspection, etc.) to filter applications
 - Added visual feedback for active filters: ring border, shadow enhancement, and "Filtered" badge on selected stage
