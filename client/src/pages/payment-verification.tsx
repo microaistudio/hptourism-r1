@@ -35,11 +35,17 @@ export default function PaymentVerificationPage() {
   const confirmPaymentMutation = useMutation({
     mutationFn: async (paymentId: string) => {
       const response = await apiRequest("POST", `/api/payments/${paymentId}/confirm`, {});
-      return response.json();
+      return await response.json() as { certificateNumber: string; applicationId: string };
     },
-    onSuccess: (data: { certificateNumber: string }) => {
+    onSuccess: (data) => {
+      // Invalidate all relevant caches so UI updates everywhere
       queryClient.invalidateQueries({ queryKey: ["/api/payments/pending"] });
       queryClient.invalidateQueries({ queryKey: ["/api/applications/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      // Invalidate the specific application cache for the owner
+      if (data.applicationId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/applications", data.applicationId] });
+      }
       toast({
         title: "Payment Confirmed",
         description: `Certificate ${data.certificateNumber} has been issued successfully.`,

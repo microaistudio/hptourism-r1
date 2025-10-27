@@ -736,7 +736,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         message: "Payment confirmed and certificate issued",
-        certificateNumber 
+        certificateNumber,
+        applicationId: payment.applicationId
       });
     } catch (error) {
       console.error('Payment confirmation error:', error);

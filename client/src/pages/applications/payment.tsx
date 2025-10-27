@@ -22,13 +22,15 @@ export default function PaymentPage() {
 
   const UPI_ID = "subhash.thakur.india@oksbi";
 
-  const { data: application, isLoading: appLoading } = useQuery<HomestayApplication>({
-    queryKey: [`/api/applications/${id}`],
+  const { data: applicationData, isLoading: appLoading } = useQuery<{ application: HomestayApplication }>({
+    queryKey: ["/api/applications", id],
     enabled: !!id,
   });
 
+  const application = applicationData?.application;
+
   const { data: paymentsData } = useQuery<{ payments: Payment[] }>({
-    queryKey: [`/api/applications/${id}/payments`],
+    queryKey: ["/api/applications", id, "payments"],
     enabled: !!id,
   });
 
@@ -54,7 +56,9 @@ export default function PaymentPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/applications/${id}/payments`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications", id, "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
       toast({
         title: "Payment Submitted",
         description: "Your payment details have been submitted for verification by the officer.",
