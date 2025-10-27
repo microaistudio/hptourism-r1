@@ -416,7 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'submitted',
         submittedAt: new Date(),
         clarificationRequested: null, // Clear feedback after resubmission
-      }, { trusted: true });
+      });
       
       res.json({ application: updatedApplication });
     } catch (error) {
@@ -532,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateApplication(id, {
         status: 'sent_back_for_corrections',
         clarificationRequested: feedback,
-      }, { trusted: true });
+      });
 
       res.json({ application: updated, message: "Application sent back to applicant" });
     } catch (error) {
@@ -564,7 +564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         siteInspectionScheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
         siteInspectionOfficerId: user.id,
         siteInspectionNotes: notes,
-      }, { trusted: true });
+      });
 
       res.json({ application: updated, message: "Site inspection scheduled" });
     } catch (error) {
@@ -595,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         siteInspectionCompletedDate: new Date(),
         siteInspectionFindings: findings || {},
         siteInspectionNotes: notes,
-      }, { trusted: true });
+      });
 
       res.json({ application: updated, message: "Inspection marked as complete" });
     } catch (error) {
