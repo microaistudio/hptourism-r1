@@ -101,12 +101,17 @@ export const homestayApplications = pgTable("homestay_applications", {
   siteInspectionCompletedDate: timestamp("site_inspection_completed_date"),
   siteInspectionOfficerId: varchar("site_inspection_officer_id").references(() => users.id),
   siteInspectionNotes: text("site_inspection_notes"),
+  siteInspectionOutcome: varchar("site_inspection_outcome", { length: 50 }), // 'approved', 'corrections_needed', 'rejected'
   siteInspectionFindings: jsonb("site_inspection_findings").$type<{
     roomCountVerified?: boolean;
+    roomCountActual?: number;
     amenitiesVerified?: boolean;
+    amenitiesIssues?: string;
     fireSafetyVerified?: boolean;
+    fireSafetyIssues?: string;
     categoryRecommendation?: string;
     overallSatisfactory?: boolean;
+    issuesFound?: string;
   }>(),
   
   // Uploaded Documents (URLs stored as JSON array for photos)
