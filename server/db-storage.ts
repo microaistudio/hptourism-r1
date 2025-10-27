@@ -37,6 +37,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
   // Homestay Application methods
   async getApplication(id: string): Promise<HomestayApplication | undefined> {
     const result = await db.select().from(homestayApplications).where(eq(homestayApplications.id, id)).limit(1);

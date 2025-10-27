@@ -7,6 +7,7 @@ export interface IStorage {
   getUserByMobile(mobile: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   
   // Homestay Application methods
   getApplication(id: string): Promise<HomestayApplication | undefined>;
@@ -93,6 +94,21 @@ export class MemStorage implements IStorage {
     };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser: User = {
+      ...user,
+      ...updates,
+      id: user.id, // Prevent ID from being changed
+      createdAt: user.createdAt, // Preserve creation date
+      updatedAt: new Date(), // Update modification date
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   // Homestay Application methods

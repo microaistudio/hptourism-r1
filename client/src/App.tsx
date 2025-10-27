@@ -21,6 +21,7 @@ import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
 import WorkflowMonitoring from "@/pages/workflow-monitoring";
 import PaymentVerification from "@/pages/payment-verification";
+import AdminUsers from "@/pages/admin/users";
 import TestAPI from "@/pages/test-api";
 import type { User } from "@shared/schema";
 
@@ -104,6 +105,11 @@ function Router() {
       </Route>
       <Route path="/payment-verification">
         {() => <ProtectedRoute component={PaymentVerification} allowedRoles={['district_officer', 'state_officer']} />}
+      </Route>
+      
+      {/* Admin Routes */}
+      <Route path="/admin/users">
+        {() => <ProtectedRoute component={AdminUsers} allowedRoles={['admin']} />}
       </Route>
       
       <Route component={NotFound} />

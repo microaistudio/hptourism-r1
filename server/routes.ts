@@ -1464,6 +1464,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // ============================================
+  // Admin Routes - User Management
+  // ============================================
+  
+  // Get all users (admin only)
+  app.get("/api/admin/users", requireRole('admin'), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json({ users });
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Update user (admin only)
+  app.patch("/api/admin/users/:id", requireRole('admin'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fullName, role, district } = req.body;
+      
+      const updates: Partial<User> = {};
+      if (fullName) updates.fullName = fullName;
+      if (role) updates.role = role;
+      if (district !== undefined) updates.district = district || null;
+      
+      const updatedUser = await storage.updateUser(id, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({ user: updatedUser });
+    } catch (error) {
+      console.error("Failed to update user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Toggle user status (admin only)
+  app.patch("/api/admin/users/:id/status", requireRole('admin'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      
+      // Prevent deactivating admin users
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (user.role === 'admin' && !isActive) {
+        return res.status(400).json({ message: "Cannot deactivate admin users" });
+      }
+      
+      const updatedUser = await storage.updateUser(id, { isActive });
+      res.json({ user: updatedUser });
+    } catch (error) {
+      console.error("Failed to update user status:", error);
+      res.status(500).json({ message: "Failed to update user status" });
+    }
+  });
+
   // Start production stats scraper (runs on boot and hourly)
   startScraperScheduler();
   console.log('[scraper] Production stats scraper initialized');

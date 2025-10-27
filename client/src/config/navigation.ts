@@ -51,8 +51,25 @@ export const officerNavigation: NavSection[] = [
   },
 ];
 
+// Admin Navigation Menu
+export const adminNavigation: NavSection[] = [
+  {
+    title: "Admin",
+    items: [
+      {
+        title: "User Management",
+        url: "/admin/users",
+        icon: Users,
+      },
+    ],
+  },
+];
+
 // Get navigation based on user role
 export function getNavigationForRole(role: string): NavSection[] {
+  if (role === 'admin') {
+    return adminNavigation;
+  }
   if (role === 'district_officer' || role === 'state_officer') {
     return officerNavigation;
   }
@@ -61,6 +78,9 @@ export function getNavigationForRole(role: string): NavSection[] {
 
 // Get default route for role
 export function getDefaultRouteForRole(role: string): string {
+  if (role === 'admin') {
+    return '/admin/users';
+  }
   if (role === 'district_officer' || role === 'state_officer') {
     return '/workflow-monitoring';
   }
