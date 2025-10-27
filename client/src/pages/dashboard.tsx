@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mountain, LogOut, Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Mountain, LogOut, Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
 
 export default function Dashboard() {
@@ -60,6 +60,7 @@ export default function Dashboard() {
     total: applications.length,
     draft: applications.filter(a => a.status === 'draft').length,
     sentBack: applications.filter(a => a.status === 'sent_back_for_corrections').length,
+    paymentPending: applications.filter(a => a.status === 'payment_pending').length,
     pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review' || a.status === 'inspection_scheduled' || a.status === 'inspection_completed').length,
     approved: applications.filter(a => a.status === 'approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
@@ -74,6 +75,7 @@ export default function Dashboard() {
       sent_back_for_corrections: { variant: "destructive", label: "Sent Back for Corrections" },
       inspection_scheduled: { variant: "secondary", label: "Inspection Scheduled" },
       inspection_completed: { variant: "secondary", label: "Inspection Completed" },
+      payment_pending: { variant: "secondary", label: "Payment Pending" },
       approved: { variant: "default", label: "Approved" },
       rejected: { variant: "destructive", label: "Rejected" },
     };
@@ -148,6 +150,37 @@ export default function Dashboard() {
             </Button>
           )}
         </div>
+
+        {/* Payment Required Alert */}
+        {user.role === 'property_owner' && stats.paymentPending > 0 && (
+          <Card className="mb-6 border-primary">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-primary" />
+                <CardTitle className="text-primary">Payment Required</CardTitle>
+              </div>
+              <CardDescription>
+                You have {stats.paymentPending} application{stats.paymentPending > 1 ? 's' : ''} awaiting payment
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm mb-3">
+                Your application{stats.paymentPending > 1 ? 's have' : ' has'} been approved for registration. 
+                Complete the payment to receive your certificate.
+              </p>
+              <Button 
+                onClick={() => {
+                  const paymentApp = applications.find(a => a.status === 'payment_pending');
+                  if (paymentApp) setLocation(`/applications/${paymentApp.id}/payment`);
+                }}
+                data-testid="button-make-payment"
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Make Payment
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Action Required Alert */}
         {user.role === 'property_owner' && stats.sentBack > 0 && (
@@ -319,6 +352,18 @@ export default function Dashboard() {
                       >
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Update Application
+                      </Button>
+                    ) : app.status === 'payment_pending' ? (
+                      <Button 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/applications/${app.id}/payment`);
+                        }}
+                        data-testid={`button-payment-${app.id}`}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Make Payment
                       </Button>
                     ) : (
                       <Button variant="ghost" size="sm" data-testid={`button-view-${app.id}`}>

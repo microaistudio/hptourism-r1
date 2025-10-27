@@ -704,6 +704,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Confirm payment (Officer only)
+  app.post("/api/payments/:id/confirm", requireRole("district_officer", "state_officer"), async (req, res) => {
+    try {
+      const payment = await storage.getPaymentById(req.params.id);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      // Update payment status to success
+      await storage.updatePayment(req.params.id, {
+        paymentStatus: "success",
+        completedAt: new Date(),
+      });
+
+      // Update application status to approved and generate certificate number
+      const application = await storage.getApplication(payment.applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      const certificateNumber = `HP-HST-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`;
+      
+      await storage.updateApplication(payment.applicationId, {
+        status: "approved",
+        certificateNumber,
+        certificateIssuedDate: new Date(),
+        certificateExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+        approvedAt: new Date(),
+      });
+
+      res.json({ 
+        message: "Payment confirmed and certificate issued",
+        certificateNumber 
+      });
+    } catch (error) {
+      console.error('Payment confirmation error:', error);
+      res.status(500).json({ message: "Failed to confirm payment" });
+    }
+  });
+
+  // Get all pending payments (Officer only)
+  app.get("/api/payments/pending", requireRole("district_officer", "state_officer"), async (req, res) => {
+    try {
+      const allApplications = await storage.getAllApplications();
+      const pendingPaymentApps = allApplications.filter(a => a.status === 'payment_pending');
+      
+      const paymentsWithApps = await Promise.all(
+        pendingPaymentApps.map(async (app) => {
+          const payments = await storage.getPaymentsByApplication(app.id);
+          return {
+            application: app,
+            payment: payments.find(p => p.paymentStatus === 'pending_verification') || payments[0] || null,
+          };
+        })
+      );
+
+      res.json({ pendingPayments: paymentsWithApps.filter(p => p.payment !== null) });
+    } catch (error) {
+      console.error('Pending payments fetch error:', error);
+      res.status(500).json({ message: "Failed to fetch pending payments" });
+    }
+  });
+
   // Public Routes (Discovery Platform)
   
   // Get approved properties

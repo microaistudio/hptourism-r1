@@ -123,6 +123,13 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getPaymentById(id: string): Promise<Payment | undefined> {
+    const result = await db.select().from(payments)
+      .where(eq(payments.id, id))
+      .limit(1);
+    return result[0];
+  }
+
   async getPaymentsByApplication(applicationId: string): Promise<Payment[]> {
     return await db.select().from(payments)
       .where(eq(payments.applicationId, applicationId))

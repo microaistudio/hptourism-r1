@@ -24,6 +24,7 @@ export interface IStorage {
   // Payment methods
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, payment: Partial<Payment>): Promise<Payment | undefined>;
+  getPaymentById(id: string): Promise<Payment | undefined>;
   getPaymentsByApplication(applicationId: string): Promise<Payment[]>;
   
   // Notification methods
@@ -235,6 +236,10 @@ export class MemStorage implements IStorage {
     
     this.payments.set(id, updated);
     return updated;
+  }
+
+  async getPaymentById(id: string): Promise<Payment | undefined> {
+    return this.payments.get(id);
   }
 
   async getPaymentsByApplication(applicationId: string): Promise<Payment[]> {
