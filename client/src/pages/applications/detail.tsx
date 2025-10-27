@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard } from "lucide-react";
 import type { HomestayApplication, User as UserType, Document } from "@shared/schema";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -317,6 +317,101 @@ export default function ApplicationDetail() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Registration Certificate - Show when approved */}
+            {app.status === 'approved' && app.certificateNumber && (
+              <Card className="border-green-200 bg-green-50/50">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Award className="w-5 h-5 text-green-600" />
+                    <CardTitle className="text-green-800">Registration Certificate Issued</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Your homestay is officially registered with HP Tourism
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-white p-4 rounded-lg border border-green-200">
+                      <Label className="text-muted-foreground text-xs">Certificate Number</Label>
+                      <p className="text-lg font-bold text-green-700" data-testid="text-certificate-number">
+                        {app.certificateNumber}
+                      </p>
+                    </div>
+                    {app.certificateIssuedDate && (
+                      <div className="bg-white p-4 rounded-lg border border-green-200">
+                        <Label className="text-muted-foreground text-xs">Issue Date</Label>
+                        <p className="text-lg font-semibold text-green-700" data-testid="text-certificate-date">
+                          {new Date(app.certificateIssuedDate).toLocaleDateString('en-IN', { 
+                            day: 'numeric', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {app.certificateExpiryDate && (
+                    <div className="bg-white p-3 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-muted-foreground text-xs">Valid Until</Label>
+                          <p className="font-medium text-green-700">
+                            {new Date(app.certificateExpiryDate).toLocaleDateString('en-IN', { 
+                              day: 'numeric', 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}
+                          </p>
+                        </div>
+                        <Badge variant="default" className="bg-green-600">
+                          Active
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-2">
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" data-testid="button-download-certificate">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Certificate (PDF)
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Payment Pending - Show when payment is pending */}
+            {app.status === 'payment_pending' && (
+              <Card className="border-primary">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-primary">Payment Required</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Complete payment to receive your registration certificate
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-primary/5 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Total Registration Fee</span>
+                        <span className="text-2xl font-bold text-primary">₹{parseFloat(app.totalFee).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setLocation(`/applications/${app.id}/payment`)}
+                      data-testid="button-proceed-payment"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Proceed to Payment
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Owner Information */}
             <Card>
