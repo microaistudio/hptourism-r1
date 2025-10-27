@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationPanel } from "@/components/notification-panel";
 import {
@@ -34,7 +35,9 @@ import {
   ArrowRight,
   AlertCircle,
   Timer,
-  Activity
+  Activity,
+  Search,
+  X
 } from "lucide-react";
 import type { HomestayApplication } from "@shared/schema";
 
@@ -49,6 +52,8 @@ const SLA_THRESHOLDS = {
 export default function WorkflowMonitoringPage() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("pipeline");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch all applications for monitoring with real-time updates
   const { data: applications = [], isLoading, error: fetchError } = useQuery<HomestayApplication[]>({
@@ -214,8 +219,18 @@ export default function WorkflowMonitoringPage() {
 
         {/* Pipeline View Tab */}
         <TabsContent value="pipeline" className="space-y-6">
-          <VisualPipelineFlow applications={applications} />
-          <ApplicationsTable applications={applications} />
+          <VisualPipelineFlow 
+            applications={applications} 
+            onStageClick={setStatusFilter}
+            activeFilter={statusFilter}
+          />
+          <ApplicationsTable 
+            applications={applications} 
+            statusFilter={statusFilter}
+            searchQuery={searchQuery}
+            onClearFilter={() => setStatusFilter(null)}
+            onSearchChange={setSearchQuery}
+          />
         </TabsContent>
 
         {/* Bottlenecks Tab */}
@@ -275,7 +290,15 @@ function MetricCard({
 }
 
 // Visual Pipeline Flow Component
-function VisualPipelineFlow({ applications }: { applications: HomestayApplication[] }) {
+function VisualPipelineFlow({ 
+  applications, 
+  onStageClick, 
+  activeFilter 
+}: { 
+  applications: HomestayApplication[];
+  onStageClick: (status: string | null) => void;
+  activeFilter: string | null;
+}) {
   const stages = [
     { id: 'submitted', label: 'Submitted', color: 'bg-blue-500' },
     { id: 'document_verification', label: 'Document Check', color: 'bg-purple-500' },
@@ -298,7 +321,7 @@ function VisualPipelineFlow({ applications }: { applications: HomestayApplicatio
           Application Pipeline Flow
         </CardTitle>
         <CardDescription>
-          Visual representation of applications moving through workflow stages
+          Click any stage to filter applications - Visual representation of workflow stages
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -307,13 +330,24 @@ function VisualPipelineFlow({ applications }: { applications: HomestayApplicatio
             <div key={stage.id} className="flex items-center gap-3 flex-1">
               <div className="flex-1">
                 <div className="relative">
-                  <div className={`${stage.color} text-white rounded-lg p-4 text-center shadow-md hover:shadow-lg transition-shadow`}>
+                  <button
+                    onClick={() => onStageClick(activeFilter === stage.id ? null : stage.id)}
+                    className={`w-full ${stage.color} text-white rounded-lg p-4 text-center shadow-md hover:shadow-xl transition-shadow cursor-pointer ${
+                      activeFilter === stage.id ? 'ring-4 ring-white ring-offset-2' : ''
+                    }`}
+                    data-testid={`filter-stage-${stage.id}`}
+                  >
                     <div className="text-2xl font-bold">{stage.count}</div>
                     <div className="text-xs font-medium mt-1 opacity-90">{stage.label}</div>
-                  </div>
+                  </button>
                   {stage.count > 0 && (
-                    <Badge variant="secondary" className="absolute -top-2 -right-2">
+                    <Badge variant="secondary" className="absolute -top-2 -right-2 pointer-events-none">
                       {Math.round((stage.count / applications.length) * 100)}%
+                    </Badge>
+                  )}
+                  {activeFilter === stage.id && (
+                    <Badge variant="default" className="absolute -bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
+                      Filtered
                     </Badge>
                   )}
                 </div>
@@ -330,40 +364,129 @@ function VisualPipelineFlow({ applications }: { applications: HomestayApplicatio
 }
 
 // Applications Table Component
-function ApplicationsTable({ applications }: { applications: HomestayApplication[] }) {
+function ApplicationsTable({ 
+  applications, 
+  statusFilter, 
+  searchQuery,
+  onClearFilter,
+  onSearchChange
+}: { 
+  applications: HomestayApplication[];
+  statusFilter: string | null;
+  searchQuery: string;
+  onClearFilter: () => void;
+  onSearchChange: (query: string) => void;
+}) {
   const [, setLocation] = useLocation();
+  
+  // Memoize filtered applications for performance
+  const filteredApps = useMemo(() => {
+    return applications.filter(app => {
+      const matchesStatus = !statusFilter || app.status === statusFilter;
+      const matchesSearch = !searchQuery || 
+        app.propertyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        app.applicationNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        app.ownerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        app.district?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesStatus && matchesSearch;
+    });
+  }, [applications, statusFilter, searchQuery]);
+
+  // Get stage label for filter badge
+  const getStageLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'submitted': 'Submitted',
+      'document_verification': 'Document Check',
+      'site_inspection_scheduled': 'Site Inspection',
+      'site_inspection_complete': 'Inspection Done',
+      'payment_pending': 'Payment Pending',
+      'approved': 'Approved'
+    };
+    return labels[status] || status.replace(/_/g, ' ');
+  };
   
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Applications</CardTitle>
-        <CardDescription>Last 10 applications with SLA status - Click to review</CardDescription>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <CardTitle className="flex items-center gap-2">
+              {statusFilter ? `${getStageLabel(statusFilter)} Applications` : 'Recent Applications'}
+              <Badge variant="secondary">{filteredApps.length}</Badge>
+            </CardTitle>
+            <CardDescription>
+              {statusFilter ? 'Filtered applications' : 'Last 20 applications with SLA status'} - Click to review
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Search Input */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Search applications..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-9 pr-9"
+                data-testid="input-search-applications"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => onSearchChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:bg-muted rounded-full p-0.5 transition-colors"
+                  data-testid="button-clear-search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            {/* Clear Filter Button */}
+            {statusFilter && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onClearFilter}
+                data-testid="button-clear-filter"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear Filter
+              </Button>
+            )}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {applications.slice(0, 10).map((app) => (
-            <div
-              key={app.id}
-              onClick={() => setLocation(`/applications/${app.id}`)}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 hover:border-primary/50 transition-colors cursor-pointer"
-              data-testid={`application-row-${app.id}`}
-            >
-              <div className="flex items-center gap-4 flex-1">
-                <div className="flex-1">
-                  <div className="font-medium">{app.propertyName}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {app.applicationNumber} • {app.district}
+        {filteredApps.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>No applications found matching your criteria</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredApps.slice(0, 20).map((app) => (
+              <div
+                key={app.id}
+                onClick={() => setLocation(`/applications/${app.id}`)}
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 hover:border-primary/50 transition-colors cursor-pointer"
+                data-testid={`application-row-${app.id}`}
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="flex-1">
+                    <div className="font-medium">{app.propertyName}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {app.applicationNumber} • {app.district}
+                    </div>
                   </div>
+                  <Badge variant="outline" className="capitalize">
+                    {app.category}
+                  </Badge>
+                  <StatusBadge status={app.status || 'draft'} />
+                  <SLAIndicator app={app} />
                 </div>
-                <Badge variant="outline" className="capitalize">
-                  {app.category}
-                </Badge>
-                <StatusBadge status={app.status || 'draft'} />
-                <SLAIndicator app={app} />
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
