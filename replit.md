@@ -6,6 +6,18 @@ The HP Tourism Digital Ecosystem is a digital transformation platform aimed at m
 
 ## Recent Changes (October 27, 2025)
 
+**Workflow Monitoring Dashboard Enhancements**:
+- Implemented clickable pipeline stages for instant filtering - officers can click any stage (Submitted, Document Check, Site Inspection, etc.) to filter applications
+- Added visual feedback for active filters: ring border, shadow enhancement, and "Filtered" badge on selected stage
+- Integrated search functionality across property name, application number, owner name, and district with real-time filtering
+- Combined filter support: status filter AND search work together for precise application discovery
+- Clear Filter button appears when stage filter is active for easy reset
+- Dynamic title and count badges update based on active filters
+- Empty state displays when no applications match filter criteria
+- Increased application display limit from 10 to 20 for better visibility
+- Performance optimization: memoized filtered results using React useMemo
+- Design system compliance: uses shadcn Input component, no layout changes on hover (shadow-only transitions)
+
 **3-Outcome Inspection Workflow Implementation**:
 - Implemented comprehensive site inspection completion workflow with 3 outcomes (Approve, Send Back for Corrections, Reject)
 - Added `siteInspectionOutcome` field to schema to track inspection results
