@@ -380,8 +380,8 @@ export default function ApplicationDetail() {
               </Card>
             )}
 
-            {/* Payment Pending - Show when payment is pending */}
-            {app.status === 'payment_pending' && (
+            {/* Payment Pending - Show when payment is pending (property owners only) */}
+            {app.status === 'payment_pending' && userData?.user?.role === 'property_owner' && (
               <Card className="border-primary">
                 <CardHeader>
                   <div className="flex items-center gap-2">
@@ -408,6 +408,32 @@ export default function ApplicationDetail() {
                       <CreditCard className="w-4 h-4 mr-2" />
                       Proceed to Payment
                     </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Payment Status - Show for officers when payment is pending */}
+            {app.status === 'payment_pending' && userData?.user?.role !== 'property_owner' && (
+              <Card className="border-primary/50">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-primary">Payment Pending</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Awaiting payment from property owner
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-3 bg-primary/5 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Total Registration Fee</span>
+                      <span className="text-2xl font-bold text-primary">₹{parseFloat(app.totalFee).toLocaleString('en-IN')}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      The property owner needs to complete payment before certificate can be issued.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
