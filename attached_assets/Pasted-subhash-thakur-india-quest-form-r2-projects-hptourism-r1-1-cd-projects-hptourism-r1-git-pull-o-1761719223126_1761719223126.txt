@@ -1,0 +1,61 @@
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1.1$ cd ~/projects/hptourism-r1
+git pull origin main
+npm run build
+pm2 restart ecosystem.config.cjs
+bash: cd: /home/subhash.thakur.india/projects/hptourism-r1: No such file or directory
+remote: Enumerating objects: 19, done.
+remote: Counting objects: 100% (19/19), done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 14 (delta 8), reused 12 (delta 6), pack-reused 0 (from 0)
+Unpacking objects: 100% (14/14), 259.81 KiB | 1.35 MiB/s, done.
+From https://github.com/microaistudio/hptourism-r1
+ * branch            main       -> FETCH_HEAD
+   edfb52e..4360835  main       -> origin/main
+Updating edfb52e..4360835
+Fast-forward
+ .replit                                                        |   4 +
+ DEPLOYMENT.md                                                  | 202 +++++++++++++++++++++++++++++++++++++++
+ attached_assets/Screenshot 2025-10-29 114358_1761718466970.png | Bin 0 -> 159926 bytes
+ attached_assets/Screenshot 2025-10-29 114405_1761718466971.png | Bin 0 -> 116449 bytes
+ deploy.sh                                                      |  62 ++++++++++++
+ replit.md                                                      | 118 +++--------------------
+ server/seed.ts                                                 |  58 +++++++++++
+ 7 files changed, 337 insertions(+), 107 deletions(-)
+ create mode 100644 DEPLOYMENT.md
+ create mode 100644 attached_assets/Screenshot 2025-10-29 114358_1761718466970.png
+ create mode 100644 attached_assets/Screenshot 2025-10-29 114405_1761718466971.png
+ create mode 100755 deploy.sh
+ create mode 100644 server/seed.ts
+
+> rest-express@1.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+vite v5.4.20 building for production...
+transforming (1) index.htmlBrowserslist: browsers data (caniuse-lite) is 12 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+transforming (4) src/App.tsx
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+✓ 109 modules transformed.
+x Build failed in 4.64s
+error during build:
+[vite]: Rollup failed to resolve import "jspdf" from "/home/subhash.thakur.india/projects/hptourism-r1.1/client/src/lib/certificateGenerator.ts".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`
+    at viteWarn (file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65854:17)
+    at onwarn (file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/@vitejs/plugin-react/dist/index.js:90:7)
+    at onRollupWarning (file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65884:5)
+    at onwarn (file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65549:7)
+    at file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/rollup/dist/es/shared/node-entry.js:19452:13
+    at Object.logger [as onLog] (file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/rollup/dist/es/shared/node-entry.js:21178:9)
+    at ModuleLoader.handleInvalidResolvedId (file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/rollup/dist/es/shared/node-entry.js:20067:26)
+    at file:///home/subhash.thakur.india/projects/hptourism-r1.1/node_modules/rollup/dist/es/shared/node-entry.js:20025:26
+[PM2] Applying action restartProcessId on app [hp-tourism](ids: [ 0 ])
+[PM2] [hp-tourism](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ hp-tourism         │ fork     │ 3    │ online    │ 0%       │ 27.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+subhash.thakur.india@quest-form-r2:~/projects/hptourism-r1.1$ 
