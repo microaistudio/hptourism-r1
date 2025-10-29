@@ -34,6 +34,28 @@ export default function PaymentPage() {
     enabled: !!id,
   });
 
+  const application = applicationData?.application;
+  const existingPayment = paymentData?.payment;
+
+  // Generate UPI QR Code
+  useEffect(() => {
+    if (application) {
+      const totalFee = parseFloat(application.totalFee);
+      const upiString = `upi://pay?pa=${UPI_ID}&pn=HP%20Tourism&am=${totalFee}&cu=INR&tn=Homestay%20Registration%20${application.applicationNumber}`;
+      
+      QRCodeLib.toDataURL(upiString, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      })
+        .then((url: string) => setQrCodeDataUrl(url))
+        .catch((err: Error) => console.error('QR Code generation error:', err));
+    }
+  }, [application]);
+
   const submitPaymentMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/applications/${id}/payment`, {
@@ -91,9 +113,6 @@ export default function PaymentPage() {
       </div>
     );
   }
-
-  const application = applicationData?.application;
-  const existingPayment = paymentData?.payment;
 
   if (!application) {
     return (
@@ -157,24 +176,6 @@ export default function PaymentPage() {
   const totalFee = parseFloat(application.totalFee);
 
   const isPending = existingPayment?.paymentStatus === "pending_verification";
-
-  // Generate UPI QR Code
-  useEffect(() => {
-    if (application) {
-      const upiString = `upi://pay?pa=${UPI_ID}&pn=HP%20Tourism&am=${totalFee}&cu=INR&tn=Homestay%20Registration%20${application.applicationNumber}`;
-      
-      QRCodeLib.toDataURL(upiString, {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
-      })
-        .then((url: string) => setQrCodeDataUrl(url))
-        .catch((err: Error) => console.error('QR Code generation error:', err));
-    }
-  }, [application, totalFee]);
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
