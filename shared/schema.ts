@@ -185,6 +185,7 @@ export const payments = pgTable("payments", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   
   // Payment Gateway
+  paymentGateway: varchar("payment_gateway", { length: 50 }), // 'himkosh', 'razorpay', 'ccavenue', 'payu', 'upi_qr'
   gatewayTransactionId: varchar("gateway_transaction_id", { length: 255 }).unique(),
   paymentMethod: varchar("payment_method", { length: 50 }), // 'upi', 'netbanking', 'card', 'wallet'
   paymentStatus: varchar("payment_status", { length: 50 }).default('pending'), // 'pending', 'success', 'failed', 'refunded'

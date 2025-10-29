@@ -17,6 +17,10 @@ import ApplicationDetail from "@/pages/applications/detail";
 import UpdateApplication from "@/pages/applications/update";
 import PaymentPage from "@/pages/applications/payment";
 import HimKoshPaymentPage from "@/pages/applications/payment-himkosh";
+import PaymentGatewaySelect from "@/pages/applications/payment-gateway-select";
+import PaymentRazorpay from "@/pages/applications/payment-razorpay";
+import PaymentCCAvenue from "@/pages/applications/payment-ccavenue";
+import PaymentPayU from "@/pages/applications/payment-payu";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
@@ -89,6 +93,18 @@ function Router() {
       </Route>
       <Route path="/applications/:id/update">
         {() => <ProtectedRoute component={UpdateApplication} allowedRoles={['property_owner']} />}
+      </Route>
+      <Route path="/applications/:id/payment-gateway">
+        {() => <ProtectedRoute component={PaymentGatewaySelect} allowedRoles={['property_owner']} />}
+      </Route>
+      <Route path="/applications/:id/payment-razorpay">
+        {() => <ProtectedRoute component={PaymentRazorpay} allowedRoles={['property_owner']} />}
+      </Route>
+      <Route path="/applications/:id/payment-ccavenue">
+        {() => <ProtectedRoute component={PaymentCCAvenue} allowedRoles={['property_owner']} />}
+      </Route>
+      <Route path="/applications/:id/payment-payu">
+        {() => <ProtectedRoute component={PaymentPayU} allowedRoles={['property_owner']} />}
       </Route>
       <Route path="/applications/:id/payment">
         {() => <ProtectedRoute component={PaymentPage} allowedRoles={['property_owner']} />}

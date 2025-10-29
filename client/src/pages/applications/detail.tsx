@@ -405,25 +405,14 @@ export default function ApplicationDetail() {
                         <span className="text-2xl font-bold text-primary">₹{parseFloat(app.totalFee).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        className="flex-1" 
-                        onClick={() => setLocation(`/applications/${app.id}/payment-himkosh`)}
-                        data-testid="button-proceed-himkosh"
-                      >
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        HimKosh (Official)
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        className="flex-1" 
-                        onClick={() => setLocation(`/applications/${app.id}/payment`)}
-                        data-testid="button-proceed-upi"
-                      >
-                        <QrCode className="w-4 h-4 mr-2" />
-                        UPI Payment
-                      </Button>
-                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setLocation(`/applications/${app.id}/payment-gateway`)}
+                      data-testid="button-proceed-payment"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Choose Payment Method
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
