@@ -14,12 +14,12 @@ export const himkoshConfig = {
   // These will be stored in Replit Secrets
   merchantCode: process.env.HIMKOSH_MERCHANT_CODE || '', // e.g., 'HIMKOSH228'
   deptId: process.env.HIMKOSH_DEPT_ID || '', // 3-digit dept code
-  serviceCode: process.env.HIMKOSH_SERVICE_CODE || '', // 3-char service code (e.g., 'TRM')
-  ddo: process.env.HIMKOSH_DDO_CODE || '', // DDO code (e.g., 'SML10-001')
+  serviceCode: process.env.HIMKOSH_SERVICE_CODE || '', // 3-char service code (e.g., 'TSM')
+  ddo: process.env.HIMKOSH_DDO || '', // DDO code (e.g., 'SML00-532')
 
   // Head of Account Codes (Budget heads)
   heads: {
-    registrationFee: process.env.HIMKOSH_HEAD_REGISTRATION || '', // e.g., '0230-00-104-01'
+    registrationFee: process.env.HIMKOSH_HEAD || '', // e.g., '1452-00-800-01'
     // Add more heads as needed
   },
 
