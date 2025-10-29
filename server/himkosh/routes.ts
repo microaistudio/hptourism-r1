@@ -125,7 +125,7 @@ router.post('/initiate', async (req, res) => {
     });
 
     // Return payment initiation data
-    res.json({
+    const response = {
       success: true,
       paymentUrl: config.paymentUrl,
       merchantCode: config.merchantCode,
@@ -136,7 +136,10 @@ router.post('/initiate', async (req, res) => {
       message: config.isConfigured 
         ? 'Payment initiated successfully' 
         : 'Using test configuration - waiting for CTP credentials',
-    });
+    };
+    
+    console.log('[himkosh] Response isConfigured:', config.isConfigured);
+    res.json(response);
   } catch (error) {
     console.error('HimKosh initiation error:', error);
     res.status(500).json({ 
