@@ -399,3 +399,26 @@ export const insertHimkoshTransactionSchema = createInsertSchema(himkoshTransact
 export const selectHimkoshTransactionSchema = createSelectSchema(himkoshTransactions);
 export type InsertHimkoshTransaction = z.infer<typeof insertHimkoshTransactionSchema>;
 export type HimkoshTransaction = typeof himkoshTransactions.$inferSelect;
+
+// DDO Codes Table (Drawing & Disbursing Officer codes by district)
+export const ddoCodes = pgTable("ddo_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  district: varchar("district", { length: 100 }).notNull().unique(),
+  ddoCode: varchar("ddo_code", { length: 20 }).notNull(),
+  ddoDescription: text("ddo_description").notNull(),
+  treasuryCode: varchar("treasury_code", { length: 10 }).notNull(), // e.g., CHM00, KLU00, SML00
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDdoCodeSchema = createInsertSchema(ddoCodes, {
+  district: z.string().min(2),
+  ddoCode: z.string().min(3),
+  ddoDescription: z.string().min(3),
+  treasuryCode: z.string().min(3),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectDdoCodeSchema = createSelectSchema(ddoCodes);
+export type InsertDdoCode = z.infer<typeof insertDdoCodeSchema>;
+export type DdoCode = typeof ddoCodes.$inferSelect;
