@@ -90,6 +90,20 @@ router.post('/initiate', async (req, res) => {
     const encryptedData = await crypto.encrypt(requestString);
     const checksum = HimKoshCrypto.generateChecksum(requestString);
 
+    // Debug: Log values to identify which field is too long
+    console.log('[himkosh] Transaction values:', {
+      merchantCode: config.merchantCode,
+      merchantCodeLen: config.merchantCode?.length,
+      deptId: config.deptId,
+      deptIdLen: config.deptId?.length,
+      serviceCode: config.serviceCode,
+      serviceCodeLen: config.serviceCode?.length,
+      ddo: ddoCode,
+      ddoLen: ddoCode?.length,
+      head1: config.heads.registrationFee,
+      head1Len: config.heads.registrationFee?.length,
+    });
+
     // Save transaction to database
     await db.insert(himkoshTransactions).values({
       applicationId,
