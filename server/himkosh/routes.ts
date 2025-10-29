@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { himkoshTransactions, homestayApplications } from '../../shared/schema';
+import { himkoshTransactions, homestayApplications, ddoCodes } from '../../shared/schema';
 import { HimKoshCrypto, buildRequestString, parseResponseString, buildVerificationString } from './crypto';
 import { getHimKoshConfig } from './config';
 import { eq } from 'drizzle-orm';
@@ -42,6 +42,23 @@ router.post('/initiate', async (req, res) => {
 
     const config = getHimKoshConfig();
 
+    // Look up DDO code based on application's district
+    let ddoCode = config.ddo; // Default/fallback DDO
+    if (application.district) {
+      const [ddoMapping] = await db
+        .select()
+        .from(ddoCodes)
+        .where(eq(ddoCodes.district, application.district))
+        .limit(1);
+      
+      if (ddoMapping) {
+        ddoCode = ddoMapping.ddoCode;
+        console.log(`[himkosh] Using district-specific DDO: ${ddoCode} for district: ${application.district}`);
+      } else {
+        console.log(`[himkosh] No DDO mapping found for district: ${application.district}, using fallback: ${config.ddo}`);
+      }
+    }
+
     // Generate unique transaction reference
     const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
 
@@ -61,7 +78,7 @@ router.post('/initiate', async (req, res) => {
       appRefNo,
       head1: config.heads.registrationFee,
       amount1: totalAmount,
-      ddo: config.ddo,
+      ddo: ddoCode,
       periodFrom: periodDate,
       periodTo: periodDate,
       serviceCode: config.serviceCode,
@@ -83,7 +100,7 @@ router.post('/initiate', async (req, res) => {
       merchantCode: config.merchantCode,
       deptId: config.deptId,
       serviceCode: config.serviceCode,
-      ddo: config.ddo,
+      ddo: ddoCode,
       head1: config.heads.registrationFee,
       amount1: totalAmount,
       periodFrom: periodDate,
