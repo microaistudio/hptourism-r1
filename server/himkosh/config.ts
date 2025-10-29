@@ -68,6 +68,16 @@ export function validateHimKoshConfig(): { valid: boolean; missingFields: string
 export function getHimKoshConfig() {
   const config = validateHimKoshConfig();
   
+  console.log('[himkosh-config] Validation result:', {
+    valid: config.valid,
+    missingFields: config.missingFields,
+    merchantCode: !!himkoshConfig.merchantCode,
+    deptId: !!himkoshConfig.deptId,
+    serviceCode: !!himkoshConfig.serviceCode,
+    ddo: !!himkoshConfig.ddo,
+    head: !!himkoshConfig.heads.registrationFee,
+  });
+  
   if (!config.valid) {
     console.warn('⚠️  HimKosh configuration incomplete. Missing:', config.missingFields.join(', '));
     console.warn('⚠️  Using placeholder values for development/testing.');
@@ -85,6 +95,7 @@ export function getHimKoshConfig() {
     };
   }
 
+  console.log('[himkosh-config] ✅ All credentials configured - production mode enabled');
   return {
     ...himkoshConfig,
     isConfigured: true,
