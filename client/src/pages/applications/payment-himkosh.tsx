@@ -39,6 +39,8 @@ export default function HimKoshPaymentPage() {
       });
     },
     onSuccess: (data: any) => {
+      console.log('[himkosh-frontend] Received payment data:', data);
+      console.log('[himkosh-frontend] isConfigured:', data.isConfigured, typeof data.isConfigured);
       setPaymentData(data);
       
       if (!data.isConfigured) {
@@ -47,6 +49,8 @@ export default function HimKoshPaymentPage() {
           description: "HimKosh integration is using test configuration. Awaiting CTP credentials.",
           variant: "default",
         });
+      } else {
+        console.log('[himkosh-frontend] Configuration valid - will auto-redirect to HimKosh portal');
       }
     },
     onError: (error: any) => {
@@ -60,7 +64,14 @@ export default function HimKoshPaymentPage() {
 
   // Auto-submit form when payment data is ready
   useEffect(() => {
+    console.log('[himkosh-frontend] useEffect triggered:', {
+      hasPaymentData: !!paymentData,
+      hasFormRef: !!formRef.current,
+      isConfigured: paymentData?.isConfigured,
+    });
+    
     if (paymentData && formRef.current && paymentData.isConfigured) {
+      console.log('[himkosh-frontend] Auto-submitting form to HimKosh portal...');
       formRef.current.submit();
     }
   }, [paymentData]);
