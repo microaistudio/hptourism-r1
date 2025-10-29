@@ -407,11 +407,11 @@ export default function ApplicationDetail() {
                     </div>
                     <Button 
                       className="w-full" 
-                      onClick={() => setLocation(`/applications/${app.id}/payment`)}
+                      onClick={() => setLocation(`/applications/${app.id}/payment-himkosh`)}
                       data-testid="button-proceed-payment"
                     >
                       <CreditCard className="w-4 h-4 mr-2" />
-                      Proceed to Payment
+                      Proceed to HimKosh Payment
                     </Button>
                   </div>
                 </CardContent>

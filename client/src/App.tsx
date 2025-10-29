@@ -15,7 +15,6 @@ import Dashboard from "@/pages/dashboard";
 import NewApplication from "@/pages/applications/new";
 import ApplicationDetail from "@/pages/applications/detail";
 import UpdateApplication from "@/pages/applications/update";
-import PaymentPage from "@/pages/applications/payment";
 import HimKoshPaymentPage from "@/pages/applications/payment-himkosh";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
@@ -89,9 +88,6 @@ function Router() {
       </Route>
       <Route path="/applications/:id/update">
         {() => <ProtectedRoute component={UpdateApplication} allowedRoles={['property_owner']} />}
-      </Route>
-      <Route path="/applications/:id/payment">
-        {() => <ProtectedRoute component={PaymentPage} allowedRoles={['property_owner']} />}
       </Route>
       <Route path="/applications/:id/payment-himkosh">
         {() => <ProtectedRoute component={HimKoshPaymentPage} allowedRoles={['property_owner']} />}
