@@ -21,6 +21,7 @@ const __dirname = path.dirname(__filename);
 export class HimKoshCrypto {
   private keyFilePath: string;
   private key: Buffer | null = null;
+  private iv: Buffer | null = null;
 
   constructor(keyFilePath?: string) {
     // Default to echallan.key in server/himkosh directory
@@ -28,22 +29,51 @@ export class HimKoshCrypto {
   }
 
   /**
-   * Load encryption key from file
-   * Key file will be provided by CTP team
+   * Load encryption key and IV from file
+   * Key file format from CTP:
+   * - 16 bytes: Key only (will use zero IV)
+   * - 32 bytes: Key (0-15) + IV (16-31)
+   * Any other size is invalid and will throw an error
    */
-  private async loadKey(): Promise<Buffer> {
-    if (this.key) {
-      return this.key;
+  private async loadKey(): Promise<{ key: Buffer; iv: Buffer }> {
+    if (this.key && this.iv) {
+      return { key: this.key, iv: this.iv };
     }
 
     try {
       const keyData = await fs.readFile(this.keyFilePath);
-      const keyBytes = Buffer.alloc(16); // 128 bits = 16 bytes
-      const len = Math.min(keyData.length, keyBytes.length);
-      keyData.copy(keyBytes, 0, 0, len);
+      
+      // Strict validation: Must be exactly 16 or 32 bytes
+      if (keyData.length !== 16 && keyData.length !== 32) {
+        throw new Error(
+          `Invalid key file size: ${keyData.length} bytes. ` +
+          `Expected exactly 16 bytes (key only) or 32 bytes (key + IV). ` +
+          `Please verify echallan.key file from CTP team.`
+        );
+      }
+      
+      // Extract 16-byte key (bytes 0-15)
+      const keyBytes = Buffer.alloc(16);
+      keyData.copy(keyBytes, 0, 0, 16);
       this.key = keyBytes;
-      return this.key;
+      
+      // Extract 16-byte IV (bytes 16-31) if available
+      let ivBytes: Buffer;
+      if (keyData.length === 32) {
+        // IV provided in file
+        ivBytes = Buffer.alloc(16);
+        keyData.copy(ivBytes, 0, 16, 32);
+      } else {
+        // 16-byte file: Use zero IV
+        ivBytes = Buffer.alloc(16, 0);
+      }
+      this.iv = ivBytes;
+      
+      return { key: this.key, iv: this.iv };
     } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
       throw new Error(`Key file not found at: ${this.keyFilePath}. Please obtain echallan.key from CTP team.`);
     }
   }
@@ -55,10 +85,10 @@ export class HimKoshCrypto {
    */
   async encrypt(textToEncrypt: string): Promise<string> {
     try {
-      const keyBytes = await this.loadKey();
+      const { key, iv } = await this.loadKey();
       
-      // Create cipher
-      const cipher = crypto.createCipheriv('aes-128-cbc', keyBytes, keyBytes);
+      // Create cipher with separate key and IV
+      const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
       
       // Encrypt
       let encrypted = cipher.update(textToEncrypt, 'utf8', 'base64');
@@ -80,10 +110,10 @@ export class HimKoshCrypto {
    */
   async decrypt(textToDecrypt: string): Promise<string> {
     try {
-      const keyBytes = await this.loadKey();
+      const { key, iv } = await this.loadKey();
       
-      // Create decipher
-      const decipher = crypto.createDecipheriv('aes-128-cbc', keyBytes, keyBytes);
+      // Create decipher with separate key and IV
+      const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
       
       // Decrypt
       let decrypted = decipher.update(textToDecrypt, 'base64', 'utf8');
