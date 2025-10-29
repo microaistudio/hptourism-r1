@@ -34,9 +34,10 @@ export default function HimKoshPaymentPage() {
 
   const initiateMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/himkosh/initiate", {
+      const response = await apiRequest("POST", "/api/himkosh/initiate", {
         applicationId: id,
       });
+      return response.json();
     },
     onSuccess: (data: any) => {
       console.log('[himkosh-frontend] Received payment data:', data);
