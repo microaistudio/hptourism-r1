@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard, QrCode } from "lucide-react";
 import type { HomestayApplication, User as UserType, Document } from "@shared/schema";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -405,14 +405,25 @@ export default function ApplicationDetail() {
                         <span className="text-2xl font-bold text-primary">₹{parseFloat(app.totalFee).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
-                    <Button 
-                      className="w-full" 
-                      onClick={() => setLocation(`/applications/${app.id}/payment-himkosh`)}
-                      data-testid="button-proceed-payment"
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Proceed to HimKosh Payment
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        className="flex-1" 
+                        onClick={() => setLocation(`/applications/${app.id}/payment-himkosh`)}
+                        data-testid="button-proceed-himkosh"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        HimKosh (Official)
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        className="flex-1" 
+                        onClick={() => setLocation(`/applications/${app.id}/payment`)}
+                        data-testid="button-proceed-upi"
+                      >
+                        <QrCode className="w-4 h-4 mr-2" />
+                        UPI Payment
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
