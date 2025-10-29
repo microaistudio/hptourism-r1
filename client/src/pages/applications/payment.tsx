@@ -22,7 +22,7 @@ export default function PaymentPage() {
   const [copied, setCopied] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
 
-  const UPI_ID = "subhash.thakur.india@oksbi";
+  const UPI_ID = "hptourism.registration@sbi"; // Placeholder - Replace with official HP Tourism UPI ID
 
   const { data: applicationData, isLoading: appLoading } = useQuery<{ application: HomestayApplication }>({
     queryKey: ["/api/applications", id],
