@@ -336,10 +336,10 @@ export const himkoshTransactions = pgTable("himkosh_transactions", {
   tenderBy: varchar("tender_by", { length: 70 }).notNull(), // Applicant name
   
   // CTP Configuration (from environment/config)
-  merchantCode: varchar("merchant_code", { length: 10 }), // e.g., HIMKOSH228
-  deptId: varchar("dept_id", { length: 3 }), // Department code
-  serviceCode: varchar("service_code", { length: 3 }), // Service code
-  ddo: varchar("ddo", { length: 9 }), // DDO code
+  merchantCode: varchar("merchant_code", { length: 15 }), // e.g., HIMKOSH230
+  deptId: varchar("dept_id", { length: 10 }), // Department code (e.g., CTO00-068)
+  serviceCode: varchar("service_code", { length: 5 }), // Service code (e.g., TSM)
+  ddo: varchar("ddo", { length: 12 }), // DDO code (e.g., SML00-532)
   
   // Head of Account Details
   head1: varchar("head1", { length: 14 }), // Mandatory head
