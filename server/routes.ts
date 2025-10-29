@@ -8,6 +8,7 @@ import { insertUserSchema, type User, type HomestayApplication } from "@shared/s
 import { z } from "zod";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
+import himkoshRoutes from "./himkosh/routes";
 
 // Extend express-session types
 declare module 'express-session' {
@@ -1570,6 +1571,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update user status" });
     }
   });
+
+  // HimKosh Payment Gateway Routes
+  app.use("/api/himkosh", himkoshRoutes);
+  console.log('[himkosh] Payment gateway routes registered');
 
   // Start production stats scraper (runs on boot and hourly)
   startScraperScheduler();

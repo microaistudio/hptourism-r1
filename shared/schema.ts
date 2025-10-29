@@ -320,3 +320,81 @@ export const insertProductionStatsSchema = createInsertSchema(productionStats).o
 export const selectProductionStatsSchema = createSelectSchema(productionStats);
 export type InsertProductionStats = z.infer<typeof insertProductionStatsSchema>;
 export type ProductionStats = typeof productionStats.$inferSelect;
+
+// HimKosh Transactions Table (Cyber Treasury Portal Integration)
+export const himkoshTransactions = pgTable("himkosh_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id),
+  
+  // Departmental Reference (our side)
+  deptRefNo: varchar("dept_ref_no", { length: 45 }).notNull(), // Application number
+  appRefNo: varchar("app_ref_no", { length: 20 }).notNull().unique(), // Our unique transaction ID
+  
+  // Payment Details
+  totalAmount: integer("total_amount").notNull(), // In rupees (no decimals as per CTP spec)
+  tenderBy: varchar("tender_by", { length: 70 }).notNull(), // Applicant name
+  
+  // CTP Configuration (from environment/config)
+  merchantCode: varchar("merchant_code", { length: 10 }), // e.g., HIMKOSH228
+  deptId: varchar("dept_id", { length: 3 }), // Department code
+  serviceCode: varchar("service_code", { length: 3 }), // Service code
+  ddo: varchar("ddo", { length: 9 }), // DDO code
+  
+  // Head of Account Details
+  head1: varchar("head1", { length: 14 }), // Mandatory head
+  amount1: integer("amount1"), // Amount for head1
+  head2: varchar("head2", { length: 14 }),
+  amount2: integer("amount2"),
+  head3: varchar("head3", { length: 14 }),
+  amount3: integer("amount3"),
+  head4: varchar("head4", { length: 14 }),
+  amount4: integer("amount4"),
+  head10: varchar("head10", { length: 50 }), // Bank account for non-govt charges (IFSC-AccountNo)
+  amount10: integer("amount10"), // Non-govt charges amount
+  
+  // Period
+  periodFrom: varchar("period_from", { length: 10 }), // MM-DD-YYYY
+  periodTo: varchar("period_to", { length: 10 }), // MM-DD-YYYY
+  
+  // Request/Response Tracking
+  encryptedRequest: text("encrypted_request"), // Stored for audit
+  requestChecksum: varchar("request_checksum", { length: 32 }), // MD5 checksum
+  
+  // Response from CTP (after payment)
+  echTxnId: varchar("ech_txn_id", { length: 10 }).unique(), // HIMGRN number from CTP
+  bankCIN: varchar("bank_cin", { length: 20 }), // Bank transaction number
+  bankName: varchar("bank_name", { length: 10 }), // SBI, PNB, SBP
+  paymentDate: varchar("payment_date", { length: 14 }), // DDMMYYYYHHMMSS
+  status: varchar("status", { length: 70 }), // Status message from bank
+  statusCd: varchar("status_cd", { length: 1 }), // 1=Success, 0=Failure
+  responseChecksum: varchar("response_checksum", { length: 32 }), // MD5 checksum of response
+  
+  // Double Verification
+  isDoubleVerified: boolean("is_double_verified").default(false),
+  doubleVerificationDate: timestamp("double_verification_date"),
+  doubleVerificationData: jsonb("double_verification_data"),
+  
+  // Challan Details
+  challanPrintUrl: text("challan_print_url"), // URL to print challan from CTP
+  
+  // Transaction Status
+  transactionStatus: varchar("transaction_status", { length: 50 }).default('initiated'), // 'initiated', 'redirected', 'success', 'failed', 'verified'
+  
+  // Timestamps
+  initiatedAt: timestamp("initiated_at").defaultNow(),
+  respondedAt: timestamp("responded_at"),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHimkoshTransactionSchema = createInsertSchema(himkoshTransactions, {
+  deptRefNo: z.string().min(1),
+  appRefNo: z.string().min(1),
+  totalAmount: z.number().int().min(1),
+  tenderBy: z.string().min(3),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectHimkoshTransactionSchema = createSelectSchema(himkoshTransactions);
+export type InsertHimkoshTransaction = z.infer<typeof insertHimkoshTransactionSchema>;
+export type HimkoshTransaction = typeof himkoshTransactions.$inferSelect;
