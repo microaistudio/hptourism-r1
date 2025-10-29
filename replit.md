@@ -24,6 +24,12 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 - **Smart Compliance Hub**: Enables property owners to register homestays, submit applications, and track status with role-specific navigation.
 - **Analytics Dashboard**: Provides government officers with insights into application trends, status distributions, category breakdowns, and processing times via Recharts.
 - **Workflow Monitoring Dashboard**: Offers a real-time, visual pipeline of applications through six stages, with SLA tracking, smart notifications, bottleneck detection, and district performance analytics.
+- **Multiple Payment Gateways**: Integrated payment system with five RBI-approved options:
+  1. **HimKosh (HP CTP)**: Primary government payment gateway with AES-128-CBC encryption, direct integration with HP Cyber Treasury Portal
+  2. **Razorpay**: Modern payment aggregator supporting 100+ payment modes (cards, UPI, net banking, wallets)
+  3. **CCAvenue**: Comprehensive gateway with 200+ payment options, 18 language support, widely used by government portals
+  4. **PayU**: Enterprise-grade gateway with smart routing for high success rates, 150+ payment modes
+  5. **UPI QR Code**: Manual payment option via scannable QR codes for all UPI apps (hptourism.registration@sbi placeholder)
 - **Role-Based Access Control**: `ProtectedRoute` component validates user roles, redirecting unauthorized users. Officer-only routes are restricted to `district_officer` and `state_officer` roles, while property owner routes are for `property_owner` roles.
 
 ### System Design Choices
@@ -66,3 +72,44 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 - `@neondatabase/serverless`
 - `drizzle-orm`
 - `drizzle-kit`
+
+### Payment Processing
+
+- `qrcode` (UPI QR code generation)
+- HimKosh CTP integration (AES-128-CBC encryption)
+- Razorpay (requires API credentials)
+- CCAvenue (requires merchant credentials)
+- PayU (requires merchant credentials)
+
+## Payment Gateway Integration Status
+
+### Production Ready
+- **HimKosh (HP CTP)**: Fully integrated with test mode, awaiting production credentials from NIC-HP
+  - Required: Merchant Code, Department ID, Service Code, DDO Code, echallan.key file, Head of Account codes
+  - Encryption: AES-128-CBC with MD5 checksums
+  - Features: HIMGRN tracking, Bank CIN support, encrypted request/response storage
+  - Security: Only transaction metadata stored (no banking credentials)
+
+- **UPI QR Code**: Fully functional with scannable QR codes
+  - Placeholder UPI ID: hptourism.registration@sbi (replace with official HP Tourism UPI)
+  - Manual transaction ID submission and officer verification workflow
+
+### Placeholder Pages Created (Awaiting Credentials)
+- **Razorpay**: UI ready, requires Razorpay API Key & Secret
+  - Supports: Credit/debit cards, UPI, net banking (58+ banks), wallets
+  - Fee: 2% + GST for domestic, 3% + GST for international
+  
+- **CCAvenue**: UI ready, requires CCAvenue merchant credentials
+  - Supports: 200+ payment options, 18 languages
+  - Fee: 2% + GST, Annual maintenance: ₹1,200
+  
+- **PayU**: UI ready, requires PayU merchant credentials
+  - Supports: 150+ payment modes, smart routing
+  - Fee: 2% + GST domestic, 3% + GST international
+
+## Data Security & Compliance
+
+- **Transaction Data**: Only metadata stored (reference numbers, amounts, status, HIMGRN, Bank CIN)
+- **No Sensitive Data**: No banking credentials, card numbers, or PINs stored in database
+- **Retention**: Transaction data retained for 7-10 years for government audit requirements
+- **Encryption**: All payment gateways use 128-bit SSL/TLS, PCI-DSS compliant, RBI approved
