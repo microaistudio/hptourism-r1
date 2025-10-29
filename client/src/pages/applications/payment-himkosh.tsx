@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, AlertCircle, CreditCard, ArrowLeft, ShieldCheck, Building2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, CreditCard, ArrowLeft, ShieldCheck, Building2, Smartphone, Banknote, Landmark } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import type { HomestayApplication } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -186,19 +186,43 @@ export default function HimKoshPaymentPage() {
                     <div className="text-sm text-teal-700">HP Cyber Treasury Portal</div>
                   </div>
                 </div>
-                <p className="text-sm text-teal-800">
+                <p className="text-sm text-teal-800 mb-4">
                   Official payment gateway of Himachal Pradesh Government for secure online transactions.
                 </p>
+                
+                {/* Payment Methods Supported */}
+                <div className="bg-white rounded-lg p-4 border border-teal-100">
+                  <div className="text-xs font-medium text-teal-900 mb-3">Payment Methods Available on HimKosh:</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 text-xs text-teal-800">
+                      <CreditCard className="h-4 w-4 text-teal-600" />
+                      <span>Credit/Debit Cards</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-teal-800">
+                      <Smartphone className="h-4 w-4 text-teal-600" />
+                      <span>UPI (GPay, PhonePe)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-teal-800">
+                      <Landmark className="h-4 w-4 text-teal-600" />
+                      <span>Net Banking</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-teal-800">
+                      <Banknote className="h-4 w-4 text-teal-600" />
+                      <span>Wallets & More</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <Alert>
                 <CheckCircle2 className="h-4 w-4" />
                 <AlertDescription>
+                  <div className="font-medium text-sm mb-2">How it works:</div>
                   <ol className="list-decimal list-inside space-y-1 text-sm">
                     <li>Click "Proceed to Payment" below</li>
                     <li>You'll be redirected to HimKosh portal</li>
-                    <li>Select your bank and complete payment</li>
-                    <li>Return here for your certificate</li>
+                    <li>Choose your payment method (Card/UPI/Net Banking)</li>
+                    <li>Complete payment and return for certificate</li>
                   </ol>
                 </AlertDescription>
               </Alert>
