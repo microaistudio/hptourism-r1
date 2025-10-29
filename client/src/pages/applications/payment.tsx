@@ -8,10 +8,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle2, AlertCircle, CreditCard, QrCode, ArrowLeft, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { HomestayApplication, Payment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import QRCodeLib from "qrcode";
 
 export default function PaymentPage() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export default function PaymentPage() {
   const { toast } = useToast();
   const [upiTransactionId, setUpiTransactionId] = useState("");
   const [copied, setCopied] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
 
   const UPI_ID = "subhash.thakur.india@oksbi";
 
@@ -135,6 +137,24 @@ export default function PaymentPage() {
 
   const isPending = existingPayment?.paymentStatus === "pending_verification";
 
+  // Generate UPI QR Code
+  useEffect(() => {
+    if (application) {
+      const upiString = `upi://pay?pa=${UPI_ID}&pn=HP%20Tourism&am=${totalFee}&cu=INR&tn=Homestay%20Registration%20${application.applicationNumber}`;
+      
+      QRCodeLib.toDataURL(upiString, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      })
+        .then(url => setQrCodeDataUrl(url))
+        .catch(err => console.error('QR Code generation error:', err));
+    }
+  }, [application, totalFee]);
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
@@ -223,13 +243,18 @@ export default function PaymentPage() {
               <div className="bg-muted p-4 rounded-lg text-center">
                 <div className="text-sm font-medium mb-2">Scan QR Code or Use UPI ID</div>
                 <div className="bg-white p-4 rounded-lg inline-block mb-3">
-                  {/* UPI QR Code - In production, generate actual QR code */}
-                  <div className="w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center">
-                    <div className="text-center">
-                      <QrCode className="h-16 w-16 mx-auto text-primary mb-2" />
-                      <div className="text-xs font-mono break-all px-2">{UPI_ID}</div>
+                  {qrCodeDataUrl ? (
+                    <img 
+                      src={qrCodeDataUrl} 
+                      alt="UPI Payment QR Code" 
+                      className="w-48 h-48"
+                      data-testid="img-upi-qr"
+                    />
+                  ) : (
+                    <div className="w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center">
+                      <QrCode className="h-16 w-16 text-primary" />
                     </div>
-                  </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-center gap-2 bg-white p-2 rounded border">
                   <code className="text-sm font-mono">{UPI_ID}</code>
