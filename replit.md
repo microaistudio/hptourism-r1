@@ -84,10 +84,13 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 ## Payment Gateway Integration Status
 
 ### Production Ready
-- **HimKosh (HP CTP)**: Fully integrated with test mode, awaiting production credentials from NIC-HP
-  - Required: Merchant Code, Department ID, Service Code, DDO Code, echallan.key file, Head of Account codes
+- **HimKosh (HP CTP)**: Fully integrated with district-wise DDO routing, awaiting echallan.key encryption file from NIC-HP
+  - **Production Credentials Configured**: DEPT_ID=230, MERCHANT_CODE=HIMKOSH230, SERVICE_CODE=TSM, HEAD=1452-00-800-01
+  - **District-wise DDO Routing**: Automatic DDO selection based on homestay district (15 districts seeded via server/seed.ts)
+  - **DDO Mapping Examples**: Kullu → KLU00-532, Shimla → SML00-532, Chamba → CHM00-532
+  - **Pending**: echallan.key file for AES-128-CBC encryption (contact: dto-cyt-hp@nic.in)
   - Encryption: AES-128-CBC with MD5 checksums
-  - Features: HIMGRN tracking, Bank CIN support, encrypted request/response storage
+  - Features: HIMGRN tracking, Bank CIN support, encrypted request/response storage, district-specific revenue routing
   - Security: Only transaction metadata stored (no banking credentials)
 
 - **UPI QR Code**: Fully functional with scannable QR codes
@@ -113,3 +116,24 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 - **No Sensitive Data**: No banking credentials, card numbers, or PINs stored in database
 - **Retention**: Transaction data retained for 7-10 years for government audit requirements
 - **Encryption**: All payment gateways use 128-bit SSL/TLS, PCI-DSS compliant, RBI approved
+
+## Database Seeding & Initialization
+
+The system uses an idempotent seed script (`server/seed.ts`) that:
+1. Creates the default admin user (Mobile: 9999999999, Password: admin123)
+2. Seeds all 15 district DDO codes for district-wise payment routing
+3. Can be safely rerun without duplicating data
+
+**Run seed script manually**: `npx tsx server/seed.ts`
+
+**DDO Codes by District** (15 total):
+- Chamba: CHM00-532, Bharmour: CHM01-001
+- Shimla: SML00-532, Shimla (Central): CTO00-068
+- Kullu: KLU04-532, Kullu (Dhalpur): KLU00-532
+- Kangra: KNG00-532, Kinnaur: KNR00-031
+- Lahaul: LHL00-017, Lahaul-Spiti (Kaza): KZA00-011
+- Mandi: MDI00-532, Pangi: PNG00-003
+- Sirmour: SMR00-055, Solan: SOL00-046
+- Hamirpur: HMR00-053
+
+Each homestay payment automatically routes to the correct district DDO for revenue collection.

@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import https from "https";
 
 const PRODUCTION_PORTAL_URL = "https://eservices.himachaltourism.gov.in/";
 
@@ -9,22 +10,42 @@ interface ScrapedStats {
   pendingApplications: number;
 }
 
+async function fetchWithCustomAgent(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const agent = new https.Agent({
+      rejectUnauthorized: false
+    });
+
+    https.get(url, {
+      agent,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    }, (res) => {
+      let data = '';
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(data);
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+        }
+      });
+    }).on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
 export async function scrapeProductionStats(): Promise<ScrapedStats | null> {
   try {
     console.log(`[scraper] Fetching stats from ${PRODUCTION_PORTAL_URL}`);
     
-    const response = await fetch(PRODUCTION_PORTAL_URL, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-    
-    if (!response.ok) {
-      console.error(`[scraper] Failed to fetch: ${response.status} ${response.statusText}`);
-      return null;
-    }
-    
-    const html = await response.text();
+    const html = await fetchWithCustomAgent(PRODUCTION_PORTAL_URL);
     
     const stats = extractStatsFromHTML(html);
     
