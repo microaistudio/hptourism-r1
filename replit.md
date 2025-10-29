@@ -84,14 +84,21 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 ## Payment Gateway Integration Status
 
 ### Production Ready
-- **HimKosh (HP CTP)**: Fully integrated with district-wise DDO routing, awaiting echallan.key encryption file from NIC-HP
-  - **Production Credentials Configured**: DEPT_ID=230, MERCHANT_CODE=HIMKOSH230, SERVICE_CODE=TSM, HEAD=1452-00-800-01
+- **HimKosh (HP CTP)**: Fully integrated with district-wise DDO routing and auto-redirect working
+  - **Production Credentials Configured**: DEPT_ID=CTO00-068, MERCHANT_CODE=HIMKOSH230, SERVICE_CODE=TSM, HEAD=1452-00-800-01
   - **District-wise DDO Routing**: Automatic DDO selection based on homestay district (15 districts seeded via server/seed.ts)
   - **DDO Mapping Examples**: Kullu → KLU00-532, Shimla → SML00-532, Chamba → CHM00-532
-  - **Pending**: echallan.key file for AES-128-CBC encryption (contact: dto-cyt-hp@nic.in)
+  - **Integration Status**: ✅ Auto-redirect to HimKosh portal working, currently showing "CHECK SUM MISMATCH" (expected)
+  - **Pending Items**:
+    1. `echallan.key` file for AES-128-CBC encryption (contact: dto-cyt-hp@nic.in)
+    2. Callback URL clarification - Two options under discussion:
+       - **Option A (Automatic)**: HimKosh sends POST callback to our URL upon payment completion
+       - **Option B (Manual)**: We call HimKosh verification API to check payment status
+       - **Status**: Awaiting clarification from NIC-HP on whether automatic callbacks are supported
   - Encryption: AES-128-CBC with MD5 checksums
   - Features: HIMGRN tracking, Bank CIN support, encrypted request/response storage, district-specific revenue routing
   - Security: Only transaction metadata stored (no banking credentials)
+  - **Test Status**: Successfully redirecting to HimKosh portal at https://himkosh.hp.nic.in/echallan/
 
 - **UPI QR Code**: Fully functional with scannable QR codes
   - Placeholder UPI ID: hptourism.registration@sbi (replace with official HP Tourism UPI)
