@@ -21,6 +21,8 @@ cd hptourism-r1
 npm install
 ```
 
+**⚠️ IMPORTANT:** Always run `npm install` after pulling new code to ensure all dependencies are up to date.
+
 ## Step 3: Configure Environment Variables
 
 Create a `.env` file in the root directory:
@@ -194,9 +196,31 @@ Main tables:
 - `notifications` - System notifications
 - `production_stats` - Analytics data
 
+## Updating Existing Deployment
+
+When pulling new code from Git:
+
+```bash
+cd ~/projects/hptourism-r1.1
+git pull origin main
+npm install           # ← CRITICAL: Always install new dependencies
+npm run build
+pm2 restart hp-tourism
+```
+
+Common mistake: Forgetting to run `npm install` after `git pull` will cause build failures if new packages were added.
+
+---
+
 ## Support
 
 For issues or questions:
 1. Check logs: Application logs, PostgreSQL logs
 2. Review this deployment guide
 3. Check `replit.md` for system architecture details
+
+### Common Build Errors
+
+**Error: "Rollup failed to resolve import"**
+- Cause: Missing dependencies
+- Fix: Run `npm install` before `npm run build`
