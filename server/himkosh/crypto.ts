@@ -221,18 +221,12 @@ export function buildRequestString(params: {
     parts.push(`Amount10=${params.amount10}`);
   }
 
-  // Add service code if provided
-  if (params.serviceCode) {
-    parts.push(`Service_code=${params.serviceCode}`);
-  }
-
-  // Add return URL if provided
-  if (params.returnUrl) {
-    parts.push(`return_url=${params.returnUrl}`);
-  }
-
+  // NOTE: Service_code and return_url are NOT included in encrypted string
+  // They are for HimKosh server-side mapping/configuration only
+  // The example in documentation does NOT include these fields in encryption
+  
   // Join with pipe delimiter and return WITHOUT checksum
-  // Checksum is calculated separately and not encrypted
+  // Checksum is calculated separately and appended before encryption
   return parts.join('|');
 }
 
