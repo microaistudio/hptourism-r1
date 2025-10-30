@@ -85,12 +85,17 @@ router.post('/initiate', async (req, res) => {
       returnUrl: config.returnUrl,
     };
 
-    // Build and encrypt request string
+    // Build request string WITHOUT checksum first
     const requestString = buildRequestString(requestParams);
-    const encryptedData = await crypto.encrypt(requestString);
     
-    // TRY VARIANT 4: Calculate checksum on ENCRYPTED data (not plain text)
-    const checksum = HimKoshCrypto.generateChecksum(encryptedData);
+    // Calculate checksum on plain string (WITHOUT checksum field)
+    const checksum = HimKoshCrypto.generateChecksum(requestString);
+    
+    // CRITICAL: Append checksum to the plain string BEFORE encryption
+    const requestStringWithChecksum = `${requestString}|checkSum=${checksum}`;
+    
+    // Encrypt the ENTIRE string including the checksum
+    const encryptedData = await crypto.encrypt(requestStringWithChecksum);
 
     // Debug: Log values to identify which field is too long
     console.log('[himkosh] Transaction values:', {

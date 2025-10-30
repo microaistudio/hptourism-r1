@@ -146,8 +146,8 @@ export class HimKoshCrypto {
     const hash = crypto.createHash('md5');
     // Use UTF-8 for checksum
     hash.update(dataString, 'utf8');
-    // CRITICAL: .NET expects uppercase hex, not lowercase
-    return hash.digest('hex').toUpperCase();
+    // CRITICAL: HimKosh expects LOWERCASE hex (as per documentation example)
+    return hash.digest('hex').toLowerCase();
   }
 
   /**
