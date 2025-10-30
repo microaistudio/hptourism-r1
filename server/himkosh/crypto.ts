@@ -37,11 +37,14 @@ export class HimKoshCrypto {
    */
   private async loadKey(): Promise<{ key: Buffer; iv: Buffer }> {
     if (this.key && this.iv) {
+      console.log('[himkosh-crypto] Using cached key/IV');
       return { key: this.key, iv: this.iv };
     }
 
     try {
+      console.log('[himkosh-crypto] Loading key from:', this.keyFilePath);
       const keyData = await fs.readFile(this.keyFilePath);
+      console.log('[himkosh-crypto] Key file size:', keyData.length, 'bytes');
       
       // Strict validation: Must be exactly 16 or 32 bytes
       if (keyData.length !== 16 && keyData.length !== 32) {
@@ -56,6 +59,7 @@ export class HimKoshCrypto {
       const keyBytes = Buffer.alloc(16);
       keyData.copy(keyBytes, 0, 0, 16);
       this.key = keyBytes;
+      console.log('[himkosh-crypto] Key loaded successfully (16 bytes)');
       
       // Extract 16-byte IV (bytes 16-31) if available
       let ivBytes: Buffer;
@@ -63,9 +67,11 @@ export class HimKoshCrypto {
         // IV provided in file
         ivBytes = Buffer.alloc(16);
         keyData.copy(ivBytes, 0, 16, 32);
+        console.log('[himkosh-crypto] IV loaded from file (16 bytes)');
       } else {
         // 16-byte file: Use zero IV
         ivBytes = Buffer.alloc(16, 0);
+        console.log('[himkosh-crypto] Using zero IV (16-byte key file)');
       }
       this.iv = ivBytes;
       

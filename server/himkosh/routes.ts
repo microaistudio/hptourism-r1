@@ -104,6 +104,13 @@ router.post('/initiate', async (req, res) => {
       head1Len: config.heads.registrationFee?.length,
     });
 
+    // Debug: Log encryption details
+    console.log('[himkosh-encryption] Plain request string:', requestString);
+    console.log('[himkosh-encryption] Plain string length:', requestString.length);
+    console.log('[himkosh-encryption] Encrypted data:', encryptedData);
+    console.log('[himkosh-encryption] Encrypted length:', encryptedData.length);
+    console.log('[himkosh-encryption] Checksum:', checksum);
+
     // Save transaction to database
     await db.insert(himkoshTransactions).values({
       applicationId,
