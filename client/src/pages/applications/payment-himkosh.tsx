@@ -276,9 +276,11 @@ export default function HimKoshPaymentPage() {
                   action={paymentData.paymentUrl}
                   className="hidden"
                 >
-                  <input type="hidden" name="encdata" value={paymentData.encdata} />
+                  {/* URL-encode Base64 data to handle +, /, = characters */}
+                  <input type="hidden" name="encdata" value={encodeURIComponent(paymentData.encdata)} />
                   <input type="hidden" name="merchant_code" value={paymentData.merchantCode} />
-                  <input type="hidden" name="checksum" value={(paymentData as any).checksum} />
+                  {/* CRITICAL: HimKosh expects 'checksumhash' NOT 'checksum' */}
+                  <input type="hidden" name="checksumhash" value={(paymentData as any).checksum} />
                 </form>
               )}
             </CardContent>

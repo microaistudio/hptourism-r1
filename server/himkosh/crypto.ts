@@ -139,13 +139,15 @@ export class HimKoshCrypto {
 
   /**
    * Generate MD5 checksum for data string
+   * .NET backend expects UPPERCASE hex (NOT lowercase)
    * @param dataString - String to generate checksum for
-   * @returns MD5 checksum in lowercase hexadecimal
+   * @returns MD5 checksum in UPPERCASE hexadecimal
    */
   static generateChecksum(dataString: string): string {
     const hash = crypto.createHash('md5');
     hash.update(dataString, 'ascii');
-    return hash.digest('hex');
+    // CRITICAL: .NET expects uppercase hex, not lowercase
+    return hash.digest('hex').toUpperCase();
   }
 
   /**
