@@ -97,9 +97,9 @@ export class HimKoshCrypto {
       // Create cipher with separate key and IV
       const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
       
-      // CRITICAL: Use 'ascii' encoding to match .NET's Encoding.ASCII.GetBytes()
-      // .NET backends use ASCII, not UTF-8 for encryption
-      let encrypted = cipher.update(textToEncrypt, 'ascii', 'base64');
+      // TRY VARIANT 3: Use 'latin1' encoding (ISO-8859-1) - common in .NET
+      // Some .NET systems use Latin1 instead of ASCII
+      let encrypted = cipher.update(textToEncrypt, 'latin1', 'base64');
       encrypted += cipher.final('base64');
       
       return encrypted;
@@ -145,7 +145,8 @@ export class HimKoshCrypto {
    */
   static generateChecksum(dataString: string): string {
     const hash = crypto.createHash('md5');
-    hash.update(dataString, 'ascii');
+    // TRY VARIANT 3: Use latin1 encoding for checksum too
+    hash.update(dataString, 'latin1');
     // CRITICAL: .NET expects uppercase hex, not lowercase
     return hash.digest('hex').toUpperCase();
   }
