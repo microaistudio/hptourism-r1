@@ -86,6 +86,7 @@ export class HimKoshCrypto {
 
   /**
    * Encrypt data string using AES-128-CBC
+   * .NET backend expects ASCII encoding (NOT UTF-8)
    * @param textToEncrypt - Plain text string to encrypt
    * @returns Base64 encoded encrypted string
    */
@@ -96,8 +97,9 @@ export class HimKoshCrypto {
       // Create cipher with separate key and IV
       const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
       
-      // Encrypt
-      let encrypted = cipher.update(textToEncrypt, 'utf8', 'base64');
+      // CRITICAL: Use 'ascii' encoding to match .NET's Encoding.ASCII.GetBytes()
+      // .NET backends use ASCII, not UTF-8 for encryption
+      let encrypted = cipher.update(textToEncrypt, 'ascii', 'base64');
       encrypted += cipher.final('base64');
       
       return encrypted;
@@ -111,6 +113,7 @@ export class HimKoshCrypto {
 
   /**
    * Decrypt data string using AES-128-CBC
+   * .NET backend uses ASCII encoding (NOT UTF-8)
    * @param textToDecrypt - Base64 encoded encrypted string
    * @returns Decrypted plain text string
    */
@@ -121,9 +124,9 @@ export class HimKoshCrypto {
       // Create decipher with separate key and IV
       const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
       
-      // Decrypt
-      let decrypted = decipher.update(textToDecrypt, 'base64', 'utf8');
-      decrypted += decipher.final('utf8');
+      // CRITICAL: Use 'ascii' encoding to match .NET's Encoding.ASCII.GetString()
+      let decrypted = decipher.update(textToDecrypt, 'base64', 'ascii');
+      decrypted += decipher.final('ascii');
       
       return decrypted;
     } catch (error) {
