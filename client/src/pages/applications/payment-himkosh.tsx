@@ -278,6 +278,7 @@ export default function HimKoshPaymentPage() {
                 >
                   <input type="hidden" name="encdata" value={paymentData.encdata} />
                   <input type="hidden" name="merchant_code" value={paymentData.merchantCode} />
+                  <input type="hidden" name="checksum" value={(paymentData as any).checksum} />
                 </form>
               )}
             </CardContent>

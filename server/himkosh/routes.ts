@@ -137,6 +137,7 @@ router.post('/initiate', async (req, res) => {
       paymentUrl: config.paymentUrl,
       merchantCode: config.merchantCode,
       encdata: encryptedData,
+      checksum: checksum, // CRITICAL: Send checksum separately (NOT encrypted)
       appRefNo,
       totalAmount,
       isConfigured: config.isConfigured,
