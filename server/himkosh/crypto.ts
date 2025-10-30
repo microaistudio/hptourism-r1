@@ -160,7 +160,7 @@ export class HimKoshCrypto {
 /**
  * Build pipe-delimited request string for HimKosh
  * @param params - Request parameters
- * @returns Pipe-delimited string with checksum
+ * @returns Pipe-delimited string WITHOUT checksum (for encryption)
  */
 export function buildRequestString(params: {
   deptId: string;
@@ -226,12 +226,9 @@ export function buildRequestString(params: {
     parts.push(`return_url=${params.returnUrl}`);
   }
 
-  // Join with pipe delimiter
-  const dataString = parts.join('|');
-
-  // Calculate checksum and append
-  const checksum = HimKoshCrypto.generateChecksum(dataString);
-  return `${dataString}|checkSum=${checksum}`;
+  // Join with pipe delimiter and return WITHOUT checksum
+  // Checksum is calculated separately and not encrypted
+  return parts.join('|');
 }
 
 /**
