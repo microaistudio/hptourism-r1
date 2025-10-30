@@ -2,10 +2,11 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import { storage } from "./storage";
-import { insertUserSchema, type User, type HomestayApplication } from "@shared/schema";
+import { insertUserSchema, type User, type HomestayApplication, homestayApplications } from "@shared/schema";
 import { z } from "zod";
+import { eq, desc } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
 import himkoshRoutes from "./himkosh/routes";
@@ -329,9 +330,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get ALL applications for workflow monitoring (officers only)
+  // RBAC: District officers see only their district, State officers see all
   app.get("/api/applications/all", requireRole('district_officer', 'state_officer', 'admin'), async (req, res) => {
     try {
-      const applications = await storage.getAllApplications();
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      let applications: HomestayApplication[] = [];
+      
+      // District officers: Only see applications from their assigned district
+      if (user.role === 'district_officer') {
+        if (!user.district) {
+          return res.status(400).json({ message: "District officer must have an assigned district" });
+        }
+        // Get all applications in their district (not just pending)
+        applications = await db.select().from(homestayApplications)
+          .where(eq(homestayApplications.district, user.district))
+          .orderBy(desc(homestayApplications.createdAt));
+      }
+      // State officers and admins: See all applications
+      else if (user.role === 'state_officer' || user.role === 'admin') {
+        applications = await storage.getAllApplications();
+      }
+      
       res.json(applications);
     } catch (error) {
       console.error('[workflow-monitoring] Error fetching all applications:', error);

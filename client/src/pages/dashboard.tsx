@@ -56,7 +56,8 @@ export default function Dashboard() {
   const user = userData.user;
   const applications = applicationsData?.applications || [];
 
-  const stats = {
+  // Different stats for different roles
+  const stats = user.role === 'property_owner' ? {
     total: applications.length,
     draft: applications.filter(a => a.status === 'draft').length,
     sentBack: applications.filter(a => a.status === 'sent_back_for_corrections').length,
@@ -64,6 +65,22 @@ export default function Dashboard() {
     pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review' || a.status === 'inspection_scheduled' || a.status === 'inspection_completed').length,
     approved: applications.filter(a => a.status === 'approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
+  } : {
+    // Officer stats - all applications they can see
+    total: applications.length,
+    pendingReview: applications.filter(a => 
+      a.status === 'submitted' || 
+      a.status === 'district_review' || 
+      a.status === 'state_review' ||
+      a.status === 'inspection_completed'
+    ).length,
+    inspectionScheduled: applications.filter(a => a.status === 'inspection_scheduled').length,
+    paymentPending: applications.filter(a => a.status === 'payment_pending').length,
+    approved: applications.filter(a => a.status === 'approved').length,
+    rejected: applications.filter(a => a.status === 'rejected').length,
+    sentBack: applications.filter(a => a.status === 'sent_back_for_corrections').length,
+    draft: applications.filter(a => a.status === 'draft').length,
+    pending: 0,
   };
 
   const getStatusBadge = (status: string) => {
@@ -147,7 +164,18 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold">Welcome, {user.fullName}!</h2>
-            <p className="text-muted-foreground">Manage your homestay applications</p>
+            {user.role === 'property_owner' && (
+              <p className="text-muted-foreground">Manage your homestay applications</p>
+            )}
+            {user.role === 'district_officer' && (
+              <p className="text-muted-foreground">District Officer Dashboard - {user.district || 'No District Assigned'}</p>
+            )}
+            {user.role === 'state_officer' && (
+              <p className="text-muted-foreground">State Officer Dashboard - Statewide Access</p>
+            )}
+            {user.role === 'admin' && (
+              <p className="text-muted-foreground">Administrator Dashboard</p>
+            )}
           </div>
           {user.role === 'property_owner' && (
             <Button
@@ -232,7 +260,8 @@ export default function Dashboard() {
             <CardContent>
               <div className="flex items-center text-xs text-muted-foreground">
                 <FileText className="w-4 h-4 mr-1" />
-                All submissions
+                {user.role === 'property_owner' ? 'All submissions' : 
+                 user.role === 'district_officer' ? `In ${user.district || 'district'}` : 'Statewide'}
               </div>
             </CardContent>
           </Card>
@@ -252,7 +281,22 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {!(user.role === 'property_owner' && stats.sentBack > 0) && (
+          {user.role !== 'property_owner' && 'pendingReview' in stats && (
+            <Card className="border-orange-600">
+              <CardHeader className="pb-3">
+                <CardDescription>Pending Review</CardDescription>
+                <CardTitle className="text-3xl text-orange-600" data-testid="stat-pending-review">{stats.pendingReview}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="w-4 h-4 mr-1" />
+                  Requires action
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {user.role === 'property_owner' && !(stats.sentBack > 0) && (
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Draft</CardDescription>
@@ -267,18 +311,35 @@ export default function Dashboard() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Pending Review</CardDescription>
-              <CardTitle className="text-3xl text-orange-600" data-testid="stat-pending">{stats.pending}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center text-xs text-muted-foreground">
-                <Clock className="w-4 h-4 mr-1" />
-                Under review
-              </div>
-            </CardContent>
-          </Card>
+          {user.role === 'property_owner' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Pending Review</CardDescription>
+                <CardTitle className="text-3xl text-orange-600" data-testid="stat-pending">{stats.pending}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="w-4 h-4 mr-1" />
+                  Under review
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {user.role !== 'property_owner' && 'inspectionScheduled' in stats && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Inspections</CardDescription>
+                <CardTitle className="text-3xl text-blue-600" data-testid="stat-inspection">{stats.inspectionScheduled}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="w-4 h-4 mr-1" />
+                  Scheduled
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3">
@@ -288,7 +349,7 @@ export default function Dashboard() {
             <CardContent>
               <div className="flex items-center text-xs text-muted-foreground">
                 <CheckCircle2 className="w-4 h-4 mr-1" />
-                Active properties
+                {user.role === 'property_owner' ? 'Active properties' : 'Completed'}
               </div>
             </CardContent>
           </Card>

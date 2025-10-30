@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { LogOut, Home } from "lucide-react";
 import { getDefaultRouteForRole } from "@/config/navigation";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
 
 interface AuthLayoutProps {
@@ -23,9 +23,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
+      // CRITICAL: Clear all cached queries to prevent role-switching bugs
+      queryClient.clear();
       setLocation("/");
     } catch (error) {
       console.error("Logout failed:", error);
+      // Still clear cache even on error to ensure clean state
+      queryClient.clear();
       setLocation("/");
     }
   };

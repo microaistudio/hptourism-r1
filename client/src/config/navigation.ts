@@ -38,6 +38,11 @@ export const officerNavigation: NavSection[] = [
     title: "Main",
     items: [
       {
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: Home,
+      },
+      {
         title: "Workflow Monitoring",
         url: "/workflow-monitoring",
         icon: BarChart3,
@@ -81,8 +86,6 @@ export function getDefaultRouteForRole(role: string): string {
   if (role === 'admin') {
     return '/admin/users';
   }
-  if (role === 'district_officer' || role === 'state_officer') {
-    return '/workflow-monitoring';
-  }
+  // All roles now land on /dashboard with role-specific content
   return '/dashboard';
 }
