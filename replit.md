@@ -30,7 +30,11 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
   3. **CCAvenue**: Comprehensive gateway with 200+ payment options, 18 language support, widely used by government portals
   4. **PayU**: Enterprise-grade gateway with smart routing for high success rates, 150+ payment modes
   5. **UPI QR Code**: Manual payment option via scannable QR codes for all UPI apps (hptourism.registration@sbi placeholder)
-- **Role-Based Access Control**: `ProtectedRoute` component validates user roles, redirecting unauthorized users. Officer-only routes are restricted to `district_officer` and `state_officer` roles, while property owner routes are for `property_owner` roles.
+- **Production-Level Role-Based Access Control (RBAC)**: Comprehensive RBAC system with 4 distinct roles, each with specific permissions and UI/UX:
+  - **Property Owner** (`property_owner`): Register homestays, submit applications, track status, update sent-back applications, make payments, download certificates
+  - **District Officer** (`district_officer`): Review applications from assigned district only, approve/reject/send back, schedule inspections, verify payments, access analytics
+  - **State Officer** (`state_officer`): Final approval authority, review all applications statewide, access comprehensive analytics, schedule inspections
+  - **Admin** (`admin`): User management, role assignment, system configuration, full platform access
 
 ### System Design Choices
 
@@ -38,7 +42,12 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 - **Serverless-Ready Database**: Uses Neon PostgreSQL and Drizzle ORM for type-safe, persistent data storage.
 - **Component-First UI**: Leverages Shadcn/ui for rapid development and consistent user experience.
 - **Shared Schema Pattern**: Ensures type safety and prevents schema drift by defining database schemas once.
-- **Session-Based Authentication**: Implements PostgreSQL-backed sessions for authentication and authorization, aligning with government security policies. User roles include `property_owner`, `district_officer`, and `state_officer`.
+- **Session-Based Authentication**: Implements PostgreSQL-backed sessions for authentication and authorization, aligning with government security policies
+  - **Current**: Password-based login (bcrypt hashing, 10 salt rounds)
+  - **Planned**: Mobile OTP via NIC SMS Gateway for property owners, HP Government LDAP/Active Directory integration for officers
+- **Query Cache Management**: TanStack Query cache automatically clears on logout to prevent role-switching bugs
+- **Role-Specific APIs**: Backend endpoints filter data based on user role and district assignment
+- **Frontend Route Guards**: `ProtectedRoute` component validates roles and redirects unauthorized access
 
 ## External Dependencies
 
