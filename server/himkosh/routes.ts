@@ -112,11 +112,12 @@ router.post('/initiate', async (req, res) => {
     });
 
     // Debug: Log encryption details
-    console.log('[himkosh-encryption] Plain request string:', requestString);
-    console.log('[himkosh-encryption] Plain string length:', requestString.length);
+    console.log('[himkosh-encryption] Plain request string (WITHOUT checksum):', requestString);
+    console.log('[himkosh-encryption] Checksum calculated:', checksum);
+    console.log('[himkosh-encryption] Full string WITH checksum (what we encrypt):', requestStringWithChecksum);
+    console.log('[himkosh-encryption] Full string length:', requestStringWithChecksum.length);
     console.log('[himkosh-encryption] Encrypted data:', encryptedData);
     console.log('[himkosh-encryption] Encrypted length:', encryptedData.length);
-    console.log('[himkosh-encryption] Checksum:', checksum);
 
     // Save transaction to database
     await db.insert(himkoshTransactions).values({
