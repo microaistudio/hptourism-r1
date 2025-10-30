@@ -268,7 +268,7 @@ export default function HimKoshPaymentPage() {
                 </div>
               )}
 
-              {/* Hidden form for HimKosh POST */}
+              {/* Hidden form for HimKosh POST - TRY WITHOUT URL ENCODING */}
               {paymentData && (
                 <form
                   ref={formRef}
@@ -276,10 +276,9 @@ export default function HimKoshPaymentPage() {
                   action={paymentData.paymentUrl}
                   className="hidden"
                 >
-                  {/* URL-encode Base64 data to handle +, /, = characters */}
-                  <input type="hidden" name="encdata" value={encodeURIComponent(paymentData.encdata)} />
+                  {/* TRY 1: NO URL encoding - send raw Base64 */}
+                  <input type="hidden" name="encdata" value={paymentData.encdata} />
                   <input type="hidden" name="merchant_code" value={paymentData.merchantCode} />
-                  {/* CRITICAL: HimKosh expects 'checksumhash' NOT 'checksum' */}
                   <input type="hidden" name="checksumhash" value={(paymentData as any).checksum} />
                 </form>
               )}

@@ -88,7 +88,10 @@ router.post('/initiate', async (req, res) => {
     // Build and encrypt request string
     const requestString = buildRequestString(requestParams);
     const encryptedData = await crypto.encrypt(requestString);
-    const checksum = HimKoshCrypto.generateChecksum(requestString);
+    
+    // TRY VARIANT 2: Include merchant_code in checksum calculation
+    const checksumInput = `${config.merchantCode}${requestString}`;
+    const checksum = HimKoshCrypto.generateChecksum(checksumInput);
 
     // Debug: Log values to identify which field is too long
     console.log('[himkosh] Transaction values:', {
