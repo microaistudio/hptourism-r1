@@ -102,7 +102,8 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
     - ✅ Checksum calculation fixed to match government code (includes Service_code + return_url)
     - ✅ Date format corrected to DD-MM-YYYY (per government standard)
     - ✅ Encryption logic implemented matching eChallanED.dll (AES-128-CBC, MD5)
-    - ⏳ Awaiting `echallan.key` file from NIC-HP for final testing
+    - ✅ echallan.key file received and configured (32 bytes: 16-byte key + 16-byte IV)
+    - ✅ **READY FOR PRODUCTION TESTING**
   - **Reference Files Received from HP Government**:
     - `Dummy Code.txt`: C# code showing exact checksum format and integration flow
     - `eChallanED.dll`: .NET encryption library (algorithm reverse-engineered to Node.js)
@@ -112,9 +113,10 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
     Head1=XXX|Amount1=XXX|Head2=XXX|Amount2=XXX|Ddo=XXX|
     PeriodFrom=DD-MM-YYYY|PeriodTo=DD-MM-YYYY|Service_code=XXX|return_url=XXX
     ```
-  - **Pending Items**:
-    1. **CRITICAL**: `echallan.key` file (16 or 32 bytes) - Contact: dto-cyt-hp@nic.in
-    2. Callback URL mechanism (automatic POST vs manual verification API)
+  - **Next Steps**:
+    1. ✅ `echallan.key` file configured successfully
+    2. Test payment flow end-to-end with real transaction
+    3. Clarify callback URL mechanism with NIC-HP (automatic POST vs manual verification API)
   - **Encryption**: AES-128-CBC with MD5 checksums, implemented in `server/himkosh/crypto.ts`
   - **Features**: HIMGRN tracking, Bank CIN support, encrypted request/response storage, district-specific revenue routing
   - **Security**: Only transaction metadata stored (no banking credentials)
