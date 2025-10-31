@@ -451,9 +451,8 @@ router.post('/test-callback-url', async (req, res) => {
     // Build the request string WITHOUT checksum
     const requestString = buildRequestString(requestParams);
     
-    // Calculate checksum using MD5
-    const crypto2 = require('crypto');
-    const checksumCalc = crypto2.createHash('md5').update(requestString, 'ascii').digest('hex');
+    // Calculate checksum using our HimKoshCrypto class (now UPPERCASE!)
+    const checksumCalc = HimKoshCrypto.generateChecksum(requestString);
     
     // Build full string WITH checksum
     const fullString = `${requestString}|checkSum=${checksumCalc}`;
