@@ -22,6 +22,14 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 
 - **Public Tourism Discovery Platform**: Allows browsing and filtering of approved homestays with detailed property pages.
 - **Smart Compliance Hub**: Enables property owners to register homestays, submit applications, and track status with role-specific navigation.
+- **ANNEXURE-I Compliant Registration Form**: Complete 6-page multi-step form implementing HP Homestay Rules 2025:
+  - **Page 1 - Property Details** (7 fields): Property name, address, district, pincode, location type (MC/TCP/GP), telephone, fax
+  - **Page 2 - Owner Information** (4 fields): Owner name, mobile, email, Aadhaar (auto-filled from user account)
+  - **Page 3 - Room Details & Category** (9 fields): Category (Diamond/Gold/Silver), proposed room rate, project type, property area, single/double/family rooms with sizes, attached washrooms, GSTIN (conditional: mandatory for Diamond/Gold, optional for Silver)
+  - **Page 4 - Distances & Public Areas** (8 fields): 5 auto-filled distance fields (airport, railway, city center, shopping, bus stand) based on district with manual override, 3 public areas (lobby, dining, parking description)
+  - **Page 5 - ANNEXURE-II Documents** (6 mandatory + photos): Revenue papers, affidavit under Section 29, undertaking in Form-C, register for verification, bill book, property photos (minimum 2)
+  - **Page 6 - Amenities & Summary**: Wi-Fi, parking, air conditioning, hot water, room service, complimentary breakfast, additional facilities (eco-friendly, differently-abled, fire equipment, nearest hospital), dynamic fee summary with category badge and GST calculation
+  - **Key Features**: District-based distance auto-population (15 districts), location-based fee calculation (MC/TCP/GP rates + 18% GST), conditional GSTIN validation, room count totals, maximum 12 beds validation, step-by-step validation blocking navigation until mandatory fields completed
 - **Analytics Dashboard**: Provides government officers with insights into application trends, status distributions, category breakdowns, and processing times via Recharts.
 - **Workflow Monitoring Dashboard**: Offers a real-time, visual pipeline of applications through six stages, with SLA tracking, smart notifications, bottleneck detection, and district performance analytics.
 - **Multiple Payment Gateways**: Integrated payment system with five RBI-approved options:
