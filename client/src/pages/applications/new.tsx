@@ -61,12 +61,12 @@ const applicationSchema = z.object({
   // Contact details
   telephone: z.string().optional().or(z.literal("")),
   fax: z.string().optional().or(z.literal("")),
-  ownerEmail: z.string().email("Enter valid email").optional().or(z.literal("")),
+  ownerEmail: z.string().min(1, "Email is required").email("Enter valid email"),
   ownerMobile: z.string().regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile"),
   
   // Owner info
   ownerName: z.string().min(3, "Owner name is required"),
-  ownerAadhaar: z.string().regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
+  ownerAadhaar: z.string().min(1, "Aadhaar is required").regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
   
   // Category & room rate
   category: z.enum(["diamond", "gold", "silver"]),
@@ -548,7 +548,9 @@ export default function NewApplication() {
                       name="ownerEmail"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email (Optional)</FormLabel>
+                          <FormLabel>
+                            Email <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
                             <Input type="email" placeholder="your@email.com" data-testid="input-owner-email" {...field} />
                           </FormControl>
@@ -562,7 +564,9 @@ export default function NewApplication() {
                       name="ownerAadhaar"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Aadhaar Number</FormLabel>
+                          <FormLabel>
+                            Aadhaar Number <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
                             <Input placeholder="12-digit Aadhaar" data-testid="input-owner-aadhaar" {...field} />
                           </FormControl>
