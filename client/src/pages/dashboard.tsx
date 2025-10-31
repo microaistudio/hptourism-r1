@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
 
+type FilterType = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'sent_back' | 'payment_pending' | 'pending_review' | 'inspection';
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   const { data: userData, isLoading: userLoading, error } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -43,6 +47,44 @@ export default function Dashboard() {
   // Separate drafts from submitted applications
   const draftApplications = applications.filter(a => a.status === 'draft');
   const submittedApplications = applications.filter(a => a.status !== 'draft');
+
+  // Filter applications based on active filter
+  const getFilteredApplications = () => {
+    switch (activeFilter) {
+      case 'draft':
+        return applications.filter(a => a.status === 'draft');
+      case 'pending':
+        return applications.filter(a => 
+          a.status === 'submitted' || 
+          a.status === 'district_review' || 
+          a.status === 'state_review' || 
+          a.status === 'inspection_scheduled' || 
+          a.status === 'inspection_completed'
+        );
+      case 'pending_review':
+        return applications.filter(a => 
+          a.status === 'submitted' || 
+          a.status === 'district_review' || 
+          a.status === 'state_review' ||
+          a.status === 'inspection_completed'
+        );
+      case 'inspection':
+        return applications.filter(a => a.status === 'inspection_scheduled');
+      case 'approved':
+        return applications.filter(a => a.status === 'approved');
+      case 'rejected':
+        return applications.filter(a => a.status === 'rejected');
+      case 'sent_back':
+        return applications.filter(a => a.status === 'sent_back_for_corrections');
+      case 'payment_pending':
+        return applications.filter(a => a.status === 'payment_pending');
+      case 'all':
+      default:
+        return applications;
+    }
+  };
+
+  const filteredApplications = getFilteredApplications();
 
   // Different stats for different roles
   const stats = user.role === 'property_owner' ? {
@@ -182,7 +224,11 @@ export default function Dashboard() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card>
+          <Card 
+            className={`cursor-pointer hover-elevate transition-all ${activeFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setActiveFilter('all')}
+            data-testid="card-filter-all"
+          >
             <CardHeader className="pb-3">
               <CardDescription>Total Applications</CardDescription>
               <CardTitle className="text-3xl" data-testid="stat-total">{stats.total}</CardTitle>
@@ -197,7 +243,11 @@ export default function Dashboard() {
           </Card>
 
           {user.role === 'property_owner' && stats.sentBack > 0 && (
-            <Card className="border-destructive">
+            <Card 
+              className={`border-destructive cursor-pointer hover-elevate transition-all ${activeFilter === 'sent_back' ? 'ring-2 ring-destructive' : ''}`}
+              onClick={() => setActiveFilter('sent_back')}
+              data-testid="card-filter-sent-back"
+            >
               <CardHeader className="pb-3">
                 <CardDescription>Sent Back</CardDescription>
                 <CardTitle className="text-3xl text-destructive" data-testid="stat-sent-back">{stats.sentBack}</CardTitle>
@@ -212,7 +262,11 @@ export default function Dashboard() {
           )}
 
           {user.role !== 'property_owner' && 'pendingReview' in stats && (
-            <Card className="border-orange-600">
+            <Card 
+              className={`border-orange-600 cursor-pointer hover-elevate transition-all ${activeFilter === 'pending_review' ? 'ring-2 ring-orange-600' : ''}`}
+              onClick={() => setActiveFilter('pending_review')}
+              data-testid="card-filter-pending-review"
+            >
               <CardHeader className="pb-3">
                 <CardDescription>Pending Review</CardDescription>
                 <CardTitle className="text-3xl text-orange-600" data-testid="stat-pending-review">{stats.pendingReview}</CardTitle>
@@ -227,7 +281,11 @@ export default function Dashboard() {
           )}
 
           {user.role === 'property_owner' && !(stats.sentBack > 0) && (
-            <Card>
+            <Card 
+              className={`cursor-pointer hover-elevate transition-all ${activeFilter === 'draft' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setActiveFilter('draft')}
+              data-testid="card-filter-draft"
+            >
               <CardHeader className="pb-3">
                 <CardDescription>Draft</CardDescription>
                 <CardTitle className="text-3xl text-muted-foreground" data-testid="stat-draft">{stats.draft}</CardTitle>
@@ -242,7 +300,11 @@ export default function Dashboard() {
           )}
 
           {user.role === 'property_owner' && (
-            <Card>
+            <Card 
+              className={`cursor-pointer hover-elevate transition-all ${activeFilter === 'pending' ? 'ring-2 ring-orange-600' : ''}`}
+              onClick={() => setActiveFilter('pending')}
+              data-testid="card-filter-pending"
+            >
               <CardHeader className="pb-3">
                 <CardDescription>Pending Review</CardDescription>
                 <CardTitle className="text-3xl text-orange-600" data-testid="stat-pending">{stats.pending}</CardTitle>
@@ -257,7 +319,11 @@ export default function Dashboard() {
           )}
 
           {user.role !== 'property_owner' && 'inspectionScheduled' in stats && (
-            <Card>
+            <Card 
+              className={`cursor-pointer hover-elevate transition-all ${activeFilter === 'inspection' ? 'ring-2 ring-blue-600' : ''}`}
+              onClick={() => setActiveFilter('inspection')}
+              data-testid="card-filter-inspection"
+            >
               <CardHeader className="pb-3">
                 <CardDescription>Inspections</CardDescription>
                 <CardTitle className="text-3xl text-blue-600" data-testid="stat-inspection">{stats.inspectionScheduled}</CardTitle>
@@ -271,7 +337,11 @@ export default function Dashboard() {
             </Card>
           )}
 
-          <Card>
+          <Card 
+            className={`cursor-pointer hover-elevate transition-all ${activeFilter === 'approved' ? 'ring-2 ring-green-600' : ''}`}
+            onClick={() => setActiveFilter('approved')}
+            data-testid="card-filter-approved"
+          >
             <CardHeader className="pb-3">
               <CardDescription>Approved</CardDescription>
               <CardTitle className="text-3xl text-green-600" data-testid="stat-approved">{stats.approved}</CardTitle>
@@ -337,10 +407,42 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Applications</CardTitle>
-            <CardDescription>
-              {user.role === 'property_owner' ? 'Your submitted homestay applications' : 'Applications for review'}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>
+                  {activeFilter === 'all' && 'All Applications'}
+                  {activeFilter === 'draft' && 'Draft Applications'}
+                  {activeFilter === 'pending' && 'Pending Review'}
+                  {activeFilter === 'pending_review' && 'Pending Review'}
+                  {activeFilter === 'inspection' && 'Inspection Scheduled'}
+                  {activeFilter === 'approved' && 'Approved Applications'}
+                  {activeFilter === 'rejected' && 'Rejected Applications'}
+                  {activeFilter === 'sent_back' && 'Sent Back for Corrections'}
+                  {activeFilter === 'payment_pending' && 'Payment Pending'}
+                </CardTitle>
+                <CardDescription>
+                  {activeFilter === 'all' && (user.role === 'property_owner' ? 'Your homestay applications' : 'Applications for review')}
+                  {activeFilter === 'draft' && 'Continue editing incomplete applications'}
+                  {activeFilter === 'pending' && 'Applications under review'}
+                  {activeFilter === 'pending_review' && 'Requires officer action'}
+                  {activeFilter === 'inspection' && 'Site inspections scheduled'}
+                  {activeFilter === 'approved' && 'Registration completed'}
+                  {activeFilter === 'rejected' && 'Not approved'}
+                  {activeFilter === 'sent_back' && 'Needs corrections'}
+                  {activeFilter === 'payment_pending' && 'Payment required to complete'}
+                </CardDescription>
+              </div>
+              {activeFilter !== 'all' && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setActiveFilter('all')}
+                  data-testid="button-clear-filter"
+                >
+                  Clear Filter
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {appsLoading ? (
@@ -349,16 +451,18 @@ export default function Dashboard() {
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </div>
-            ) : (user.role === 'property_owner' ? submittedApplications.length === 0 : applications.length === 0) ? (
+            ) : filteredApplications.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No applications yet</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {activeFilter === 'all' ? 'No applications yet' : `No ${activeFilter.replace('_', ' ')} applications`}
+                </h3>
                 <p className="text-muted-foreground mb-4">
-                  {user.role === 'property_owner' 
+                  {activeFilter === 'all' && user.role === 'property_owner' 
                     ? 'Start your first homestay registration application'
-                    : 'No applications pending review'}
+                    : `No applications match this filter`}
                 </p>
-                {user.role === 'property_owner' && (
+                {user.role === 'property_owner' && activeFilter === 'all' && (
                   <Button onClick={() => setLocation("/applications/new")} data-testid="button-create-first">
                     <Plus className="w-4 h-4 mr-2" />
                     Create First Application
@@ -367,7 +471,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {(user.role === 'property_owner' ? submittedApplications : applications).map((app) => (
+                {filteredApplications.map((app) => (
                   <div
                     key={app.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer"
