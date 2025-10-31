@@ -305,8 +305,104 @@ export default function NewApplication() {
     createApplicationMutation.mutate(data);
   };
 
-  const nextStep = () => {
-    // Validate Step 4 (Documents) before moving forward
+  const nextStep = async () => {
+    // Step 1: Validate Property Details
+    if (step === 1) {
+      const isValid = await form.trigger([
+        "propertyName",
+        "address",
+        "district",
+        "pincode",
+        "locationType"
+      ]);
+      if (!isValid) {
+        toast({
+          title: "Please complete all required fields",
+          description: "Fill in all mandatory property details before proceeding",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Step 2: Validate Owner Information
+    if (step === 2) {
+      const isValid = await form.trigger([
+        "ownerName",
+        "ownerMobile",
+        "ownerEmail",
+        "ownerAadhaar"
+      ]);
+      if (!isValid) {
+        toast({
+          title: "Please complete all required fields",
+          description: "Fill in all mandatory owner information before proceeding",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Step 3: Validate Room Details & Category
+    if (step === 3) {
+      const category = form.getValues("category");
+      const fieldsToValidate: Array<keyof ApplicationForm> = [
+        "category",
+        "proposedRoomRate",
+        "projectType",
+        "propertyArea",
+        "singleBedRooms",
+        "doubleBedRooms",
+        "familySuites",
+        "attachedWashrooms"
+      ];
+      
+      // Add GSTIN validation for Diamond/Gold categories
+      if (category === "diamond" || category === "gold") {
+        fieldsToValidate.push("gstin");
+        
+        // Check if GSTIN is filled
+        const gstinValue = form.getValues("gstin");
+        if (!gstinValue || gstinValue.trim() === "") {
+          toast({
+            title: "GSTIN is required",
+            description: "GSTIN is mandatory for Diamond and Gold category properties",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      
+      const isValid = await form.trigger(fieldsToValidate);
+      if (!isValid) {
+        toast({
+          title: "Please complete all required fields",
+          description: "Fill in all mandatory room details before proceeding",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate total beds <= 12
+      const totalBeds = (form.getValues("singleBedRooms") || 0) + 
+                       (form.getValues("doubleBedRooms") || 0) * 2 + 
+                       (form.getValues("familySuites") || 0) * 4;
+      if (totalBeds > 12) {
+        toast({
+          title: "Maximum beds exceeded",
+          description: "Total beds cannot exceed 12 (Single=1, Double=2, Suite=4 beds each)",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Step 4: Validate Distances & Public Areas (all optional, can proceed)
+    if (step === 4) {
+      // No mandatory fields on this step, can proceed
+    }
+
+    // Step 5: Validate Documents (ANNEXURE-II)
     if (step === 5) {
       const missingDocs = [];
       if (uploadedDocuments.revenuePapers.length === 0) missingDocs.push("Revenue Papers");
