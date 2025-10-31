@@ -416,6 +416,7 @@ export default function NewApplication() {
         gstAmount: fees.gstAmount.toFixed(2),
         totalFee: fees.totalFee.toFixed(2),
         totalRooms,
+        currentPage: step, // Save the current page/step for resume functionality
         documents: [
           ...uploadedDocuments.revenuePapers.map(f => ({ ...f, documentType: 'revenue_papers' })),
           ...uploadedDocuments.affidavitSection29.map(f => ({ ...f, documentType: 'affidavit_section_29' })),
