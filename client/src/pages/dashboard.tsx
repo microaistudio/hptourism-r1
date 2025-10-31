@@ -1,17 +1,14 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Mountain, LogOut, Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
+import { Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
 
   const { data: userData, isLoading: userLoading, error } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -21,19 +18,6 @@ export default function Dashboard() {
   const { data: applicationsData, isLoading: appsLoading } = useQuery<{ applications: HomestayApplication[] }>({
     queryKey: ["/api/applications"],
     enabled: !!userData?.user,
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout");
-    },
-    onSuccess: () => {
-      queryClient.clear();
-      setLocation("/login");
-      toast({
-        title: "Logged out successfully",
-      });
-    },
   });
 
   if (userLoading) {
@@ -106,65 +90,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Mountain className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">HP Tourism Portal</h1>
-              <p className="text-sm text-muted-foreground">Dashboard</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium" data-testid="text-user-name">{user.fullName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</p>
-            </div>
-            {(user.role === 'district_officer' || user.role === 'state_officer') && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLocation('/workflow-monitoring')}
-                  data-testid="button-workflow-monitoring"
-                >
-                  Workflow Monitoring
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLocation('/payment-verification')}
-                  data-testid="button-payment-verification"
-                >
-                  <CreditCard className="w-4 h-4 mr-1" />
-                  Payments
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLocation('/analytics')}
-                  data-testid="button-analytics"
-                >
-                  Analytics
-                </Button>
-              </>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              data-testid="button-logout"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold">Welcome, {user.fullName}!</h2>
@@ -500,7 +426,7 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 }
