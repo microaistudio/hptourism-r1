@@ -22,9 +22,7 @@ export default function AdminConsole() {
 
   const resetDbMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/admin/reset-db", {
-        method: "POST",
-      });
+      return apiRequest("POST", "/api/admin/reset-db");
     },
     onSuccess: (data) => {
       toast({
