@@ -213,7 +213,7 @@ export default function NewApplication() {
   });
 
   const form = useForm<ApplicationForm>({
-    resolver: zodResolver(applicationSchema),
+    // No resolver - validation happens manually on next/submit to allow draft saves
     defaultValues: {
       propertyName: "",
       address: "",
@@ -275,32 +275,32 @@ export default function NewApplication() {
         address: draft.address || "",
         district: draft.district || "",
         pincode: draft.pincode || "",
-        locationType: draft.locationType || "gp",
+        locationType: (draft.locationType as "mc" | "tcp" | "gp") || "gp",
         telephone: draft.telephone || "",
         fax: draft.fax || "",
         ownerEmail: draft.ownerEmail || "",
         ownerMobile: draft.ownerMobile || "",
         ownerName: draft.ownerName || "",
         ownerAadhaar: draft.ownerAadhaar || "",
-        category: draft.category || "silver",
+        category: (draft.category as "diamond" | "gold" | "silver") || "silver",
         proposedRoomRate: draft.proposedRoomRate ? parseFloat(draft.proposedRoomRate.toString()) : 2000,
-        projectType: draft.projectType || "new_project",
-        propertyArea: draft.propertyArea || 0,
-        singleBedRooms: draft.singleBedRooms || 0,
-        singleBedRoomSize: draft.singleBedRoomSize || undefined,
-        doubleBedRooms: draft.doubleBedRooms || 0,
-        doubleBedRoomSize: draft.doubleBedRoomSize || undefined,
-        familySuites: draft.familySuites || 0,
-        familySuiteSize: draft.familySuiteSize || undefined,
-        attachedWashrooms: draft.attachedWashrooms || 0,
+        projectType: (draft.projectType as "new_rooms" | "new_project") || "new_project",
+        propertyArea: draft.propertyArea ? parseFloat(draft.propertyArea.toString()) : 0,
+        singleBedRooms: draft.singleBedRooms ? parseInt(draft.singleBedRooms.toString()) : 0,
+        singleBedRoomSize: draft.singleBedRoomSize ? parseFloat(draft.singleBedRoomSize.toString()) : undefined,
+        doubleBedRooms: draft.doubleBedRooms ? parseInt(draft.doubleBedRooms.toString()) : 0,
+        doubleBedRoomSize: draft.doubleBedRoomSize ? parseFloat(draft.doubleBedRoomSize.toString()) : undefined,
+        familySuites: draft.familySuites ? parseInt(draft.familySuites.toString()) : 0,
+        familySuiteSize: draft.familySuiteSize ? parseFloat(draft.familySuiteSize.toString()) : undefined,
+        attachedWashrooms: draft.attachedWashrooms ? parseInt(draft.attachedWashrooms.toString()) : 0,
         gstin: draft.gstin || "",
-        distanceAirport: draft.distanceAirport || undefined,
-        distanceRailway: draft.distanceRailway || undefined,
-        distanceCityCenter: draft.distanceCityCenter || undefined,
-        distanceShopping: draft.distanceShopping || undefined,
-        distanceBusStand: draft.distanceBusStand || undefined,
-        lobbyArea: draft.lobbyArea || undefined,
-        diningArea: draft.diningArea || undefined,
+        distanceAirport: draft.distanceAirport ? parseFloat(draft.distanceAirport.toString()) : undefined,
+        distanceRailway: draft.distanceRailway ? parseFloat(draft.distanceRailway.toString()) : undefined,
+        distanceCityCenter: draft.distanceCityCenter ? parseFloat(draft.distanceCityCenter.toString()) : undefined,
+        distanceShopping: draft.distanceShopping ? parseFloat(draft.distanceShopping.toString()) : undefined,
+        distanceBusStand: draft.distanceBusStand ? parseFloat(draft.distanceBusStand.toString()) : undefined,
+        lobbyArea: draft.lobbyArea ? parseFloat(draft.lobbyArea.toString()) : undefined,
+        diningArea: draft.diningArea ? parseFloat(draft.diningArea.toString()) : undefined,
         parkingArea: draft.parkingArea || "",
         ecoFriendlyFacilities: draft.ecoFriendlyFacilities || "",
         differentlyAbledFacilities: draft.differentlyAbledFacilities || "",
@@ -440,7 +440,9 @@ export default function NewApplication() {
       if (!draftId) {
         setDraftId(data.application.id);
       }
+      // Invalidate and refetch to ensure dashboard shows the draft immediately
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      queryClient.refetchQueries({ queryKey: ["/api/applications"] });
       toast({
         title: "Draft saved!",
         description: "Your progress has been saved. You can continue anytime.",

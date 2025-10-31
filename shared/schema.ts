@@ -148,13 +148,24 @@ export const homestayApplications = pgTable("homestay_applications", {
     issuesFound?: string;
   }>(),
   
-  // Uploaded Documents (ANNEXURE-II - 6 mandatory documents)
-  revenuePapersUrl: text("revenue_papers_url"), // Jamabandi & Tatima (Land Revenue Records)
-  affidavitSection29Url: text("affidavit_section29_url"), // Affidavit under Section 29
-  undertakingFormCUrl: text("undertaking_form_c_url"), // Undertaking in Form-C
-  registerForVerificationUrl: text("register_for_verification_url"), // Register for Verification
-  billBookUrl: text("bill_book_url"), // Bill Book
-  propertyPhotosUrls: jsonb("property_photos_urls").$type<string[]>(), // Minimum 2 photos
+  // Legacy document columns (keeping for backward compatibility)
+  ownershipProofUrl: text("ownership_proof_url"),
+  aadhaarCardUrl: text("aadhaar_card_url"),
+  panCardUrl: text("pan_card_url"),
+  gstCertificateUrl: text("gst_certificate_url"),
+  fireSafetyNocUrl: text("fire_safety_noc_url"),
+  pollutionClearanceUrl: text("pollution_clearance_url"),
+  buildingPlanUrl: text("building_plan_url"),
+  propertyPhotosUrls: jsonb("property_photos_urls").$type<string[]>(),
+  
+  // New JSONB documents column for ANNEXURE-II documents
+  documents: jsonb("documents").$type<Array<{
+    id: string;
+    fileName: string;
+    fileUrl: string;
+    documentType: string;
+    uploadedAt?: string;
+  }>>(),
   
   // Certificate
   certificateNumber: varchar("certificate_number", { length: 50 }).unique(),
