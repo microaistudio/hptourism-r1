@@ -70,6 +70,7 @@ router.post('/initiate', async (req, res) => {
     const periodDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
 
     // Build request parameters
+    // CRITICAL: Government code ALWAYS includes Head2/Amount2 (even if 0)
     const requestParams = {
       deptId: config.deptId,
       deptRefNo: application.applicationNumber,
@@ -78,6 +79,8 @@ router.post('/initiate', async (req, res) => {
       appRefNo,
       head1: config.heads.registrationFee,
       amount1: totalAmount,
+      head2: config.heads.registrationFee, // Same head, amount 0 (required by HimKosh)
+      amount2: 0,
       ddo: ddoCode,
       periodFrom: periodDate,
       periodTo: periodDate,

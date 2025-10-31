@@ -203,8 +203,9 @@ export function buildRequestString(params: {
     `PeriodTo=${params.periodTo}`,
   ];
 
-  // Add optional heads (only if amount > 0)
-  if (params.head2 && params.amount2 && params.amount2 > 0) {
+  // Add optional heads
+  // CRITICAL: Government code includes Head2/Amount2 ALWAYS (even if Amount2=0)
+  if (params.head2 !== undefined && params.amount2 !== undefined) {
     parts.push(`Head2=${params.head2}`);
     parts.push(`Amount2=${params.amount2}`);
   }
