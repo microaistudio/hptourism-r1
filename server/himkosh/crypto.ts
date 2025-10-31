@@ -97,8 +97,8 @@ export class HimKoshCrypto {
       // Create cipher with separate key and IV
       const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
       
-      // TRY VARIANT 4: Back to UTF-8 encoding (most standard)
-      let encrypted = cipher.update(textToEncrypt, 'utf8', 'base64');
+      // CRITICAL: Use 'ascii' encoding to match .NET's Encoding.ASCII (NOT UTF-8)
+      let encrypted = cipher.update(textToEncrypt, 'ascii', 'base64');
       encrypted += cipher.final('base64');
       
       return encrypted;
@@ -138,14 +138,14 @@ export class HimKoshCrypto {
 
   /**
    * Generate MD5 checksum for data string
-   * .NET backend expects UPPERCASE hex (NOT lowercase)
+   * .NET backend expects lowercase hex
    * @param dataString - String to generate checksum for
-   * @returns MD5 checksum in UPPERCASE hexadecimal
+   * @returns MD5 checksum in lowercase hexadecimal
    */
   static generateChecksum(dataString: string): string {
     const hash = crypto.createHash('md5');
-    // Use UTF-8 for checksum
-    hash.update(dataString, 'utf8');
+    // CRITICAL: Use ASCII encoding to match .NET's Encoding.ASCII
+    hash.update(dataString, 'ascii');
     // CRITICAL: HimKosh expects LOWERCASE hex (as per documentation example)
     return hash.digest('hex').toLowerCase();
   }
