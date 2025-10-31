@@ -208,7 +208,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Create application
+  // Save application as draft (partial data allowed)
+  app.post("/api/applications/draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      
+      // For drafts, accept any partial data - validation is minimal
+      const draftSchema = z.object({
+        propertyName: z.string().optional(),
+        category: z.enum(['diamond', 'gold', 'silver']).optional(),
+        address: z.string().optional(),
+        district: z.string().optional(),
+        pincode: z.string().optional(),
+        locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
+        telephone: z.string().optional(),
+        fax: z.string().optional(),
+        ownerName: z.string().optional(),
+        ownerMobile: z.string().optional(),
+        ownerEmail: z.string().optional(),
+        ownerAadhaar: z.string().optional(),
+        proposedRoomRate: z.coerce.number().optional(),
+        projectType: z.enum(['new_rooms', 'new_project']).optional(),
+        propertyArea: z.coerce.number().optional(),
+        singleBedRooms: z.coerce.number().optional(),
+        singleBedRoomSize: z.coerce.number().optional(),
+        doubleBedRooms: z.coerce.number().optional(),
+        doubleBedRoomSize: z.coerce.number().optional(),
+        familySuites: z.coerce.number().optional(),
+        familySuiteSize: z.coerce.number().optional(),
+        attachedWashrooms: z.coerce.number().optional(),
+        gstin: z.string().optional(),
+        distanceAirport: z.coerce.number().optional(),
+        distanceRailway: z.coerce.number().optional(),
+        distanceCityCenter: z.coerce.number().optional(),
+        distanceShopping: z.coerce.number().optional(),
+        distanceBusStand: z.coerce.number().optional(),
+        lobbyArea: z.coerce.number().optional(),
+        diningArea: z.coerce.number().optional(),
+        parkingArea: z.string().optional(),
+        ecoFriendlyFacilities: z.string().optional(),
+        differentlyAbledFacilities: z.string().optional(),
+        fireEquipmentDetails: z.string().optional(),
+        nearestHospital: z.string().optional(),
+        amenities: z.any().optional(),
+        baseFee: z.coerce.number().optional(),
+        perRoomFee: z.coerce.number().optional(),
+        gstAmount: z.coerce.number().optional(),
+        totalFee: z.coerce.number().optional(),
+        latitude: z.string().optional(),
+        longitude: z.string().optional(),
+        documents: z.array(z.object({
+          filePath: z.string(),
+          fileName: z.string(),
+          fileSize: z.number(),
+          mimeType: z.string(),
+          documentType: z.string(),
+        })).optional(),
+      });
+      
+      const validatedData = draftSchema.parse(req.body);
+      
+      // Calculate totalRooms if room data exists
+      const totalRooms = (validatedData.singleBedRooms || 0) + 
+                        (validatedData.doubleBedRooms || 0) + 
+                        (validatedData.familySuites || 0);
+
+      // Create draft application
+      const application = await storage.createApplication({
+        ...validatedData,
+        userId,
+        totalRooms: totalRooms || 0,
+        status: 'draft', // Explicitly set as draft
+      } as any);
+
+      res.json({ 
+        application, 
+        message: "Draft saved successfully. You can continue editing anytime." 
+      });
+    } catch (error) {
+      console.error("Draft save error:", error);
+      res.status(500).json({ message: "Failed to save draft" });
+    }
+  });
+
+  // Update existing draft
+  app.patch("/api/applications/:id/draft", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.userId!;
+      
+      // Check if application exists and belongs to user
+      const existing = await storage.getApplication(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+      if (existing.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this application" });
+      }
+      if (existing.status !== 'draft') {
+        return res.status(400).json({ message: "Can only update draft applications" });
+      }
+      
+      // Same minimal validation as create draft
+      const draftSchema = z.object({
+        propertyName: z.string().optional(),
+        category: z.enum(['diamond', 'gold', 'silver']).optional(),
+        address: z.string().optional(),
+        district: z.string().optional(),
+        pincode: z.string().optional(),
+        locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
+        telephone: z.string().optional(),
+        fax: z.string().optional(),
+        ownerName: z.string().optional(),
+        ownerMobile: z.string().optional(),
+        ownerEmail: z.string().optional(),
+        ownerAadhaar: z.string().optional(),
+        proposedRoomRate: z.coerce.number().optional(),
+        projectType: z.enum(['new_rooms', 'new_project']).optional(),
+        propertyArea: z.coerce.number().optional(),
+        singleBedRooms: z.coerce.number().optional(),
+        singleBedRoomSize: z.coerce.number().optional(),
+        doubleBedRooms: z.coerce.number().optional(),
+        doubleBedRoomSize: z.coerce.number().optional(),
+        familySuites: z.coerce.number().optional(),
+        familySuiteSize: z.coerce.number().optional(),
+        attachedWashrooms: z.coerce.number().optional(),
+        gstin: z.string().optional(),
+        distanceAirport: z.coerce.number().optional(),
+        distanceRailway: z.coerce.number().optional(),
+        distanceCityCenter: z.coerce.number().optional(),
+        distanceShopping: z.coerce.number().optional(),
+        distanceBusStand: z.coerce.number().optional(),
+        lobbyArea: z.coerce.number().optional(),
+        diningArea: z.coerce.number().optional(),
+        parkingArea: z.string().optional(),
+        ecoFriendlyFacilities: z.string().optional(),
+        differentlyAbledFacilities: z.string().optional(),
+        fireEquipmentDetails: z.string().optional(),
+        nearestHospital: z.string().optional(),
+        amenities: z.any().optional(),
+        baseFee: z.coerce.number().optional(),
+        perRoomFee: z.coerce.number().optional(),
+        gstAmount: z.coerce.number().optional(),
+        totalFee: z.coerce.number().optional(),
+        latitude: z.string().optional(),
+        longitude: z.string().optional(),
+        documents: z.array(z.object({
+          filePath: z.string(),
+          fileName: z.string(),
+          fileSize: z.number(),
+          mimeType: z.string(),
+          documentType: z.string(),
+        })).optional(),
+      });
+      
+      const validatedData = draftSchema.parse(req.body);
+      
+      // Calculate totalRooms if room data exists
+      const totalRooms = (validatedData.singleBedRooms || 0) + 
+                        (validatedData.doubleBedRooms || 0) + 
+                        (validatedData.familySuites || 0);
+
+      // Update draft application
+      const updated = await storage.updateApplication(id, {
+        ...validatedData,
+        totalRooms: totalRooms || existing.totalRooms,
+      } as any);
+
+      res.json({ 
+        application: updated, 
+        message: "Draft updated successfully" 
+      });
+    } catch (error) {
+      console.error("Draft update error:", error);
+      res.status(500).json({ message: "Failed to update draft" });
+    }
+  });
+  
+  // Create application (final submission)
   app.post("/api/applications", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;

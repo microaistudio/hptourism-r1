@@ -207,8 +207,53 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   nearestHospital: z.string().optional().or(z.literal('')),
 }).omit({ id: true, applicationNumber: true, createdAt: true, updatedAt: true });
 
+// Draft Application Schema - Most fields optional for saving incomplete applications
+export const draftHomestayApplicationSchema = createInsertSchema(homestayApplications, {
+  propertyName: z.string().min(1).optional().or(z.literal('')),
+  category: z.enum(['diamond', 'gold', 'silver']).optional(),
+  locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
+  totalRooms: z.number().int().min(0).optional(),
+  address: z.string().optional().or(z.literal('')),
+  district: z.string().optional().or(z.literal('')),
+  pincode: z.string().optional().or(z.literal('')),
+  telephone: z.string().optional().or(z.literal('')),
+  fax: z.string().optional().or(z.literal('')),
+  ownerName: z.string().optional().or(z.literal('')),
+  ownerMobile: z.string().optional().or(z.literal('')),
+  ownerEmail: z.string().optional().or(z.literal('')),
+  ownerAadhaar: z.string().optional().or(z.literal('')),
+  proposedRoomRate: z.number().optional(),
+  projectType: z.enum(['new_rooms', 'new_project']).optional(),
+  propertyArea: z.number().optional(),
+  singleBedRooms: z.number().int().min(0).optional(),
+  singleBedRoomSize: z.number().optional(),
+  doubleBedRooms: z.number().int().min(0).optional(),
+  doubleBedRoomSize: z.number().optional(),
+  familySuites: z.number().int().optional(),
+  familySuiteSize: z.number().optional(),
+  attachedWashrooms: z.number().int().optional(),
+  gstin: z.string().optional().or(z.literal('')),
+  distanceAirport: z.number().optional(),
+  distanceRailway: z.number().optional(),
+  distanceCityCenter: z.number().optional(),
+  distanceShopping: z.number().optional(),
+  distanceBusStand: z.number().optional(),
+  lobbyArea: z.number().optional(),
+  diningArea: z.number().optional(),
+  parkingArea: z.string().optional().or(z.literal('')),
+  ecoFriendlyFacilities: z.string().optional().or(z.literal('')),
+  differentlyAbledFacilities: z.string().optional().or(z.literal('')),
+  fireEquipmentDetails: z.string().optional().or(z.literal('')),
+  nearestHospital: z.string().optional().or(z.literal('')),
+  baseFee: z.number().optional(),
+  perRoomFee: z.number().optional(),
+  gstAmount: z.number().optional(),
+  totalFee: z.number().optional(),
+}).omit({ id: true, applicationNumber: true, createdAt: true, updatedAt: true });
+
 export const selectHomestayApplicationSchema = createSelectSchema(homestayApplications);
 export type InsertHomestayApplication = z.infer<typeof insertHomestayApplicationSchema>;
+export type DraftHomestayApplication = z.infer<typeof draftHomestayApplicationSchema>;
 export type HomestayApplication = typeof homestayApplications.$inferSelect;
 
 // Documents Table

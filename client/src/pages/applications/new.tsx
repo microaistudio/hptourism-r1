@@ -15,9 +15,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye } from "lucide-react";
 import type { User } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const HP_DISTRICTS = [
   "Bharmour", "Bilaspur", "Chamba", "Dodra Kwar", "Hamirpur", "Kangra", 
@@ -244,6 +246,62 @@ export default function NewApplication() {
       totalFee: total,
     };
   };
+
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Draft save mutation
+  const saveDraftMutation = useMutation({
+    mutationFn: async () => {
+      const formData = form.getValues();
+      const fees = calculateFee();
+      const payload = {
+        ...formData,
+        ownerEmail: formData.ownerEmail || undefined,
+        amenities: selectedAmenities,
+        baseFee: fees.baseFee.toString(),
+        perRoomFee: "0",
+        gstAmount: fees.gstAmount.toFixed(2),
+        totalFee: fees.totalFee.toFixed(2),
+        totalRooms,
+        documents: [
+          ...uploadedDocuments.revenuePapers.map(f => ({ ...f, documentType: 'revenue_papers' })),
+          ...uploadedDocuments.affidavitSection29.map(f => ({ ...f, documentType: 'affidavit_section_29' })),
+          ...uploadedDocuments.undertakingFormC.map(f => ({ ...f, documentType: 'undertaking_form_c' })),
+          ...uploadedDocuments.registerForVerification.map(f => ({ ...f, documentType: 'register_for_verification' })),
+          ...uploadedDocuments.billBook.map(f => ({ ...f, documentType: 'bill_book' })),
+          ...propertyPhotos.map(f => ({ ...f, documentType: 'property_photo' })),
+        ],
+      };
+
+      if (draftId) {
+        // Update existing draft
+        const response = await apiRequest("PATCH", `/api/applications/${draftId}/draft`, payload);
+        return response.json();
+      } else {
+        // Create new draft
+        const response = await apiRequest("POST", "/api/applications/draft", payload);
+        return response.json();
+      }
+    },
+    onSuccess: (data) => {
+      if (!draftId) {
+        setDraftId(data.application.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      toast({
+        title: "Draft saved!",
+        description: "Your progress has been saved. You can continue anytime.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to save draft",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
 
   const createApplicationMutation = useMutation({
     mutationFn: async (data: ApplicationForm) => {
@@ -1456,7 +1514,7 @@ export default function NewApplication() {
               </Card>
             )}
 
-            <div className="flex justify-between gap-4">
+            <div className="flex flex-wrap justify-between gap-4">
               {step > 1 && (
                 <Button type="button" variant="outline" onClick={prevStep} data-testid="button-previous">
                   <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1465,6 +1523,31 @@ export default function NewApplication() {
               )}
 
               <div className="flex-1" />
+
+              {/* Save Draft button - available on all pages */}
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => saveDraftMutation.mutate()}
+                disabled={saveDraftMutation.isPending}
+                data-testid="button-save-draft"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
+              </Button>
+
+              {/* Preview button - only on final page */}
+              {step === totalSteps && (
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => setShowPreview(true)}
+                  data-testid="button-preview"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Preview
+                </Button>
+              )}
 
               {step < totalSteps ? (
                 <Button 
@@ -1505,6 +1588,161 @@ export default function NewApplication() {
             </div>
           </form>
         </Form>
+
+        {/* Preview Dialog */}
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5" />
+                Application Preview
+              </DialogTitle>
+              <DialogDescription>
+                Review all details before final submission
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-[calc(90vh-120px)] pr-4">
+              <div className="space-y-6">
+                {/* Page 1: Property Details */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Property Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Property Name:</span> <span className="font-medium">{form.watch("propertyName") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">District:</span> <span className="font-medium">{form.watch("district") || "—"}</span></div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Address:</span> <span className="font-medium">{form.watch("address") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Pincode:</span> <span className="font-medium">{form.watch("pincode") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Location Type:</span> <span className="font-medium">{LOCATION_TYPES.find(t => t.value === form.watch("locationType"))?.label || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Telephone:</span> <span className="font-medium">{form.watch("telephone") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Fax:</span> <span className="font-medium">{form.watch("fax") || "—"}</span></div>
+                  </CardContent>
+                </Card>
+
+                {/* Page 2: Owner Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Owner Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Owner Name:</span> <span className="font-medium">{form.watch("ownerName") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{form.watch("ownerMobile") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Email:</span> <span className="font-medium">{form.watch("ownerEmail") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Aadhaar:</span> <span className="font-medium">{form.watch("ownerAadhaar") || "—"}</span></div>
+                  </CardContent>
+                </Card>
+
+                {/* Page 3: Room Details & Category */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Room Details & Category</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Category:</span> <Badge className="ml-2">{form.watch("category")?.toUpperCase() || "—"}</Badge></div>
+                    <div><span className="text-muted-foreground">Room Rate:</span> <span className="font-medium">₹{form.watch("proposedRoomRate") || 0}/day</span></div>
+                    <div><span className="text-muted-foreground">Project Type:</span> <span className="font-medium">{form.watch("projectType") === "new_project" ? "New Project" : "New Rooms"}</span></div>
+                    <div><span className="text-muted-foreground">Property Area:</span> <span className="font-medium">{form.watch("propertyArea") || 0} sq m</span></div>
+                    <div><span className="text-muted-foreground">Single Bed Rooms:</span> <span className="font-medium">{form.watch("singleBedRooms") || 0}</span></div>
+                    <div><span className="text-muted-foreground">Double Bed Rooms:</span> <span className="font-medium">{form.watch("doubleBedRooms") || 0}</span></div>
+                    <div><span className="text-muted-foreground">Family Suites:</span> <span className="font-medium">{form.watch("familySuites") || 0}</span></div>
+                    <div><span className="text-muted-foreground">Total Rooms:</span> <span className="font-medium">{totalRooms}</span></div>
+                    <div><span className="text-muted-foreground">Attached Washrooms:</span> <span className="font-medium">{form.watch("attachedWashrooms") || 0}</span></div>
+                    <div><span className="text-muted-foreground">GSTIN:</span> <span className="font-medium">{form.watch("gstin") || "Not provided"}</span></div>
+                  </CardContent>
+                </Card>
+
+                {/* Page 4: Distances & Public Areas */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Distances & Public Areas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-muted-foreground">Airport:</span> <span className="font-medium">{form.watch("distanceAirport") || 0} km</span></div>
+                    <div><span className="text-muted-foreground">Railway Station:</span> <span className="font-medium">{form.watch("distanceRailway") || 0} km</span></div>
+                    <div><span className="text-muted-foreground">City Center:</span> <span className="font-medium">{form.watch("distanceCityCenter") || 0} km</span></div>
+                    <div><span className="text-muted-foreground">Shopping Area:</span> <span className="font-medium">{form.watch("distanceShopping") || 0} km</span></div>
+                    <div><span className="text-muted-foreground">Bus Stand:</span> <span className="font-medium">{form.watch("distanceBusStand") || 0} km</span></div>
+                    <div><span className="text-muted-foreground">Lobby Area:</span> <span className="font-medium">{form.watch("lobbyArea") || "—"} sq ft</span></div>
+                    <div><span className="text-muted-foreground">Dining Area:</span> <span className="font-medium">{form.watch("diningArea") || "—"} sq ft</span></div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Parking:</span> <span className="font-medium">{form.watch("parkingArea") || "—"}</span></div>
+                  </CardContent>
+                </Card>
+
+                {/* Page 5: Documents */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Uploaded Documents</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div><span className="text-muted-foreground">Revenue Papers:</span> <span className="font-medium">{uploadedDocuments.revenuePapers.length} file(s)</span></div>
+                    <div><span className="text-muted-foreground">Affidavit Section 29:</span> <span className="font-medium">{uploadedDocuments.affidavitSection29.length} file(s)</span></div>
+                    <div><span className="text-muted-foreground">Undertaking Form-C:</span> <span className="font-medium">{uploadedDocuments.undertakingFormC.length} file(s)</span></div>
+                    <div><span className="text-muted-foreground">Register for Verification:</span> <span className="font-medium">{uploadedDocuments.registerForVerification.length} file(s)</span></div>
+                    <div><span className="text-muted-foreground">Bill Book:</span> <span className="font-medium">{uploadedDocuments.billBook.length} file(s)</span></div>
+                    <div><span className="text-muted-foreground">Property Photos:</span> <span className="font-medium">{propertyPhotos.length} file(s)</span></div>
+                  </CardContent>
+                </Card>
+
+                {/* Page 6: Amenities & Fees */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Amenities & Fee Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Selected Amenities:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {AMENITIES.filter(a => selectedAmenities[a.id]).map(a => (
+                          <Badge key={a.id} variant="secondary">{a.label}</Badge>
+                        ))}
+                        {AMENITIES.filter(a => selectedAmenities[a.id]).length === 0 && (
+                          <span className="text-sm text-muted-foreground">None selected</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Base Fee:</span>
+                        <span className="font-medium">₹{calculateFee().baseFee.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">GST (18%):</span>
+                        <span className="font-medium">₹{calculateFee().gstAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold border-t pt-2">
+                        <span>Total Fee:</span>
+                        <span className="text-primary">₹{calculateFee().totalFee.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Additional Facilities */}
+                {(form.watch("ecoFriendlyFacilities") || form.watch("differentlyAbledFacilities") || form.watch("fireEquipmentDetails") || form.watch("nearestHospital")) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Additional Facilities</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      {form.watch("ecoFriendlyFacilities") && (
+                        <div><span className="text-muted-foreground">Eco-Friendly:</span> <p className="mt-1">{form.watch("ecoFriendlyFacilities")}</p></div>
+                      )}
+                      {form.watch("differentlyAbledFacilities") && (
+                        <div><span className="text-muted-foreground">Differently-Abled Facilities:</span> <p className="mt-1">{form.watch("differentlyAbledFacilities")}</p></div>
+                      )}
+                      {form.watch("fireEquipmentDetails") && (
+                        <div><span className="text-muted-foreground">Fire Equipment:</span> <p className="mt-1">{form.watch("fireEquipmentDetails")}</p></div>
+                      )}
+                      {form.watch("nearestHospital") && (
+                        <div><span className="text-muted-foreground">Nearest Hospital:</span> <p className="mt-1">{form.watch("nearestHospital")}</p></div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
