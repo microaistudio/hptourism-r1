@@ -28,6 +28,7 @@ import WorkflowMonitoring from "@/pages/workflow-monitoring";
 import PaymentVerification from "@/pages/payment-verification";
 import AdminUsers from "@/pages/admin/users";
 import TestAPI from "@/pages/test-api";
+import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
 
 interface ProtectedRouteProps {
@@ -78,6 +79,7 @@ function Router() {
       {/* Public Routes */}
       <Route path="/" component={HomePage} />
       <Route path="/test-api" component={TestAPI} />
+      <Route path="/himkosh-test" component={HimKoshTest} />
       <Route path="/properties" component={PublicProperties} />
       <Route path="/properties/:id" component={PublicPropertyDetail} />
       <Route path="/login" component={Login} />

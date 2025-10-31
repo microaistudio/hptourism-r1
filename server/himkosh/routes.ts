@@ -386,4 +386,100 @@ router.get('/config/status', (req, res) => {
   });
 });
 
+/**
+ * POST /api/himkosh/test-callback-url
+ * Test if a specific callback URL makes the checksum pass
+ */
+router.post('/test-callback-url', async (req, res) => {
+  try {
+    const { callbackUrl, applicationId } = req.body;
+
+    if (!callbackUrl || !applicationId) {
+      return res.status(400).json({ error: 'callbackUrl and applicationId are required' });
+    }
+
+    // Fetch application details
+    const [application] = await db
+      .select()
+      .from(homestayApplications)
+      .where(eq(homestayApplications.id, applicationId))
+      .limit(1);
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const config = getHimKoshConfig();
+
+    // Look up DDO code
+    let ddoCode = config.ddo;
+    if (application.district) {
+      const [ddoMapping] = await db
+        .select()
+        .from(ddoCodes)
+        .where(eq(ddoCodes.district, application.district))
+        .limit(1);
+      
+      if (ddoMapping) {
+        ddoCode = ddoMapping.ddoCode;
+      }
+    }
+
+    const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
+    const totalAmount = Math.round(parseFloat(application.totalFee.toString()));
+
+    const now = new Date();
+    const periodDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+
+    const requestParams = {
+      deptId: config.deptId,
+      deptRefNo: application.applicationNumber,
+      totalAmount: totalAmount,
+      tenderBy: application.ownerName,
+      appRefNo: appRefNo,
+      head1: config.heads.registrationFee,
+      amount1: totalAmount,
+      head2: config.heads.registrationFee,
+      amount2: 0,
+      ddo: ddoCode,
+      periodFrom: periodDate,
+      periodTo: periodDate,
+      serviceCode: config.serviceCode,
+      returnUrl: callbackUrl, // Use the test callback URL
+    };
+
+    // Build the request string WITHOUT checksum
+    const requestString = buildRequestString(requestParams);
+    
+    // Calculate checksum using MD5
+    const crypto2 = require('crypto');
+    const checksumCalc = crypto2.createHash('md5').update(requestString, 'ascii').digest('hex');
+    
+    // Build full string WITH checksum
+    const fullString = `${requestString}|checkSum=${checksumCalc}`;
+    
+    // Encrypt
+    const encrypted = await crypto.encrypt(fullString);
+
+    console.log('[himkosh-test] Testing callback URL:', callbackUrl);
+    console.log('[himkosh-test] Request string:', requestString);
+    console.log('[himkosh-test] Checksum:', checksumCalc);
+
+    res.json({
+      success: true,
+      testUrl: callbackUrl,
+      checksum: checksumCalc,
+      requestString: requestString,
+      fullString: fullString,
+      encrypted: encrypted,
+      paymentUrl: `${config.paymentUrl}?encdata=${encodeURIComponent(encrypted)}&merchant_code=${config.merchantCode}`,
+      message: 'Test data generated. Try submitting to HimKosh to see if checksum passes.',
+    });
+
+  } catch (error) {
+    console.error('[himkosh-test] Error:', error);
+    res.status(500).json({ error: 'Failed to generate test data' });
+  }
+});
+
 export default router;
