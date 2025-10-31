@@ -38,21 +38,55 @@ export const homestayApplications = pgTable("homestay_applications", {
   userId: varchar("user_id").notNull().references(() => users.id),
   applicationNumber: varchar("application_number", { length: 50 }).notNull().unique(),
   
-  // Property Details
+  // Property Details (ANNEXURE-I)
   propertyName: varchar("property_name", { length: 255 }).notNull(),
   category: varchar("category", { length: 20 }).notNull(), // 'diamond', 'gold', 'silver'
+  locationType: varchar("location_type", { length: 10 }).notNull(), // 'mc', 'tcp', 'gp' - CRITICAL for fee calculation
   totalRooms: integer("total_rooms").notNull(),
   address: text("address").notNull(),
   district: varchar("district", { length: 100 }).notNull(),
   pincode: varchar("pincode", { length: 10 }).notNull(),
+  telephone: varchar("telephone", { length: 20 }),
+  fax: varchar("fax", { length: 20 }),
   latitude: decimal("latitude", { precision: 10, scale: 8 }),
   longitude: decimal("longitude", { precision: 11, scale: 8 }),
   
-  // Owner Details
+  // Owner Details (ANNEXURE-I)
   ownerName: varchar("owner_name", { length: 255 }).notNull(),
   ownerMobile: varchar("owner_mobile", { length: 15 }).notNull(),
   ownerEmail: varchar("owner_email", { length: 255 }),
   ownerAadhaar: varchar("owner_aadhaar", { length: 12 }).notNull(),
+  
+  // Room & Category Details (ANNEXURE-I)
+  proposedRoomRate: decimal("proposed_room_rate", { precision: 10, scale: 2 }).notNull(),
+  projectType: varchar("project_type", { length: 20 }).notNull(), // 'new_rooms', 'new_project'
+  propertyArea: decimal("property_area", { precision: 10, scale: 2 }).notNull(), // in sq meters
+  singleBedRooms: integer("single_bed_rooms").default(0),
+  singleBedRoomSize: decimal("single_bed_room_size", { precision: 10, scale: 2 }), // in sq ft
+  doubleBedRooms: integer("double_bed_rooms").default(0),
+  doubleBedRoomSize: decimal("double_bed_room_size", { precision: 10, scale: 2 }), // in sq ft
+  familySuites: integer("family_suites").default(0),
+  familySuiteSize: decimal("family_suite_size", { precision: 10, scale: 2 }), // in sq ft
+  attachedWashrooms: integer("attached_washrooms").notNull(),
+  gstin: varchar("gstin", { length: 15 }), // Mandatory for Diamond/Gold, optional for Silver
+  
+  // Distances from key locations (ANNEXURE-I) - in km
+  distanceAirport: decimal("distance_airport", { precision: 10, scale: 2 }),
+  distanceRailway: decimal("distance_railway", { precision: 10, scale: 2 }),
+  distanceCityCenter: decimal("distance_city_center", { precision: 10, scale: 2 }),
+  distanceShopping: decimal("distance_shopping", { precision: 10, scale: 2 }),
+  distanceBusStand: decimal("distance_bus_stand", { precision: 10, scale: 2 }),
+  
+  // Public Areas (ANNEXURE-I) - in sq ft
+  lobbyArea: decimal("lobby_area", { precision: 10, scale: 2 }),
+  diningArea: decimal("dining_area", { precision: 10, scale: 2 }),
+  parkingArea: text("parking_area"), // Description of parking facilities
+  
+  // Additional Facilities (ANNEXURE-I)
+  ecoFriendlyFacilities: text("eco_friendly_facilities"),
+  differentlyAbledFacilities: text("differently_abled_facilities"),
+  fireEquipmentDetails: text("fire_equipment_details"),
+  nearestHospital: varchar("nearest_hospital", { length: 255 }),
   
   // Amenities and Room Details (JSONB for flexibility)
   amenities: jsonb("amenities").$type<{
@@ -114,15 +148,13 @@ export const homestayApplications = pgTable("homestay_applications", {
     issuesFound?: string;
   }>(),
   
-  // Uploaded Documents (URLs stored as JSON array for photos)
-  ownershipProofUrl: text("ownership_proof_url"),
-  aadhaarCardUrl: text("aadhaar_card_url"),
-  panCardUrl: text("pan_card_url"),
-  gstCertificateUrl: text("gst_certificate_url"),
-  fireSafetyNocUrl: text("fire_safety_noc_url"),
-  pollutionClearanceUrl: text("pollution_clearance_url"),
-  buildingPlanUrl: text("building_plan_url"),
-  propertyPhotosUrls: jsonb("property_photos_urls").$type<string[]>(),
+  // Uploaded Documents (ANNEXURE-II - 6 mandatory documents)
+  revenuePapersUrl: text("revenue_papers_url"), // Jamabandi & Tatima (Land Revenue Records)
+  affidavitSection29Url: text("affidavit_section29_url"), // Affidavit under Section 29
+  undertakingFormCUrl: text("undertaking_form_c_url"), // Undertaking in Form-C
+  registerForVerificationUrl: text("register_for_verification_url"), // Register for Verification
+  billBookUrl: text("bill_book_url"), // Bill Book
+  propertyPhotosUrls: jsonb("property_photos_urls").$type<string[]>(), // Minimum 2 photos
   
   // Certificate
   certificateNumber: varchar("certificate_number", { length: 50 }).unique(),
@@ -139,13 +171,40 @@ export const homestayApplications = pgTable("homestay_applications", {
 export const insertHomestayApplicationSchema = createInsertSchema(homestayApplications, {
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
   category: z.enum(['diamond', 'gold', 'silver']),
+  locationType: z.enum(['mc', 'tcp', 'gp']),
   totalRooms: z.number().int().min(1).max(50),
   address: z.string().min(10, "Address must be at least 10 characters"),
   district: z.string().min(2),
   pincode: z.string().regex(/^[1-9]\d{5}$/, "Invalid pincode"),
+  telephone: z.string().optional(),
+  fax: z.string().optional(),
   ownerName: z.string().min(3),
   ownerMobile: z.string().regex(/^[6-9]\d{9}$/),
+  ownerEmail: z.string().email().optional().or(z.literal('')),
   ownerAadhaar: z.string().regex(/^\d{12}$/),
+  proposedRoomRate: z.number().min(100, "Room rate must be at least ₹100"),
+  projectType: z.enum(['new_rooms', 'new_project']),
+  propertyArea: z.number().min(1, "Property area required"),
+  singleBedRooms: z.number().int().min(0).default(0),
+  singleBedRoomSize: z.number().min(0).optional(),
+  doubleBedRooms: z.number().int().min(0).default(0),
+  doubleBedRoomSize: z.number().min(0).optional(),
+  familySuites: z.number().int().min(0).max(3).default(0),
+  familySuiteSize: z.number().min(0).optional(),
+  attachedWashrooms: z.number().int().min(0),
+  gstin: z.string().optional().or(z.literal('')),
+  distanceAirport: z.number().min(0).optional(),
+  distanceRailway: z.number().min(0).optional(),
+  distanceCityCenter: z.number().min(0).optional(),
+  distanceShopping: z.number().min(0).optional(),
+  distanceBusStand: z.number().min(0).optional(),
+  lobbyArea: z.number().min(0).optional(),
+  diningArea: z.number().min(0).optional(),
+  parkingArea: z.string().optional().or(z.literal('')),
+  ecoFriendlyFacilities: z.string().optional().or(z.literal('')),
+  differentlyAbledFacilities: z.string().optional().or(z.literal('')),
+  fireEquipmentDetails: z.string().optional().or(z.literal('')),
+  nearestHospital: z.string().optional().or(z.literal('')),
 }).omit({ id: true, applicationNumber: true, createdAt: true, updatedAt: true });
 
 export const selectHomestayApplicationSchema = createSelectSchema(homestayApplications);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -94,10 +94,10 @@ const applicationSchema = z.object({
   familySuiteSize: z.number().min(0).optional(),
   attachedWashrooms: z.number().int().min(0),
   
-  // Public areas (sq ft)
+  // Public areas (lobby/dining in sq ft, parking is description)
   lobbyArea: z.number().min(0).optional(),
   diningArea: z.number().min(0).optional(),
-  parkingArea: z.number().min(0).optional(),
+  parkingArea: z.string().optional().or(z.literal("")),
   
   // Additional facilities
   ecoFriendlyFacilities: z.string().optional().or(z.literal("")),
@@ -152,10 +152,6 @@ export default function NewApplication() {
     undertakingFormC: [],
     registerForVerification: [],
     billBook: [],
-    aadhaarCard: [],
-    fireSafetyNOC: [],
-    pollutionClearance: [],
-    buildingPlan: [],
   });
   const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
   const totalSteps = 6;
@@ -183,19 +179,59 @@ export default function NewApplication() {
       projectType: "new_project",
       propertyArea: 0,
       singleBedRooms: 0,
+      singleBedRoomSize: undefined,
       doubleBedRooms: 1,
+      doubleBedRoomSize: undefined,
       familySuites: 0,
+      familySuiteSize: undefined,
       attachedWashrooms: 1,
       gstin: "",
+      distanceAirport: undefined,
+      distanceRailway: undefined,
+      distanceCityCenter: undefined,
+      distanceShopping: undefined,
+      distanceBusStand: undefined,
+      lobbyArea: undefined,
+      diningArea: undefined,
+      parkingArea: "",
+      ecoFriendlyFacilities: "",
+      differentlyAbledFacilities: "",
+      fireEquipmentDetails: "",
+      nearestHospital: "",
     },
   });
 
   const category = form.watch("category");
   const locationType = form.watch("locationType");
+  const district = form.watch("district");
   const singleBedRooms = form.watch("singleBedRooms") || 0;
   const doubleBedRooms = form.watch("doubleBedRooms") || 0;
   const familySuites = form.watch("familySuites") || 0;
   const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
+
+  // Auto-populate distances when district changes (user can override)
+  useEffect(() => {
+    if (district && DISTRICT_DISTANCES[district]) {
+      const defaults = DISTRICT_DISTANCES[district];
+      
+      // Only auto-fill if fields are undefined (not set), allow intentional zero values
+      if (form.getValues("distanceAirport") === undefined) {
+        form.setValue("distanceAirport", defaults.airport);
+      }
+      if (form.getValues("distanceRailway") === undefined) {
+        form.setValue("distanceRailway", defaults.railway);
+      }
+      if (form.getValues("distanceCityCenter") === undefined) {
+        form.setValue("distanceCityCenter", defaults.cityCenter);
+      }
+      if (form.getValues("distanceShopping") === undefined) {
+        form.setValue("distanceShopping", defaults.shopping);
+      }
+      if (form.getValues("distanceBusStand") === undefined) {
+        form.setValue("distanceBusStand", defaults.busStand);
+      }
+    }
+  }, [district]);
 
   const calculateFee = () => {
     const baseFee = FEE_STRUCTURE[category][locationType];
@@ -223,12 +259,13 @@ export default function NewApplication() {
         totalRooms,
         status: 'pending',
         submittedAt: new Date().toISOString(),
-        // Include uploaded documents with metadata
+        // Include uploaded ANNEXURE-II documents with metadata
         documents: [
-          ...uploadedDocuments.ownershipProof.map(f => ({ ...f, documentType: 'ownership_proof' })),
-          ...uploadedDocuments.aadhaarCard.map(f => ({ ...f, documentType: 'aadhaar_card' })),
-          ...uploadedDocuments.panCard.map(f => ({ ...f, documentType: 'pan_card' })),
-          ...uploadedDocuments.gstCertificate.map(f => ({ ...f, documentType: 'gst_certificate' })),
+          ...uploadedDocuments.revenuePapers.map(f => ({ ...f, documentType: 'revenue_papers' })),
+          ...uploadedDocuments.affidavitSection29.map(f => ({ ...f, documentType: 'affidavit_section_29' })),
+          ...uploadedDocuments.undertakingFormC.map(f => ({ ...f, documentType: 'undertaking_form_c' })),
+          ...uploadedDocuments.registerForVerification.map(f => ({ ...f, documentType: 'register_for_verification' })),
+          ...uploadedDocuments.billBook.map(f => ({ ...f, documentType: 'bill_book' })),
           ...propertyPhotos.map(f => ({ ...f, documentType: 'property_photo' })),
         ],
       };
@@ -270,11 +307,19 @@ export default function NewApplication() {
 
   const nextStep = () => {
     // Validate Step 4 (Documents) before moving forward
-    if (step === 4) {
-      if (uploadedDocuments.ownershipProof.length === 0 || uploadedDocuments.aadhaarCard.length === 0 || propertyPhotos.length < 5) {
+    if (step === 5) {
+      const missingDocs = [];
+      if (uploadedDocuments.revenuePapers.length === 0) missingDocs.push("Revenue Papers");
+      if (uploadedDocuments.affidavitSection29.length === 0) missingDocs.push("Affidavit under Section 29");
+      if (uploadedDocuments.undertakingFormC.length === 0) missingDocs.push("Undertaking in Form-C");
+      if (uploadedDocuments.registerForVerification.length === 0) missingDocs.push("Register for Verification");
+      if (uploadedDocuments.billBook.length === 0) missingDocs.push("Bill Book");
+      if (propertyPhotos.length < 2) missingDocs.push("Property Photos (minimum 2)");
+      
+      if (missingDocs.length > 0) {
         toast({
-          title: "Required documents missing",
-          description: "Please upload all mandatory documents before proceeding.",
+          title: "Required ANNEXURE-II documents missing",
+          description: `Please upload: ${missingDocs.join(", ")}`,
           variant: "destructive"
         });
         return;
@@ -377,6 +422,7 @@ export default function NewApplication() {
                               ))}
                             </SelectContent>
                           </Select>
+                          <FormDescription>Auto-fills typical distances for your district</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -390,6 +436,62 @@ export default function NewApplication() {
                           <FormLabel>PIN Code</FormLabel>
                           <FormControl>
                             <Input placeholder="6-digit PIN code" data-testid="input-pincode" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="locationType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location Type (affects registration fee)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-location-type">
+                              <SelectValue placeholder="Select location type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {LOCATION_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>Required for calculating registration fees as per 2025 Rules</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="telephone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telephone (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Landline number" data-testid="input-telephone" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="fax"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fax (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Fax number" data-testid="input-fax" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -531,6 +633,242 @@ export default function NewApplication() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="proposedRoomRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Proposed Room Rate (per day)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="Enter rate" 
+                              data-testid="input-room-rate" 
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormDescription>Suggested category will appear based on rate</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="projectType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-project-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="new_rooms">New Rooms (adding to existing house)</SelectItem>
+                              <SelectItem value="new_project">New Project (constructing new building)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="propertyArea"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property Area (sq meters)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="Total property area" 
+                            data-testid="input-property-area" 
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="font-medium">Room Configuration</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="singleBedRooms"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Single Bed Rooms</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="0" 
+                                data-testid="input-single-bed-rooms" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="singleBedRoomSize"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Single Room Size (sq ft)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Optional" 
+                                data-testid="input-single-bed-room-size" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="doubleBedRooms"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Double Bed Rooms</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="0" 
+                                data-testid="input-double-bed-rooms" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="doubleBedRoomSize"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Double Room Size (sq ft)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Optional" 
+                                data-testid="input-double-bed-room-size" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="familySuites"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Family Suites (max 3)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="0" 
+                                data-testid="input-family-suites" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="familySuiteSize"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Suite Size (sq ft)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Optional" 
+                                data-testid="input-family-suite-size" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="attachedWashrooms"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Total Attached Washrooms</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="Number of washrooms" 
+                              data-testid="input-attached-washrooms" 
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {(category === "diamond" || category === "gold") && (
+                    <FormField
+                      control={form.control}
+                      name="gstin"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>GSTIN {category === "diamond" || category === "gold" ? "(Mandatory)" : "(Optional)"}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="15-character GSTIN" 
+                              data-testid="input-gstin" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>GST registration is mandatory for Diamond and Gold categories</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -538,92 +876,298 @@ export default function NewApplication() {
             {step === 4 && (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="w-5 h-5 text-primary" />
-                    <CardTitle>Upload Documents</CardTitle>
-                  </div>
-                  <CardDescription>Upload required documents for verification</CardDescription>
+                  <CardTitle>Distances & Public Areas</CardTitle>
+                  <CardDescription>Location details and common areas (all fields optional)</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Property Ownership Proof */}
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Distances are auto-filled based on your district. You can modify them if your property is in a different location.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Distances from Key Locations (in km)</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="distanceAirport"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Airport</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Distance in km" 
+                                data-testid="input-distance-airport" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="distanceRailway"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Railway Station</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Distance in km" 
+                                data-testid="input-distance-railway" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="distanceCityCenter"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City Centre</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Distance in km" 
+                                data-testid="input-distance-city-center" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="distanceShopping"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Shopping Centre</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Distance in km" 
+                                data-testid="input-distance-shopping" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="distanceBusStand"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bus Stand</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Distance in km" 
+                                data-testid="input-distance-bus-stand" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="font-medium">Public Areas</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="lobbyArea"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lobby/Lounge Area (sq ft)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Optional" 
+                                data-testid="input-lobby-area" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="diningArea"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dining Space (sq ft)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Optional" 
+                                data-testid="input-dining-area" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="parkingArea"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Parking Facilities</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Describe parking facilities (e.g., covered parking for 5 cars)" 
+                              className="min-h-20"
+                              data-testid="input-parking-area" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Optional - describe available parking</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {step === 5 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <CardTitle>Upload Documents (ANNEXURE-II)</CardTitle>
+                  </div>
+                  <CardDescription>Upload required documents as per 2025 Homestay Rules</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Revenue Papers (Jamabandi & Tatima) */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Property Ownership Proof <span className="text-destructive">*</span>
+                      Revenue Papers (Jamabandi & Tatima) <span className="text-destructive">*</span>
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Sale deed, mutation certificate, or property tax receipt
+                      Land revenue records showing ownership
                     </p>
                     <ObjectUploader
-                      label="Upload Ownership Proof"
+                      label="Upload Revenue Papers"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      maxFiles={1}
-                      fileType="ownership-proof"
-                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, ownershipProof: paths }))}
-                      existingFiles={uploadedDocuments.ownershipProof}
+                      maxFiles={2}
+                      fileType="revenue-papers"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: paths }))}
+                      existingFiles={uploadedDocuments.revenuePapers}
                     />
                   </div>
 
-                  {/* Aadhaar Card */}
+                  {/* Affidavit under Section 29 */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Aadhaar Card <span className="text-destructive">*</span>
+                      Affidavit under Section 29 <span className="text-destructive">*</span>
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Owner's Aadhaar card (both sides if applicable)
+                      Sworn statement as per homestay regulations
                     </p>
                     <ObjectUploader
-                      label="Upload Aadhaar Card"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      label="Upload Affidavit"
+                      accept=".pdf"
                       maxFiles={1}
-                      fileType="aadhaar-card"
-                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, aadhaarCard: paths }))}
-                      existingFiles={uploadedDocuments.aadhaarCard}
+                      fileType="affidavit-section29"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: paths }))}
+                      existingFiles={uploadedDocuments.affidavitSection29}
                     />
                   </div>
 
-                  {/* PAN Card (Optional) */}
+                  {/* Undertaking in Form-C */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      PAN Card <span className="text-muted-foreground">(Optional)</span>
+                      Undertaking in Form-C <span className="text-destructive">*</span>
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Required if annual revenue exceeds ₹2.5 lakhs
+                      Signed undertaking form as per prescribed format
                     </p>
                     <ObjectUploader
-                      label="Upload PAN Card"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      label="Upload Form-C"
+                      accept=".pdf"
                       maxFiles={1}
-                      fileType="pan-card"
-                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, panCard: paths }))}
-                      existingFiles={uploadedDocuments.panCard}
+                      fileType="undertaking-form-c"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: paths }))}
+                      existingFiles={uploadedDocuments.undertakingFormC}
                     />
                   </div>
 
-                  {/* GST Certificate (Optional) */}
+                  {/* Register for Verification */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      GST Certificate <span className="text-muted-foreground">(Optional)</span>
+                      Register for Verification <span className="text-destructive">*</span>
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Required if registered under GST
+                      Guest register or booking register
                     </p>
                     <ObjectUploader
-                      label="Upload GST Certificate"
+                      label="Upload Register"
                       accept=".pdf,.jpg,.jpeg,.png"
                       maxFiles={1}
-                      fileType="gst-certificate"
-                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, gstCertificate: paths }))}
-                      existingFiles={uploadedDocuments.gstCertificate}
+                      fileType="register-verification"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: paths }))}
+                      existingFiles={uploadedDocuments.registerForVerification}
                     />
                   </div>
 
-                  {/* Property Photos */}
+                  {/* Bill Book */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Property Photos <span className="text-destructive">*</span> (Minimum 5 photos)
+                      Bill Book <span className="text-destructive">*</span>
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Clear photos of exterior, rooms, bathrooms, and key amenities
+                      Sample billing/invoice book
+                    </p>
+                    <ObjectUploader
+                      label="Upload Bill Book"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      maxFiles={1}
+                      fileType="bill-book"
+                      onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, billBook: paths }))}
+                      existingFiles={uploadedDocuments.billBook}
+                    />
+                  </div>
+
+                  {/* Property Photographs */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Property Photographs <span className="text-destructive">*</span> (Minimum 2 photos)
+                    </label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Clear photos of property exterior, rooms, and facilities
                     </p>
                     <ObjectUploader
                       label="Upload Property Photos"
@@ -637,13 +1181,16 @@ export default function NewApplication() {
                   </div>
 
                   {/* Validation Messages */}
-                  {(uploadedDocuments.ownershipProof.length === 0 || uploadedDocuments.aadhaarCard.length === 0 || propertyPhotos.length < 5) && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mt-4">
-                      <p className="text-sm text-orange-800 font-medium mb-2">Required documents missing:</p>
-                      <ul className="text-sm text-orange-700 list-disc list-inside space-y-1">
-                        {uploadedDocuments.ownershipProof.length === 0 && <li>Property Ownership Proof</li>}
-                        {uploadedDocuments.aadhaarCard.length === 0 && <li>Aadhaar Card</li>}
-                        {propertyPhotos.length < 5 && <li>At least 5 property photos ({propertyPhotos.length}/5)</li>}
+                  {(uploadedDocuments.revenuePapers.length === 0 || uploadedDocuments.affidavitSection29.length === 0 || uploadedDocuments.undertakingFormC.length === 0 || uploadedDocuments.registerForVerification.length === 0 || uploadedDocuments.billBook.length === 0 || propertyPhotos.length < 2) && (
+                    <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mt-4">
+                      <p className="text-sm text-orange-800 dark:text-orange-200 font-medium mb-2">Required documents missing:</p>
+                      <ul className="text-sm text-orange-700 dark:text-orange-300 list-disc list-inside space-y-1">
+                        {uploadedDocuments.revenuePapers.length === 0 && <li>Revenue Papers (Jamabandi & Tatima)</li>}
+                        {uploadedDocuments.affidavitSection29.length === 0 && <li>Affidavit under Section 29</li>}
+                        {uploadedDocuments.undertakingFormC.length === 0 && <li>Undertaking in Form-C</li>}
+                        {uploadedDocuments.registerForVerification.length === 0 && <li>Register for Verification</li>}
+                        {uploadedDocuments.billBook.length === 0 && <li>Bill Book</li>}
+                        {propertyPhotos.length < 2 && <li>At least 2 property photos ({propertyPhotos.length}/2)</li>}
                       </ul>
                     </div>
                   )}
@@ -651,54 +1198,127 @@ export default function NewApplication() {
               </Card>
             )}
 
-            {step === 5 && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wifi className="w-5 h-5 text-primary" />
-                    <CardTitle>Amenities</CardTitle>
-                  </div>
-                  <CardDescription>Select all amenities available at your property</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {AMENITIES.map((amenity) => (
-                      <div
-                        key={amenity.id}
-                        className="flex items-center space-x-3 p-3 border rounded-lg hover-elevate"
-                        data-testid={`checkbox-amenity-${amenity.id}`}
-                      >
-                        <Checkbox
-                          checked={selectedAmenities[amenity.id] || false}
-                          onCheckedChange={(checked) => 
-                            setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !!checked }))
-                          }
-                        />
-                        <label 
-                          className="flex-1 cursor-pointer"
-                          onClick={() => setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }))}
-                        >
-                          <span className="mr-2">{amenity.icon}</span>
-                          <span className="text-sm font-medium">{amenity.label}</span>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {step === 6 && (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center gap-2 mb-2">
-                    <IndianRupee className="w-5 h-5 text-primary" />
-                    <CardTitle>Fee Summary</CardTitle>
-                  </div>
-                  <CardDescription>Registration fee breakdown as per 2025 Homestay Rules</CardDescription>
+                  <CardTitle>Amenities, Facilities & Fee Summary</CardTitle>
+                  <CardDescription>Final details and registration fee calculation</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="bg-primary/5 p-6 rounded-lg">
+                  {/* Amenities Section */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Property Amenities</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {AMENITIES.map((amenity) => (
+                        <div
+                          key={amenity.id}
+                          className="flex items-center space-x-3 p-3 border rounded-lg hover-elevate"
+                          data-testid={`checkbox-amenity-${amenity.id}`}
+                        >
+                          <Checkbox
+                            checked={selectedAmenities[amenity.id] || false}
+                            onCheckedChange={(checked) => 
+                              setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !!checked }))
+                            }
+                          />
+                          <label 
+                            className="flex-1 cursor-pointer"
+                            onClick={() => setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }))}
+                          >
+                            <span className="mr-2">{amenity.icon}</span>
+                            <span className="text-sm font-medium">{amenity.label}</span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Additional Facilities Section */}
+                  <div className="space-y-4 border-t pt-4">
+                    <h4 className="font-medium">Additional Facilities (Optional)</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="ecoFriendlyFacilities"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Eco-Friendly Facilities</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Solar panels, rainwater harvesting, waste management, etc." 
+                                className="min-h-20"
+                                data-testid="input-eco-friendly" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="differentlyAbledFacilities"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Differently Abled Facilities</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Ramps, wheelchair access, accessible washrooms, etc." 
+                                className="min-h-20"
+                                data-testid="input-differently-abled" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="fireEquipmentDetails"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fire Safety Equipment</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Fire extinguishers, smoke detectors, emergency exits, etc." 
+                                className="min-h-20"
+                                data-testid="input-fire-equipment" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="nearestHospital"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nearest Hospital</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Name and distance" 
+                                data-testid="input-nearest-hospital" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Fee Summary Section */}
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-4">Registration Fee Summary</h4>
+                    <div className="bg-primary/5 p-6 rounded-lg">
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Category</span>
@@ -730,6 +1350,7 @@ export default function NewApplication() {
                       <p><span className="text-muted-foreground">Rooms:</span> {totalRooms}</p>
                       <p><span className="text-muted-foreground">Amenities:</span> {Object.values(selectedAmenities).filter(Boolean).length} selected</p>
                     </div>
+                  </div>
                   </div>
                 </CardContent>
               </Card>
