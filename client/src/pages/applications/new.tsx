@@ -25,26 +25,71 @@ const HP_DISTRICTS = [
   "Sirmaur", "Solan", "Una"
 ];
 
-const roomConfigSchema = z.object({
-  roomType: z.enum(["Standard", "Deluxe", "Suite"]),
-  size: z.number().min(50, "Minimum 50 sq ft").max(1000, "Maximum 1000 sq ft"),
-  count: z.number().int().min(1, "At least 1 room").max(20, "Max 20 rooms per type"),
-});
+const LOCATION_TYPES = [
+  { value: "mc", label: "Municipal Corporation (MC)" },
+  { value: "tcp", label: "Town & Country Planning / SADA / Nagar Panchayat" },
+  { value: "gp", label: "Gram Panchayat" },
+];
 
 const applicationSchema = z.object({
+  // Basic property info
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
   address: z.string().min(10, "Address must be at least 10 characters"),
   district: z.string().min(1, "District is required"),
   pincode: z.string().regex(/^[1-9]\d{5}$/, "Enter valid 6-digit pincode"),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
-  ownerName: z.string().min(3, "Owner name is required"),
-  ownerMobile: z.string().regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile"),
+  locationType: z.enum(["mc", "tcp", "gp"]),
+  
+  // Contact details
+  telephone: z.string().optional().or(z.literal("")),
+  fax: z.string().optional().or(z.literal("")),
   ownerEmail: z.string().email("Enter valid email").optional().or(z.literal("")),
+  ownerMobile: z.string().regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile"),
+  
+  // Owner info
+  ownerName: z.string().min(3, "Owner name is required"),
   ownerAadhaar: z.string().regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
-  totalRooms: z.number().int().min(1, "At least 1 room required").max(50, "Maximum 50 rooms allowed"),
-  rooms: z.array(roomConfigSchema).min(1, "At least one room configuration required"),
+  
+  // Category & room rate
   category: z.enum(["diamond", "gold", "silver"]),
+  proposedRoomRate: z.number().min(100, "Room rate must be positive"),
+  
+  // Distance from key locations (in km)
+  distanceAirport: z.number().min(0).optional(),
+  distanceRailway: z.number().min(0).optional(),
+  distanceCityCenter: z.number().min(0).optional(),
+  distanceShopping: z.number().min(0).optional(),
+  distanceBusStand: z.number().min(0).optional(),
+  
+  // Project type
+  projectType: z.enum(["new_rooms", "new_project"]),
+  
+  // Property details
+  propertyArea: z.number().min(1, "Property area required"),
+  
+  // Room configuration (single/double/suite)
+  singleBedRooms: z.number().int().min(0).default(0),
+  singleBedRoomSize: z.number().min(0).optional(),
+  doubleBedRooms: z.number().int().min(0).default(0),
+  doubleBedRoomSize: z.number().min(0).optional(),
+  familySuites: z.number().int().min(0).max(3, "Maximum 3 family suites").default(0),
+  familySuiteSize: z.number().min(0).optional(),
+  attachedWashrooms: z.number().int().min(0),
+  
+  // Public areas (sq ft)
+  lobbyArea: z.number().min(0).optional(),
+  diningArea: z.number().min(0).optional(),
+  parkingArea: z.number().min(0).optional(),
+  
+  // Additional facilities
+  ecoFriendlyFacilities: z.string().optional().or(z.literal("")),
+  differentlyAbledFacilities: z.string().optional().or(z.literal("")),
+  fireEquipmentDetails: z.string().optional().or(z.literal("")),
+  
+  // GSTIN (mandatory for Diamond/Gold)
+  gstin: z.string().optional().or(z.literal("")),
+  
+  // Nearest hospital
+  nearestHospital: z.string().optional().or(z.literal("")),
 });
 
 type ApplicationForm = z.infer<typeof applicationSchema>;
@@ -63,10 +108,18 @@ const AMENITIES = [
   { id: "petFriendly", label: "Pet Friendly", icon: "🐕" },
 ];
 
+// Fee structure as per ANNEXURE-I (location-based)
 const FEE_STRUCTURE = {
-  diamond: { base: 20000, perRoom: 1000 },
-  gold: { base: 10000, perRoom: 1000 },
-  silver: { base: 5000, perRoom: 1000 },
+  diamond: { mc: 18000, tcp: 12000, gp: 10000 },
+  gold: { mc: 12000, tcp: 8000, gp: 6000 },
+  silver: { mc: 8000, tcp: 5000, gp: 3000 },
+};
+
+// Room rate thresholds for categories (as per official document)
+const ROOM_RATE_THRESHOLDS = {
+  diamond: { min: 10000, label: "Higher than ₹10,000 per room per day" },
+  gold: { min: 3000, max: 10000, label: "₹3,000 to ₹10,000 per room per day" },
+  silver: { max: 3000, label: "Less than ₹3,000 per room per day" },
 };
 
 export default function NewApplication() {
@@ -75,10 +128,15 @@ export default function NewApplication() {
   const [step, setStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
   const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, UploadedFileMetadata[]>>({
-    ownershipProof: [],
+    revenuePapers: [],
+    affidavitSection29: [],
+    undertakingFormC: [],
+    registerForVerification: [],
+    billBook: [],
     aadhaarCard: [],
-    panCard: [],
-    gstCertificate: [],
+    fireSafetyNOC: [],
+    pollutionClearance: [],
+    buildingPlan: [],
   });
   const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
   const totalSteps = 6;
@@ -94,30 +152,39 @@ export default function NewApplication() {
       address: "",
       district: "",
       pincode: "",
-      ownerName: userData?.user?.fullName || "",
-      ownerMobile: userData?.user?.mobile || "",
+      locationType: "gp",
+      telephone: "",
+      fax: "",
       ownerEmail: userData?.user?.email || "",
+      ownerMobile: userData?.user?.mobile || "",
+      ownerName: userData?.user?.fullName || "",
       ownerAadhaar: userData?.user?.aadhaarNumber || "",
-      totalRooms: 1,
       category: "silver",
+      proposedRoomRate: 2000,
+      projectType: "new_project",
+      propertyArea: 0,
+      singleBedRooms: 0,
+      doubleBedRooms: 1,
+      familySuites: 0,
+      attachedWashrooms: 1,
+      gstin: "",
     },
   });
 
   const category = form.watch("category");
-  const totalRooms = form.watch("totalRooms");
+  const locationType = form.watch("locationType");
+  const singleBedRooms = form.watch("singleBedRooms") || 0;
+  const doubleBedRooms = form.watch("doubleBedRooms") || 0;
+  const familySuites = form.watch("familySuites") || 0;
+  const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
 
   const calculateFee = () => {
-    const feeConfig = FEE_STRUCTURE[category];
-    const baseFee = feeConfig.base;
-    const perRoomFee = feeConfig.perRoom * totalRooms;
-    const subtotal = baseFee + perRoomFee;
-    const gst = subtotal * 0.18;
-    const total = subtotal + gst;
+    const baseFee = FEE_STRUCTURE[category][locationType];
+    const gst = baseFee * 0.18;
+    const total = baseFee + gst;
 
     return {
       baseFee,
-      perRoomFee: perRoomFee / totalRooms,
-      totalPerRoomFee: perRoomFee,
       gstAmount: gst,
       totalFee: total,
     };
@@ -131,9 +198,10 @@ export default function NewApplication() {
         ownerEmail: data.ownerEmail || undefined,
         amenities: selectedAmenities,
         baseFee: fees.baseFee.toString(),
-        perRoomFee: fees.perRoomFee.toFixed(2),
+        perRoomFee: "0",
         gstAmount: fees.gstAmount.toFixed(2),
         totalFee: fees.totalFee.toFixed(2),
+        totalRooms,
         status: 'pending',
         submittedAt: new Date().toISOString(),
         // Include uploaded documents with metadata
@@ -396,27 +464,10 @@ export default function NewApplication() {
                   <CardDescription>Number of rooms and property category</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="totalRooms"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Number of Rooms</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="1" 
-                            max="50"
-                            data-testid="input-total-rooms"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                          />
-                        </FormControl>
-                        <FormDescription>Enter the total guest rooms available</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <p className="text-sm font-medium mb-2">Total Rooms: {totalRooms}</p>
+                    <p className="text-xs text-muted-foreground">Maximum 12 beds across all rooms</p>
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -639,10 +690,6 @@ export default function NewApplication() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Base Fee</span>
                         <span className="font-medium">₹{fees.baseFee.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Per Room Fee ({totalRooms} rooms × ₹{fees.perRoomFee.toFixed(2)})</span>
-                        <span className="font-medium">₹{fees.totalPerRoomFee.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">GST (18%)</span>
