@@ -351,6 +351,11 @@ export default function NewApplication() {
         setPropertyPhotos(photos);
       }
 
+      // Restore the page/step user was on when they saved the draft
+      if (draft.currentPage && draft.currentPage >= 1 && draft.currentPage <= totalSteps) {
+        setStep(draft.currentPage);
+      }
+
       toast({
         title: "Draft loaded",
         description: "Continue editing your application from where you left off.",
