@@ -52,6 +52,7 @@ const DISTRICT_DISTANCES: Record<string, { airport: number; railway: number; cit
   "Pangi": { airport: 320, railway: 450, cityCenter: 25, shopping: 18, busStand: 12 },
 };
 
+// Strict schema for final submission - all required fields
 const applicationSchema = z.object({
   // Basic property info
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
@@ -113,7 +114,47 @@ const applicationSchema = z.object({
   nearestHospital: z.string().optional().or(z.literal("")),
 });
 
+// Fully relaxed schema for draft saves - all fields optional with no constraints
+const draftSchema = z.object({
+  propertyName: z.string().optional(),
+  address: z.string().optional(),
+  district: z.string().optional(),
+  pincode: z.string().optional(),
+  locationType: z.enum(["mc", "tcp", "gp"]).optional(),
+  telephone: z.string().optional(),
+  fax: z.string().optional(),
+  ownerEmail: z.string().optional(),
+  ownerMobile: z.string().optional(),
+  ownerName: z.string().optional(),
+  ownerAadhaar: z.string().optional(),
+  category: z.enum(["diamond", "gold", "silver"]).optional(),
+  proposedRoomRate: z.number().optional(),
+  distanceAirport: z.number().optional(),
+  distanceRailway: z.number().optional(),
+  distanceCityCenter: z.number().optional(),
+  distanceShopping: z.number().optional(),
+  distanceBusStand: z.number().optional(),
+  projectType: z.enum(["new_rooms", "new_project"]).optional(),
+  propertyArea: z.number().optional(),
+  singleBedRooms: z.number().optional(),
+  singleBedRoomSize: z.number().optional(),
+  doubleBedRooms: z.number().optional(),
+  doubleBedRoomSize: z.number().optional(),
+  familySuites: z.number().optional(),
+  familySuiteSize: z.number().optional(),
+  attachedWashrooms: z.number().optional(),
+  lobbyArea: z.number().optional(),
+  diningArea: z.number().optional(),
+  parkingArea: z.string().optional(),
+  ecoFriendlyFacilities: z.string().optional(),
+  differentlyAbledFacilities: z.string().optional(),
+  fireEquipmentDetails: z.string().optional(),
+  gstin: z.string().optional(),
+  nearestHospital: z.string().optional(),
+});
+
 type ApplicationForm = z.infer<typeof applicationSchema>;
+type DraftForm = z.infer<typeof draftSchema>;
 
 const AMENITIES = [
   { id: "ac", label: "Air Conditioning", icon: "❄️" },
@@ -356,14 +397,19 @@ export default function NewApplication() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Draft save mutation
+  // Draft save mutation - bypasses form validation to allow partial saves
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
-      const formData = form.getValues();
+      // Get raw form values without triggering validation
+      const rawFormData = form.getValues();
+      
+      // Validate with relaxed draft schema (all fields optional)
+      const validatedData = draftSchema.parse(rawFormData);
+      
       const fees = calculateFee();
       const payload = {
-        ...formData,
-        ownerEmail: formData.ownerEmail || undefined,
+        ...validatedData,
+        ownerEmail: validatedData.ownerEmail || undefined,
         amenities: selectedAmenities,
         baseFee: fees.baseFee.toString(),
         perRoomFee: "0",

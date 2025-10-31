@@ -173,7 +173,20 @@ The system uses an idempotent seed script (`server/seed.ts`) that:
 
 **Run seed script manually**: `npx tsx server/seed.ts`
 
-**DDO Codes by District** (15 total):
+### Test Accounts
+
+**Admin Account**:
+- Mobile: 9999999999
+- Password: admin123
+- Role: admin
+- Access: Full system access, user management, admin console
+
+**Property Owner Account** (for testing):
+- Create new account via registration page at /register
+- Default role: property_owner
+- Access: Create applications, view own applications, make payments, save drafts
+
+## DDO Codes by District
 - Chamba: CHM00-532, Bharmour: CHM01-001
 - Shimla: SML00-532, Shimla (Central): CTO00-068
 - Kullu: KLU04-532, Kullu (Dhalpur): KLU00-532
