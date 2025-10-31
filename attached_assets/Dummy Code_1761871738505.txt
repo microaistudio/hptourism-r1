@@ -1,0 +1,92 @@
+  
+ string DeptID = System.Configuration.ConfigurationManager.AppSettings["DeptID"];
+ string ServiceCode = System.Configuration.ConfigurationManager.AppSettings["ServiceCode"];
+ string MutationFeesHead = System.Configuration.ConfigurationManager.AppSettings["MutationFeeHead"];
+ string OtherFeesHead = System.Configuration.ConfigurationManager.AppSettings["OtherFeesHead"];
+ string TreasuryURL = System.Web.Configuration.WebConfigurationManager.AppSettings["TreasuryURL"];
+ string ReturnTreasuryURL = System.Web.Configuration.WebConfigurationManager.AppSettings["ReturnTreasuryURL"];
+
+void GenerateChallanPayment(string DeptRefNo, string AppRefNo)
+  {
+      try
+      {
+          //Grid's footer row
+          var footerRow = gridFee.FooterRow;
+          int MutationFeesHeadAmount = 0;
+          int OtherFeesHeadAmount = 0;
+          int BillYear = 0;
+          int BillMonth = 0;
+          if (footerRow != null)
+          {
+              //get your textbox instances
+              var lblMutationFeeAmountTotal = (Label)footerRow.FindControl("lblMutationFeeAmountTotal");
+              var lblOtherServicesFeeAmountTotal = (Label)footerRow.FindControl("lblOtherServicesFeeAmountTotal");
+              // Check for null
+              if (lblMutationFeeAmountTotal != null && lblOtherServicesFeeAmountTotal != null)
+              {
+                  //lblMutationFeeAmountTotal.Text = lblMutationFeeAmountTotal.Text;//"1";
+                  //lblOtherServicesFeeAmountTotal.Text = lblOtherServicesFeeAmountTotal.Text;//"2";
+
+                  int.TryParse(lblMutationFeeAmountTotal.Text, out MutationFeesHeadAmount);
+                  int.TryParse(lblOtherServicesFeeAmountTotal.Text, out OtherFeesHeadAmount);
+                  int.TryParse(hdnBillYear.Value, out BillYear);
+                  int.TryParse(hdnBillMonth.Value, out BillMonth);
+
+                  if (MutationFeesHeadAmount > 0 || OtherFeesHeadAmount > 0)
+                  {
+
+                      int TotalAmount = MutationFeesHeadAmount + OtherFeesHeadAmount;
+                      /*Prepare String for every new transaction with Unique AppRefNo*/
+
+                      var now = DateTime.Now; // get the current DateTime 
+                                              //Get the number of days in the current month
+                      int daysInMonth = DateTime.DaysInMonth(BillYear, BillMonth);
+                      //First day of the month is always 1
+                      var firstDay = new DateTime(BillYear, BillMonth, 1);
+                      //Last day will be similar to the number of days calculated above
+                      var lastDay = new DateTime(BillYear, BillMonth, daysInMonth);
+
+                      //So
+                      string PeriodFrom = firstDay.ToString("dd-MM-yyyy");
+                      string PeriodTo = lastDay.ToString("dd-MM-yyyy");
+
+                      MstringForCheckSum = "DeptID=" + DeptID + "|DeptRefNo=" + DeptRefNo + "|TotalAmount=" + TotalAmount.ToString() + "" +
+                                                  "|TenderBy=" + Session["Name"] + "|AppRefNo=" + AppRefNo + "|Head1=" + MutationFeesHead + "|" +
+                                                  "Amount1=" + MutationFeesHeadAmount + "|Head2=" + OtherFeesHead + "|" +
+                                                  "Amount2=" + OtherFeesHeadAmount + "|Ddo=" + txtDDOCode.Text + "|" +
+                                                  "PeriodFrom=" + PeriodFrom + "|PeriodTo=" + PeriodTo + "|Service_code=" + ServiceCode + "" +
+                                                  "|return_url=" + ReturnTreasuryURL + "";
+
+                      // HIMKOSH url where data is to be posted
+                      MAppurlToRedirect = TreasuryURL;
+
+                      // HIMKOSH merchant code                        
+                      MmerchantCode = System.Configuration.ConfigurationManager.AppSettings["Merchantcode"];
+
+                      // HIMKOSH key path used for encryptiondecryption
+                      MpathbankKeyForEncryption = Server.MapPath("~/bin/echallan.key");
+
+                      // calculate checksum of the above string using the echallan DLL
+                      McheckSum = echallan.getCheckSum(MstringForCheckSum);
+
+                      // Prepare the above string with checksum
+                      MstringForEncryption = MstringForCheckSum + "|checkSum=" + McheckSum;
+
+                      // encrypt the string using echallan DLL and echallan.key
+                      MstringTobeAddedToUrlAfterEncryption = echallan.Encrypt(MstringForEncryption, Server.MapPath("~/bin/echallan.key"));
+
+
+                      // Post the data to himkosh using below code
+                      echallanPost.Url = MAppurlToRedirect;
+                      echallanPost.Add("encdata", MstringTobeAddedToUrlAfterEncryption);
+                      echallanPost.Add("merchant_code", MmerchantCode);
+                      echallanPost.Post();
+                  }
+              }
+          }
+      }
+      catch (Exception ex)
+      {
+          ScriptManager.RegisterStartupScript(this, GetType(), Guid.NewGuid().ToString(), "alert('" + RCMS.Utility.CommonUtility.CleanExceptionMessage(ex.Message) + "');", true);
+      }
+  }

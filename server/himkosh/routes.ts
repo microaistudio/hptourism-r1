@@ -65,9 +65,9 @@ router.post('/initiate', async (req, res) => {
     // Calculate amount (convert to integer rupees, no decimals)
     const totalAmount = Math.round(parseFloat(application.totalFee.toString()));
 
-    // Get current date in MM-DD-YYYY format
+    // Get current date in DD-MM-YYYY format (as per HP Government code)
     const now = new Date();
-    const periodDate = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${now.getFullYear()}`;
+    const periodDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
 
     // Build request parameters
     const requestParams = {

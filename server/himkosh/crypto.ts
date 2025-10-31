@@ -221,9 +221,14 @@ export function buildRequestString(params: {
     parts.push(`Amount10=${params.amount10}`);
   }
 
-  // NOTE: Service_code and return_url are NOT included in encrypted string
-  // They are for HimKosh server-side mapping/configuration only
-  // The example in documentation does NOT include these fields in encryption
+  // CRITICAL: Service_code and return_url MUST be included in checksum calculation
+  // Confirmed by HP Government's production code (Dummy Code.txt)
+  if (params.serviceCode) {
+    parts.push(`Service_code=${params.serviceCode}`);
+  }
+  if (params.returnUrl) {
+    parts.push(`return_url=${params.returnUrl}`);
+  }
   
   // Join with pipe delimiter and return WITHOUT checksum
   // Checksum is calculated separately and appended before encryption
