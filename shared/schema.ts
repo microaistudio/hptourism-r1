@@ -117,6 +117,7 @@ export const homestayApplications = pgTable("homestay_applications", {
   // Workflow
   status: varchar("status", { length: 50 }).default('draft'), // 'draft', 'submitted', 'document_verification', 'clarification_requested', 'site_inspection_scheduled', 'site_inspection_complete', 'payment_pending', 'approved', 'rejected'
   currentStage: varchar("current_stage", { length: 50 }), // 'document_upload', 'document_verification', 'site_inspection', 'payment', 'approved'
+  currentPage: integer("current_page").default(1), // Track which page of the form user is on (1-6) for draft resume
   
   // Approval Details
   districtOfficerId: varchar("district_officer_id").references(() => users.id),
