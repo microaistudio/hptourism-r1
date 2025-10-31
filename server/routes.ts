@@ -257,6 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalFee: z.coerce.number().optional(),
         latitude: z.string().optional(),
         longitude: z.string().optional(),
+        currentPage: z.coerce.number().optional(), // Track which page user was on
         documents: z.array(z.object({
           filePath: z.string(),
           fileName: z.string(),
@@ -353,6 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalFee: z.coerce.number().optional(),
         latitude: z.string().optional(),
         longitude: z.string().optional(),
+        currentPage: z.coerce.number().optional(), // Track which page user was on
         documents: z.array(z.object({
           filePath: z.string(),
           fileName: z.string(),

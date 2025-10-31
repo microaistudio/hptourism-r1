@@ -425,7 +425,13 @@ export default function Dashboard() {
                   <div
                     key={app.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer"
-                    onClick={() => setLocation(`/applications/${app.id}`)}
+                    onClick={() => {
+                      if (app.status === 'draft') {
+                        setLocation(`/applications/new?draft=${app.id}`);
+                      } else {
+                        setLocation(`/applications/${app.id}`);
+                      }
+                    }}
                     data-testid={`card-application-${app.id}`}
                   >
                     <div className="flex-1">
@@ -444,7 +450,20 @@ export default function Dashboard() {
                         </p>
                       )}
                     </div>
-                    {app.status === 'sent_back_for_corrections' ? (
+                    {app.status === 'draft' ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/applications/new?draft=${app.id}`);
+                        }}
+                        data-testid={`button-resume-${app.id}`}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Resume Editing
+                      </Button>
+                    ) : app.status === 'sent_back_for_corrections' ? (
                       <Button 
                         variant="destructive" 
                         size="sm" 

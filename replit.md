@@ -22,6 +22,7 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
 
 - **Public Tourism Discovery Platform**: Allows browsing and filtering of approved homestays with detailed property pages.
 - **Smart Compliance Hub**: Enables property owners to register homestays, submit applications, and track status with role-specific navigation.
+- **Draft Save & Resume Functionality**: Applicants can save progress at any stage and resume from the exact page they left off, with all form data, uploaded documents, and property photos automatically restored. Uses `currentPage` tracking and `window.location.search` for reliable query parameter handling.
 - **ANNEXURE-I Compliant Registration Form**: Complete 6-page multi-step form implementing HP Homestay Rules 2025:
   - **Page 1 - Property Details** (7 fields): Property name, address, district, pincode, location type (MC/TCP/GP), telephone, fax
   - **Page 2 - Owner Information** (4 fields): Owner name, mobile, email, Aadhaar (auto-filled from user account)

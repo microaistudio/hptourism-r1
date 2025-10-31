@@ -199,8 +199,8 @@ export default function NewApplication() {
   const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
   const totalSteps = 6;
 
-  // Get draft ID from URL query parameter
-  const draftIdFromUrl = new URLSearchParams(location.split('?')[1] || '').get('draft');
+  // Get draft ID from URL query parameter (use window.location.search to get query params)
+  const draftIdFromUrl = new URLSearchParams(window.location.search).get('draft');
 
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
