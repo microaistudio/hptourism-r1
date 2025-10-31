@@ -29,6 +29,7 @@ import PaymentVerification from "@/pages/payment-verification";
 import AdminUsers from "@/pages/admin/users";
 import AdminConsole from "@/pages/admin/console";
 import SuperAdminConsole from "@/pages/admin/super-admin-console";
+import SuperAdminDashboard from "@/pages/admin/super-admin-dashboard";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -140,6 +141,9 @@ function Router() {
       </Route>
       
       {/* Super Admin Only Routes */}
+      <Route path="/admin/super-dashboard">
+        {() => <ProtectedRoute component={SuperAdminDashboard} allowedRoles={['super_admin']} />}
+      </Route>
       <Route path="/admin/super-console">
         {() => <ProtectedRoute component={SuperAdminConsole} allowedRoles={['super_admin']} />}
       </Route>

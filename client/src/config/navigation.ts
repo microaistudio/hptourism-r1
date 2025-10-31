@@ -75,8 +75,50 @@ export const adminNavigation: NavSection[] = [
   },
 ];
 
+// Super Admin Navigation Menu
+export const superAdminNavigation: NavSection[] = [
+  {
+    title: "Main",
+    items: [
+      {
+        title: "Dashboard",
+        url: "/admin/super-dashboard",
+        icon: Home,
+      },
+      {
+        title: "User Management",
+        url: "/admin/users",
+        icon: Users,
+      },
+      {
+        title: "Super Console",
+        url: "/admin/super-console",
+        icon: Settings,
+      },
+    ],
+  },
+  {
+    title: "Analytics",
+    items: [
+      {
+        title: "Workflow Monitor",
+        url: "/workflow-monitoring",
+        icon: BarChart3,
+      },
+      {
+        title: "Analytics",
+        url: "/analytics",
+        icon: BarChart3,
+      },
+    ],
+  },
+];
+
 // Get navigation based on user role
 export function getNavigationForRole(role: string): NavSection[] {
+  if (role === 'super_admin') {
+    return superAdminNavigation;
+  }
   if (role === 'admin') {
     return adminNavigation;
   }
@@ -88,6 +130,9 @@ export function getNavigationForRole(role: string): NavSection[] {
 
 // Get default route for role
 export function getDefaultRouteForRole(role: string): string {
+  if (role === 'super_admin') {
+    return '/admin/super-dashboard';
+  }
   if (role === 'admin') {
     return '/admin/users';
   }

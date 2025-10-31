@@ -1919,6 +1919,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SUPER ADMIN CONSOLE ROUTES
   // ========================================
 
+  // Get dashboard statistics for super admin
+  app.get("/api/admin/dashboard/stats", requireRole('super_admin'), async (req, res) => {
+    try {
+      // Get all applications
+      const allApplications = await db.select().from(homestayApplications);
+      
+      // Count by status
+      const statusCounts = allApplications.reduce((acc, app) => {
+        acc[app.status] = (acc[app.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Get all users
+      const allUsers = await db.select().from(users);
+      
+      // Count by role
+      const propertyOwners = allUsers.filter(u => u.role === 'property_owner').length;
+      const officers = allUsers.filter(u => ['dealing_assistant', 'district_tourism_officer', 'state_officer'].includes(u.role)).length;
+      const admins = allUsers.filter(u => ['admin', 'super_admin'].includes(u.role)).length;
+
+      // Get inspections
+      const [allInspectionOrders, allInspectionReports] = await Promise.all([
+        db.select().from(inspectionOrders),
+        db.select().from(inspectionReports),
+      ]);
+
+      // Get payments
+      const allPayments = await db.select().from(payments);
+      const completedPayments = allPayments.filter(p => p.status === 'completed');
+      const totalAmount = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      res.json({
+        applications: {
+          total: allApplications.length,
+          pending: statusCounts['submitted'] || 0,
+          underReview: statusCounts['under_review'] || 0,
+          approved: statusCounts['approved'] || 0,
+          rejected: statusCounts['rejected'] || 0,
+          draft: statusCounts['draft'] || 0,
+        },
+        users: {
+          total: allUsers.length,
+          propertyOwners,
+          officers,
+          admins,
+        },
+        inspections: {
+          scheduled: allInspectionOrders.length,
+          completed: allInspectionReports.length,
+          pending: allInspectionOrders.length - allInspectionReports.length,
+        },
+        payments: {
+          total: allPayments.length,
+          completed: completedPayments.length,
+          pending: allPayments.length - completedPayments.length,
+          totalAmount,
+        },
+      });
+    } catch (error) {
+      console.error("[admin] Failed to fetch dashboard stats:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard statistics" });
+    }
+  });
+
   // Get system statistics
   app.get("/api/admin/stats", requireRole('super_admin'), async (req, res) => {
     try {
