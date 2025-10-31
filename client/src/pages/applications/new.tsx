@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye } from "lucide-react";
-import type { User } from "@shared/schema";
+import type { User, HomestayApplication } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -144,7 +144,7 @@ const ROOM_RATE_THRESHOLDS = {
 };
 
 export default function NewApplication() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
@@ -158,8 +158,17 @@ export default function NewApplication() {
   const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
   const totalSteps = 6;
 
+  // Get draft ID from URL query parameter
+  const draftIdFromUrl = new URLSearchParams(location.split('?')[1] || '').get('draft');
+
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
+  });
+
+  // Load draft application if resuming
+  const { data: draftData } = useQuery<{ application: HomestayApplication }>({
+    queryKey: ["/api/applications", draftIdFromUrl],
+    enabled: !!draftIdFromUrl,
   });
 
   const form = useForm<ApplicationForm>({
@@ -210,6 +219,103 @@ export default function NewApplication() {
   const doubleBedRooms = form.watch("doubleBedRooms") || 0;
   const familySuites = form.watch("familySuites") || 0;
   const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
+
+  // Load draft data into form when resuming
+  useEffect(() => {
+    if (draftData?.application) {
+      const draft = draftData.application;
+      
+      // Set the draft ID for updating
+      setDraftId(draft.id);
+
+      // Populate all form fields with draft data
+      form.reset({
+        propertyName: draft.propertyName || "",
+        address: draft.address || "",
+        district: draft.district || "",
+        pincode: draft.pincode || "",
+        locationType: draft.locationType || "gp",
+        telephone: draft.telephone || "",
+        fax: draft.fax || "",
+        ownerEmail: draft.ownerEmail || "",
+        ownerMobile: draft.ownerMobile || "",
+        ownerName: draft.ownerName || "",
+        ownerAadhaar: draft.ownerAadhaar || "",
+        category: draft.category || "silver",
+        proposedRoomRate: draft.proposedRoomRate ? parseFloat(draft.proposedRoomRate.toString()) : 2000,
+        projectType: draft.projectType || "new_project",
+        propertyArea: draft.propertyArea || 0,
+        singleBedRooms: draft.singleBedRooms || 0,
+        singleBedRoomSize: draft.singleBedRoomSize || undefined,
+        doubleBedRooms: draft.doubleBedRooms || 0,
+        doubleBedRoomSize: draft.doubleBedRoomSize || undefined,
+        familySuites: draft.familySuites || 0,
+        familySuiteSize: draft.familySuiteSize || undefined,
+        attachedWashrooms: draft.attachedWashrooms || 0,
+        gstin: draft.gstin || "",
+        distanceAirport: draft.distanceAirport || undefined,
+        distanceRailway: draft.distanceRailway || undefined,
+        distanceCityCenter: draft.distanceCityCenter || undefined,
+        distanceShopping: draft.distanceShopping || undefined,
+        distanceBusStand: draft.distanceBusStand || undefined,
+        lobbyArea: draft.lobbyArea || undefined,
+        diningArea: draft.diningArea || undefined,
+        parkingArea: draft.parkingArea || "",
+        ecoFriendlyFacilities: draft.ecoFriendlyFacilities || "",
+        differentlyAbledFacilities: draft.differentlyAbledFacilities || "",
+        fireEquipmentDetails: draft.fireEquipmentDetails || "",
+        nearestHospital: draft.nearestHospital || "",
+      });
+
+      // Load amenities if present
+      if (draft.amenities) {
+        try {
+          const amenities = typeof draft.amenities === 'string' 
+            ? JSON.parse(draft.amenities) 
+            : draft.amenities;
+          setSelectedAmenities(amenities);
+        } catch (e) {
+          console.error("Failed to parse amenities:", e);
+        }
+      }
+
+      // Load uploaded documents
+      if (draft.documents && Array.isArray(draft.documents)) {
+        const docs: Record<string, UploadedFileMetadata[]> = {
+          revenuePapers: [],
+          affidavitSection29: [],
+          undertakingFormC: [],
+          registerForVerification: [],
+          billBook: [],
+        };
+        const photos: UploadedFileMetadata[] = [];
+
+        draft.documents.forEach((doc: any) => {
+          if (doc.documentType === 'property_photo') {
+            photos.push(doc);
+          } else if (doc.documentType === 'revenue_papers') {
+            docs.revenuePapers.push(doc);
+          } else if (doc.documentType === 'affidavit_section_29') {
+            docs.affidavitSection29.push(doc);
+          } else if (doc.documentType === 'undertaking_form_c') {
+            docs.undertakingFormC.push(doc);
+          } else if (doc.documentType === 'register_for_verification') {
+            docs.registerForVerification.push(doc);
+          } else if (doc.documentType === 'bill_book') {
+            docs.billBook.push(doc);
+          }
+        });
+
+        setUploadedDocuments(docs);
+        setPropertyPhotos(photos);
+      }
+
+      toast({
+        title: "Draft loaded",
+        description: "Continue editing your application from where you left off.",
+      });
+    }
+  }, [draftData]);
 
   // Auto-populate distances when district changes (user can override)
   useEffect(() => {

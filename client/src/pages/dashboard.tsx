@@ -55,6 +55,10 @@ export default function Dashboard() {
 
   const user = userData.user;
   const applications = applicationsData?.applications || [];
+  
+  // Separate drafts from submitted applications
+  const draftApplications = applications.filter(a => a.status === 'draft');
+  const submittedApplications = applications.filter(a => a.status !== 'draft');
 
   // Different stats for different roles
   const stats = user.role === 'property_owner' ? {
@@ -355,11 +359,61 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Draft Applications Section - Only for property owners */}
+        {user.role === 'property_owner' && draftApplications.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-muted-foreground" />
+                <CardTitle>Draft Applications</CardTitle>
+              </div>
+              <CardDescription>
+                Continue editing incomplete applications
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {draftApplications.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className="flex items-center justify-between p-4 border border-dashed rounded-lg hover-elevate"
+                    data-testid={`card-draft-${draft.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h4 className="font-semibold">{draft.propertyName || 'Untitled Application'}</h4>
+                        {getStatusBadge('draft')}
+                        {draft.category && <Badge variant="outline" className="capitalize">{draft.category}</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {draft.district || 'Location not set'} 
+                        {draft.totalRooms > 0 && ` • ${draft.totalRooms} rooms`}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Last saved: {draft.updatedAt ? new Date(draft.updatedAt).toLocaleDateString() : 'Recently'}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline"
+                      size="sm" 
+                      onClick={() => setLocation(`/applications/new?draft=${draft.id}`)}
+                      data-testid={`button-resume-${draft.id}`}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Resume Editing
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Recent Applications</CardTitle>
             <CardDescription>
-              {user.role === 'property_owner' ? 'Your homestay applications' : 'Applications for review'}
+              {user.role === 'property_owner' ? 'Your submitted homestay applications' : 'Applications for review'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -369,7 +423,7 @@ export default function Dashboard() {
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </div>
-            ) : applications.length === 0 ? (
+            ) : (user.role === 'property_owner' ? submittedApplications.length === 0 : applications.length === 0) ? (
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No applications yet</h3>
@@ -387,7 +441,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {applications.map((app) => (
+                {(user.role === 'property_owner' ? submittedApplications : applications).map((app) => (
                   <div
                     key={app.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer"
