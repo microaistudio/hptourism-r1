@@ -4,7 +4,21 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool, db } from "./db";
 import { storage } from "./storage";
-import { insertUserSchema, type User, type HomestayApplication, homestayApplications, documents, payments, productionStats, users } from "@shared/schema";
+import { 
+  insertUserSchema, 
+  type User, 
+  type HomestayApplication, 
+  homestayApplications, 
+  documents, 
+  payments, 
+  productionStats, 
+  users,
+  inspectionOrders,
+  inspectionReports,
+  objections,
+  clarifications,
+  certificates
+} from "@shared/schema";
 import { z } from "zod";
 import { eq, desc, ne } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
@@ -1898,6 +1912,285 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[admin] Database reset failed:", error);
       res.status(500).json({ message: "Failed to reset database" });
+    }
+  });
+
+  // ========================================
+  // SUPER ADMIN CONSOLE ROUTES
+  // ========================================
+
+  // Get system statistics
+  app.get("/api/admin/stats", requireRole('super_admin'), async (req, res) => {
+    try {
+      const environment = process.env.NODE_ENV || 'development';
+      const resetEnabled = environment === 'development' || environment === 'test';
+
+      // Get counts
+      const [
+        applicationsCount,
+        usersCount,
+        documentsCount,
+        paymentsCount
+      ] = await Promise.all([
+        db.select().from(homestayApplications).then(r => r.length),
+        db.select().from(users).then(r => r.length),
+        db.select().from(documents).then(r => r.length),
+        db.select().from(payments).then(r => r.length),
+      ]);
+
+      // Get application status breakdown
+      const applications = await db.select().from(homestayApplications);
+      const byStatus = applications.reduce((acc, app) => {
+        acc[app.status] = (acc[app.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Get user role breakdown
+      const allUsers = await db.select().from(users);
+      const byRole = allUsers.reduce((acc, user) => {
+        acc[user.role] = (acc[user.role] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Calculate database size (approximate)
+      const dbSize = "N/A"; // PostgreSQL specific query needed
+      const tables = 10; // Approximate
+
+      res.json({
+        database: {
+          size: dbSize,
+          tables,
+        },
+        applications: {
+          total: applicationsCount,
+          byStatus,
+        },
+        users: {
+          total: usersCount,
+          byRole,
+        },
+        files: {
+          total: documentsCount,
+          totalSize: "N/A", // Would need to calculate from storage
+        },
+        environment,
+        resetEnabled,
+      });
+    } catch (error) {
+      console.error("[admin] Failed to fetch stats:", error);
+      res.status(500).json({ message: "Failed to fetch system statistics" });
+    }
+  });
+
+  // Reset operations
+  app.post("/api/admin/reset/:operation", requireRole('super_admin'), async (req, res) => {
+    try {
+      const { operation } = req.params;
+      const { confirmationText, reason } = req.body;
+
+      // Check environment
+      const environment = process.env.NODE_ENV || 'development';
+      if (environment === 'production') {
+        return res.status(403).json({ 
+          message: "Reset operations are disabled in production" 
+        });
+      }
+
+      // Validate confirmation
+      const requiredText = operation === 'full' ? 'RESET' : 'DELETE';
+      if (confirmationText !== requiredText) {
+        return res.status(400).json({ 
+          message: `Confirmation text must be "${requiredText}"` 
+        });
+      }
+
+      if (!reason || reason.length < 10) {
+        return res.status(400).json({ 
+          message: "Reason must be at least 10 characters" 
+        });
+      }
+
+      console.log(`[super-admin] Reset operation: ${operation}, reason: ${reason}`);
+
+      let deletedCounts: any = {};
+
+      switch (operation) {
+        case 'full':
+          // Delete everything except super_admin accounts
+          await db.delete(certificates);
+          await db.delete(clarifications);
+          await db.delete(objections);
+          await db.delete(inspectionReports);
+          await db.delete(inspectionOrders);
+          await db.delete(documents);
+          await db.delete(payments);
+          await db.delete(homestayApplications);
+          await db.delete(productionStats);
+          await db.delete(users).where(ne(users.role, 'super_admin'));
+          deletedCounts = { all: "All data except super_admin accounts" };
+          break;
+
+        case 'applications':
+          await db.delete(certificates);
+          await db.delete(clarifications);
+          await db.delete(objections);
+          await db.delete(inspectionReports);
+          await db.delete(inspectionOrders);
+          await db.delete(documents);
+          await db.delete(payments);
+          const deletedApps = await db.delete(homestayApplications);
+          deletedCounts = { applications: "all" };
+          break;
+
+        case 'users':
+          const deletedUsers = await db.delete(users).where(ne(users.role, 'super_admin'));
+          deletedCounts = { users: "All non-super_admin users" };
+          break;
+
+        case 'files':
+          const deletedDocs = await db.delete(documents);
+          deletedCounts = { documents: "all" };
+          // TODO: Delete from object storage
+          break;
+
+        case 'timeline':
+          // Timeline table not yet implemented
+          deletedCounts = { timeline: "not yet implemented" };
+          break;
+
+        case 'inspections':
+          await db.delete(inspectionReports);
+          await db.delete(inspectionOrders);
+          deletedCounts = { inspections: "all orders and reports" };
+          break;
+
+        case 'objections':
+          await db.delete(clarifications);
+          await db.delete(objections);
+          deletedCounts = { objections: "all objections and clarifications" };
+          break;
+
+        case 'payments':
+          await db.delete(payments);
+          deletedCounts = { payments: "all" };
+          break;
+
+        default:
+          return res.status(400).json({ message: "Invalid operation" });
+      }
+
+      res.json({
+        success: true,
+        message: `Reset operation '${operation}' completed successfully`,
+        deletedCounts,
+      });
+    } catch (error) {
+      console.error("[super-admin] Reset failed:", error);
+      res.status(500).json({ message: "Reset operation failed" });
+    }
+  });
+
+  // Seed test data
+  app.post("/api/admin/seed/:type", requireRole('super_admin'), async (req, res) => {
+    try {
+      const { type } = req.params;
+      const { count = 10, scenario } = req.body;
+
+      console.log(`[super-admin] Seeding data: ${type}, count: ${count}, scenario: ${scenario}`);
+
+      // Get current user
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      switch (type) {
+        case 'applications':
+          // Generate test applications
+          const createdApps = [];
+          for (let i = 0; i < count; i++) {
+            const app = await storage.createApplication({
+              userId: currentUser.id,
+              propertyName: `Test Property ${i + 1}`,
+              propertyAddress: `Test Address ${i + 1}, Shimla`,
+              district: 'shimla',
+              pincode: '171001',
+              locationType: 'mc',
+              ownerName: `Test Owner ${i + 1}`,
+              ownerMobile: `98765${String(i).padStart(5, '0')}`,
+              ownerEmail: `test${i + 1}@example.com`,
+              ownerAadhaar: `${String(i).padStart(12, '0')}`,
+              category: ['diamond', 'gold', 'silver'][i % 3] as any,
+              proposedRoomRate: 2000 + (i * 100),
+              projectType: 'new_project',
+              propertyArea: 1000,
+              singleRooms: 2,
+              singleRoomSize: 120,
+              doubleRooms: 3,
+              doubleRoomSize: 150,
+              familyRooms: 1,
+              familyRoomSize: 200,
+              attachedWashrooms: 6,
+              gstin: i % 2 === 0 ? `22AAAAA${i}111Z${i}` : undefined,
+              airportDistance: 22,
+              railwayDistance: 5,
+              cityCenterDistance: 1,
+              shoppingDistance: 0.5,
+              busStandDistance: 2,
+              lobbyArea: 100,
+              diningArea: 80,
+              parkingDescription: 'Covered parking for 5 vehicles',
+              hasWifi: true,
+              hasParking: true,
+              hasAirConditioning: i % 2 === 0,
+              hasHotWater: true,
+              hasRoomService: i % 3 === 0,
+              hasComplimentaryBreakfast: i % 2 === 0,
+              status: 'draft',
+              currentPage: 1,
+              maxStepReached: 1,
+            });
+            createdApps.push(app);
+          }
+          return res.json({
+            success: true,
+            message: `Created ${createdApps.length} test applications`,
+          });
+
+        case 'users':
+          // Generate test users for all roles
+          const testUsers = [];
+          const roles = ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'state_officer'];
+          for (const role of roles) {
+            const user = await storage.createUser({
+              name: `Test ${role.replace('_', ' ')}`,
+              mobile: `9${role.length}${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
+              email: `test.${role}@example.com`,
+              password: 'Test@123',
+              role: role as any,
+              district: role.includes('district') ? 'shimla' : undefined,
+            });
+            testUsers.push(user);
+          }
+          return res.json({
+            success: true,
+            message: `Created ${testUsers.length} test users (all roles)`,
+          });
+
+        case 'scenario':
+          // Load predefined scenario
+          // TODO: Implement scenario loading
+          return res.json({
+            success: true,
+            message: `Scenario '${scenario}' loaded (not yet implemented)`,
+          });
+
+        default:
+          return res.status(400).json({ message: "Invalid seed type" });
+      }
+    } catch (error) {
+      console.error("[super-admin] Seed failed:", error);
+      res.status(500).json({ message: "Failed to generate test data" });
     }
   });
 
