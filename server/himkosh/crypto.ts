@@ -165,7 +165,7 @@ export class HimKoshCrypto {
 /**
  * Build pipe-delimited request string for HimKosh
  * @param params - Request parameters
- * @returns Pipe-delimited string WITHOUT checksum (for encryption)
+ * @returns Object with coreString (for checksum) and fullString (for encryption)
  */
 export function buildRequestString(params: {
   deptId: string;
@@ -188,7 +188,7 @@ export function buildRequestString(params: {
   amount10?: number;
   serviceCode?: string;
   returnUrl?: string;
-}): string {
+}): { coreString: string; fullString: string } {
   // Build base string (mandatory fields)
   // CRITICAL: Field ORDER must match government code EXACTLY!
   let parts = [
@@ -225,8 +225,12 @@ export function buildRequestString(params: {
     parts.push(`Amount10=${params.amount10}`);
   }
 
-  // CRITICAL: Service_code and return_url MUST be included in checksum calculation
-  // Confirmed by HP Government's production code (Dummy Code.txt)
+  // CRITICAL FIX: Per NIC-HP feedback, checksum is calculated on CORE fields only
+  // Service_code and return_url are appended AFTER checksum calculation
+  // Core string ends at last Amount/Period field
+  const coreString = parts.join('|');
+  
+  // Append Service_code and return_url to the FULL string (but NOT in checksum)
   if (params.serviceCode) {
     parts.push(`Service_code=${params.serviceCode}`);
   }
@@ -234,9 +238,10 @@ export function buildRequestString(params: {
     parts.push(`return_url=${params.returnUrl}`);
   }
   
-  // Join with pipe delimiter and return WITHOUT checksum
-  // Checksum is calculated separately and appended before encryption
-  return parts.join('|');
+  const fullString = parts.join('|');
+  
+  // Return object with both strings
+  return { coreString, fullString };
 }
 
 /**

@@ -88,16 +88,17 @@ router.post('/initiate', async (req, res) => {
       returnUrl: config.returnUrl,
     };
 
-    // Build request string WITHOUT checksum first
-    const requestString = buildRequestString(requestParams);
+    // Build request strings (core for checksum, full for encryption)
+    const { coreString, fullString } = buildRequestString(requestParams);
     
-    // Calculate checksum on plain string (WITHOUT checksum field)
-    const checksum = HimKoshCrypto.generateChecksum(requestString);
+    // CRITICAL FIX: Calculate checksum ONLY on core string (excludes Service_code and return_url)
+    // Per NIC-HP: checksum calculated before appending Service_code/return_url
+    const checksum = HimKoshCrypto.generateChecksum(coreString);
     
-    // CRITICAL: Append checksum to the plain string BEFORE encryption
-    const requestStringWithChecksum = `${requestString}|checkSum=${checksum}`;
+    // Append checksum to FULL string (includes Service_code and return_url)
+    const requestStringWithChecksum = `${fullString}|checkSum=${checksum}`;
     
-    // Encrypt the ENTIRE string including the checksum
+    // Encrypt the ENTIRE string including Service_code, return_url, and checksum
     const encryptedData = await crypto.encrypt(requestStringWithChecksum);
 
     // Debug: Log values to identify which field is too long
@@ -115,8 +116,9 @@ router.post('/initiate', async (req, res) => {
     });
 
     // Debug: Log encryption details
-    console.log('[himkosh-encryption] Plain request string (WITHOUT checksum):', requestString);
-    console.log('[himkosh-encryption] Checksum calculated:', checksum);
+    console.log('[himkosh-encryption] CORE string (for checksum):', coreString);
+    console.log('[himkosh-encryption] FULL string (before checksum):', fullString);
+    console.log('[himkosh-encryption] Checksum calculated on CORE:', checksum);
     console.log('[himkosh-encryption] Full string WITH checksum (what we encrypt):', requestStringWithChecksum);
     console.log('[himkosh-encryption] Full string length:', requestStringWithChecksum.length);
     console.log('[himkosh-encryption] Encrypted data:', encryptedData);
@@ -448,31 +450,33 @@ router.post('/test-callback-url', async (req, res) => {
       returnUrl: callbackUrl, // Use the test callback URL
     };
 
-    // Build the request string WITHOUT checksum
-    const requestString = buildRequestString(requestParams);
+    // Build request strings (core for checksum, full for encryption)
+    const { coreString, fullString } = buildRequestString(requestParams);
     
-    // Calculate checksum using our HimKoshCrypto class (now UPPERCASE!)
-    const checksumCalc = HimKoshCrypto.generateChecksum(requestString);
+    // CRITICAL FIX: Calculate checksum ONLY on core string (excludes Service_code and return_url)
+    const checksumCalc = HimKoshCrypto.generateChecksum(coreString);
     
     // Build full string WITH checksum
-    const fullString = `${requestString}|checkSum=${checksumCalc}`;
+    const fullStringWithChecksum = `${fullString}|checkSum=${checksumCalc}`;
     
     // Encrypt
-    const encrypted = await crypto.encrypt(fullString);
+    const encrypted = await crypto.encrypt(fullStringWithChecksum);
 
     console.log('[himkosh-test] Testing callback URL:', callbackUrl);
-    console.log('[himkosh-test] Request string:', requestString);
-    console.log('[himkosh-test] Checksum:', checksumCalc);
+    console.log('[himkosh-test] CORE string (for checksum):', coreString);
+    console.log('[himkosh-test] FULL string (before checksum):', fullString);
+    console.log('[himkosh-test] Checksum (on CORE only):', checksumCalc);
 
     res.json({
       success: true,
       testUrl: callbackUrl,
       checksum: checksumCalc,
-      requestString: requestString,
+      coreString: coreString,
       fullString: fullString,
+      fullStringWithChecksum: fullStringWithChecksum,
       encrypted: encrypted,
       paymentUrl: `${config.paymentUrl}?encdata=${encodeURIComponent(encrypted)}&merchant_code=${config.merchantCode}`,
-      message: 'Test data generated. Try submitting to HimKosh to see if checksum passes.',
+      message: 'FIXED: Checksum now calculated on CORE string only (excluding Service_code/return_url)',
     });
 
   } catch (error) {

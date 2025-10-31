@@ -14,21 +14,23 @@
 
 ## 1. BEFORE ENCRYPTION (Plain Text)
 
-### Sample Request String (Pipe-Delimited):
+### CORE String (for Checksum Calculation):
 ```
-DeptID=CTO00-068|DeptRefNo=APP20251031001|TotalAmount=5000|TenderBy=John Doe|AppRefNo=HPT17618812345ABC|Head1=1452-00-800-01|Amount1=5000|Head2=1452-00-800-01|Amount2=0|Ddo=KLU00-532|PeriodFrom=31-10-2025|PeriodTo=31-10-2025|Service_code=TSM|return_url=https://osipl.dev/api/himkosh/callback
+DeptID=CTO00-068|DeptRefNo=APP20251031001|TotalAmount=5000|TenderBy=John Doe|AppRefNo=HPT17618812345ABC|Head1=1452-00-800-01|Amount1=5000|Head2=1452-00-800-01|Amount2=0|Ddo=KLU00-532|PeriodFrom=31-10-2025|PeriodTo=31-10-2025
 ```
+*(Ends at last Amount/Period field)*
 
 ### Checksum Calculation:
 - **Algorithm:** MD5
 - **Encoding:** ASCII
-- **Input:** Plain request string (WITHOUT checksum field)
+- **Input:** CORE string ONLY (excludes Service_code and return_url)
 - **Output:** UPPERCASE hex (e.g., `A1B2C3D4E5F6...`)
 
-### Full String Sent for Encryption:
+### FULL String (for Encryption):
 ```
-[Plain Request String]|checkSum=[MD5_CHECKSUM]
+[CORE_STRING]|Service_code=TSM|return_url=https://osipl.dev/api/himkosh/callback|checkSum=[MD5_CHECKSUM]
 ```
+**CRITICAL:** Checksum calculated on CORE fields only, then Service_code/return_url/checksum appended before encryption
 
 ---
 
@@ -69,12 +71,12 @@ xK7J5mN9pQ2rT8vW3hF6... (400-600 characters)
 
 ---
 
-## 4. RETURN URL SECURITY
+## 4. RETURN URL
 
 **Development URL:** `https://osipl.dev/api/himkosh/callback`  
 **Production URL:** `https://eservices.himachaltourism.gov.in/api/himkosh/callback`
 
-**Note:** return_url is part of the encrypted string AND acts as a security whitelist. HimKosh decrypts the request and validates the return_url against merchant-specific whitelist before showing the payment form.
+**Note:** return_url is included in the encrypted payload and HimKosh will redirect back to this URL after payment completion.
 
 ---
 
@@ -83,9 +85,12 @@ xK7J5mN9pQ2rT8vW3hF6... (400-600 characters)
 ✅ Encryption implementation verified against eChallanED.dll  
 ✅ Successfully POST encrypted data to HimKosh portal  
 ✅ Reach payment form endpoint (wrfApplicationRequest.aspx)  
-⏳ **BLOCKED:** Awaiting return_url whitelist for development URL
+✅ **FIXED:** Checksum now calculated on CORE string only (per CTP feedback)
 
-**Action Required:** Please whitelist `https://osipl.dev/api/himkosh/callback` for MERCHANT_CODE: HIMKOSH230
+**Previous Issue:** Checksum was calculated on full string including Service_code/return_url  
+**Fixed:** Checksum now calculated BEFORE appending Service_code/return_url (matches NIC implementation)
+
+**Ready for Testing!** Payment form should now display correctly.
 
 ---
 
