@@ -20,20 +20,30 @@ import type { User } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 
 const HP_DISTRICTS = [
-  "Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu",
-  "Lahaul and Spiti", "Mandi", "Shimla", "Sirmaur", "Solan", "Una"
+  "Bharmour", "Bilaspur", "Chamba", "Dodra Kwar", "Hamirpur", "Kangra", 
+  "Kinnaur", "Kullu", "Lahaul and Spiti", "Mandi", "Pangi", "Shimla", 
+  "Sirmaur", "Solan", "Una"
 ];
+
+const roomConfigSchema = z.object({
+  roomType: z.enum(["Standard", "Deluxe", "Suite"]),
+  size: z.number().min(50, "Minimum 50 sq ft").max(1000, "Maximum 1000 sq ft"),
+  count: z.number().int().min(1, "At least 1 room").max(20, "Max 20 rooms per type"),
+});
 
 const applicationSchema = z.object({
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
   address: z.string().min(10, "Address must be at least 10 characters"),
   district: z.string().min(1, "District is required"),
   pincode: z.string().regex(/^[1-9]\d{5}$/, "Enter valid 6-digit pincode"),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
   ownerName: z.string().min(3, "Owner name is required"),
   ownerMobile: z.string().regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile"),
   ownerEmail: z.string().email("Enter valid email").optional().or(z.literal("")),
   ownerAadhaar: z.string().regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
   totalRooms: z.number().int().min(1, "At least 1 room required").max(50, "Maximum 50 rooms allowed"),
+  rooms: z.array(roomConfigSchema).min(1, "At least one room configuration required"),
   category: z.enum(["diamond", "gold", "silver"]),
 });
 
@@ -54,9 +64,9 @@ const AMENITIES = [
 ];
 
 const FEE_STRUCTURE = {
-  diamond: { base: 5000, perRoom: 500 },
-  gold: { base: 3000, perRoom: 300 },
-  silver: { base: 2000, perRoom: 200 },
+  diamond: { base: 20000, perRoom: 1000 },
+  gold: { base: 10000, perRoom: 1000 },
+  silver: { base: 5000, perRoom: 1000 },
 };
 
 export default function NewApplication() {

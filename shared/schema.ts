@@ -119,6 +119,9 @@ export const homestayApplications = pgTable("homestay_applications", {
   aadhaarCardUrl: text("aadhaar_card_url"),
   panCardUrl: text("pan_card_url"),
   gstCertificateUrl: text("gst_certificate_url"),
+  fireSafetyNocUrl: text("fire_safety_noc_url"),
+  pollutionClearanceUrl: text("pollution_clearance_url"),
+  buildingPlanUrl: text("building_plan_url"),
   propertyPhotosUrls: jsonb("property_photos_urls").$type<string[]>(),
   
   // Certificate
