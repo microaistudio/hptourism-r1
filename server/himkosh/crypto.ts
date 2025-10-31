@@ -138,27 +138,27 @@ export class HimKoshCrypto {
 
   /**
    * Generate MD5 checksum for data string
-   * .NET backend expects lowercase hex
+   * .NET backend expects UPPERCASE hex (ToString("X2") format)
    * @param dataString - String to generate checksum for
-   * @returns MD5 checksum in lowercase hexadecimal
+   * @returns MD5 checksum in UPPERCASE hexadecimal
    */
   static generateChecksum(dataString: string): string {
     const hash = crypto.createHash('md5');
     // CRITICAL: Use ASCII encoding to match .NET's Encoding.ASCII
     hash.update(dataString, 'ascii');
-    // CRITICAL: HimKosh expects LOWERCASE hex (as per documentation example)
-    return hash.digest('hex').toLowerCase();
+    // CRITICAL: HimKosh expects UPPERCASE hex (matching .NET ToString("X2"))
+    return hash.digest('hex').toUpperCase();
   }
 
   /**
    * Verify checksum of received data
    * @param dataString - Data string without checksum
    * @param receivedChecksum - Checksum to verify against
-   * @returns true if checksums match
+   * @returns true if checksums match (case-insensitive comparison)
    */
   static verifyChecksum(dataString: string, receivedChecksum: string): boolean {
     const calculatedChecksum = this.generateChecksum(dataString);
-    return calculatedChecksum === receivedChecksum.toLowerCase();
+    return calculatedChecksum.toUpperCase() === receivedChecksum.toUpperCase();
   }
 }
 
