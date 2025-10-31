@@ -3,6 +3,12 @@
  * Store sensitive credentials in Replit Secrets
  */
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export const himkoshConfig = {
   // CTP API Endpoints
   paymentUrl: 'https://himkosh.hp.nic.in/echallan/WebPages/wrfApplicationRequest.aspx',
@@ -32,7 +38,8 @@ export const himkoshConfig = {
       : `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/himkosh/callback`),
 
   // Key file path (will be provided by CTP team)
-  keyFilePath: process.env.HIMKOSH_KEY_FILE_PATH || './server/himkosh/echallan.key',
+  // Use absolute path to ensure it's found regardless of working directory
+  keyFilePath: process.env.HIMKOSH_KEY_FILE_PATH || path.join(__dirname, 'echallan.key'),
 };
 
 /**
