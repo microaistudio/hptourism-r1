@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   mobile: varchar("mobile", { length: 15 }).notNull().unique(),
   email: varchar("email", { length: 255 }),
   fullName: text("full_name").notNull(),
-  role: varchar("role", { length: 50 }).notNull().default('property_owner'), // 'property_owner', 'district_officer', 'state_officer', 'admin'
+  role: varchar("role", { length: 50 }).notNull().default('property_owner'), // 'property_owner', 'district_officer', 'state_officer', 'admin', 'dealing_assistant', 'district_tourism_officer', 'super_admin'
   aadhaarNumber: varchar("aadhaar_number", { length: 12 }).unique(),
   district: varchar("district", { length: 100 }),
   password: text("password"), // For demo/testing, in production would use proper auth
@@ -22,7 +22,7 @@ export const insertUserSchema = createInsertSchema(users, {
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid mobile number"),
   email: z.string().email().optional().or(z.literal('')),
   fullName: z.string().min(3, "Name must be at least 3 characters"),
-  role: z.enum(['property_owner', 'district_officer', 'state_officer', 'admin']),
+  role: z.enum(['property_owner', 'district_officer', 'state_officer', 'admin', 'dealing_assistant', 'district_tourism_officer', 'super_admin']),
   aadhaarNumber: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional().or(z.literal('')),
   district: z.string().optional().or(z.literal('')),
   password: z.string().min(1, "Password is required"),
@@ -541,3 +541,271 @@ export const insertDdoCodeSchema = createInsertSchema(ddoCodes, {
 export const selectDdoCodeSchema = createSelectSchema(ddoCodes);
 export type InsertDdoCode = z.infer<typeof insertDdoCodeSchema>;
 export type DdoCode = typeof ddoCodes.$inferSelect;
+
+// ====================================================================
+// PRD v2.0 - Multi-Role Workflow Tables
+// ====================================================================
+
+// Inspection Orders Table (DTDO schedules inspection, assigns to DA)
+export const inspectionOrders = pgTable("inspection_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
+  
+  // Scheduled by DTDO
+  scheduledBy: varchar("scheduled_by").notNull().references(() => users.id), // DTDO user ID
+  scheduledDate: timestamp("scheduled_date").notNull(),
+  
+  // Assigned to DA
+  assignedTo: varchar("assigned_to").notNull().references(() => users.id), // DA user ID
+  assignedDate: timestamp("assigned_date").notNull(),
+  
+  // Inspection Details
+  inspectionDate: timestamp("inspection_date").notNull(), // Scheduled date for inspection
+  inspectionAddress: text("inspection_address").notNull(),
+  specialInstructions: text("special_instructions"), // DTDO's instructions to DA
+  
+  // Status
+  status: varchar("status", { length: 50 }).default('scheduled'), // 'scheduled', 'in_progress', 'completed', 'cancelled'
+  
+  // DTDO Notes
+  dtdoNotes: text("dtdo_notes"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInspectionOrderSchema = createInsertSchema(inspectionOrders, {
+  inspectionDate: z.date().or(z.string()),
+  inspectionAddress: z.string().min(10, "Address must be at least 10 characters"),
+  specialInstructions: z.string().optional().or(z.literal('')),
+  dtdoNotes: z.string().optional().or(z.literal('')),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectInspectionOrderSchema = createSelectSchema(inspectionOrders);
+export type InsertInspectionOrder = z.infer<typeof insertInspectionOrderSchema>;
+export type InspectionOrder = typeof inspectionOrders.$inferSelect;
+
+// Inspection Reports Table (DA submits after completing inspection)
+export const inspectionReports = pgTable("inspection_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inspectionOrderId: varchar("inspection_order_id").notNull().references(() => inspectionOrders.id, { onDelete: 'cascade' }),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
+  
+  // Submitted by DA
+  submittedBy: varchar("submitted_by").notNull().references(() => users.id), // DA user ID
+  submittedDate: timestamp("submitted_date").notNull(),
+  
+  // Inspection Findings
+  actualInspectionDate: timestamp("actual_inspection_date").notNull(),
+  roomCountVerified: boolean("room_count_verified").notNull(),
+  actualRoomCount: integer("actual_room_count"),
+  
+  // Category Verification
+  categoryMeetsStandards: boolean("category_meets_standards").notNull(),
+  recommendedCategory: varchar("recommended_category", { length: 20 }), // 'diamond', 'gold', 'silver'
+  
+  // Amenities Verification
+  amenitiesVerified: jsonb("amenities_verified").$type<{
+    wifi?: boolean;
+    parking?: boolean;
+    ac?: boolean;
+    hotWater?: boolean;
+    restaurant?: boolean;
+    [key: string]: boolean | undefined;
+  }>(),
+  amenitiesIssues: text("amenities_issues"),
+  
+  // Safety & Compliance
+  fireSafetyCompliant: boolean("fire_safety_compliant").notNull(),
+  fireSafetyIssues: text("fire_safety_issues"),
+  structuralSafety: boolean("structural_safety").notNull(),
+  structuralIssues: text("structural_issues"),
+  
+  // Overall Assessment
+  overallSatisfactory: boolean("overall_satisfactory").notNull(),
+  recommendation: varchar("recommendation", { length: 50 }).notNull(), // 'approve', 'approve_with_conditions', 'raise_objections', 'reject'
+  detailedFindings: text("detailed_findings").notNull(),
+  
+  // Supporting Documents (Photos from inspection)
+  inspectionPhotos: jsonb("inspection_photos").$type<Array<{
+    fileName: string;
+    fileUrl: string;
+    caption?: string;
+    uploadedAt: string;
+  }>>(),
+  
+  // Report Document (PDF uploaded by DA)
+  reportDocumentUrl: text("report_document_url"), // PDF of official inspection report
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInspectionReportSchema = createInsertSchema(inspectionReports, {
+  actualInspectionDate: z.date().or(z.string()),
+  roomCountVerified: z.boolean(),
+  actualRoomCount: z.number().int().min(0).optional(),
+  categoryMeetsStandards: z.boolean(),
+  recommendedCategory: z.enum(['diamond', 'gold', 'silver']).optional().or(z.literal('')),
+  fireSafetyCompliant: z.boolean(),
+  structuralSafety: z.boolean(),
+  overallSatisfactory: z.boolean(),
+  recommendation: z.enum(['approve', 'approve_with_conditions', 'raise_objections', 'reject']),
+  detailedFindings: z.string().min(20, "Detailed findings must be at least 20 characters"),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectInspectionReportSchema = createSelectSchema(inspectionReports);
+export type InsertInspectionReport = z.infer<typeof insertInspectionReportSchema>;
+export type InspectionReport = typeof inspectionReports.$inferSelect;
+
+// Objections Table (DTDO raises objections after reviewing inspection report)
+export const objections = pgTable("objections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
+  inspectionReportId: varchar("inspection_report_id").references(() => inspectionReports.id),
+  
+  // Raised by DTDO
+  raisedBy: varchar("raised_by").notNull().references(() => users.id), // DTDO user ID
+  raisedDate: timestamp("raised_date").notNull(),
+  
+  // Objection Details
+  objectionType: varchar("objection_type", { length: 50 }).notNull(), // 'document_incomplete', 'category_mismatch', 'safety_violation', 'amenity_mismatch', 'structural_issue', 'other'
+  objectionTitle: varchar("objection_title", { length: 255 }).notNull(),
+  objectionDescription: text("objection_description").notNull(),
+  
+  // Severity
+  severity: varchar("severity", { length: 20 }).notNull(), // 'minor', 'major', 'critical'
+  
+  // Resolution Timeline
+  responseDeadline: timestamp("response_deadline"), // Deadline for applicant to respond
+  
+  // Status
+  status: varchar("status", { length: 50 }).default('pending'), // 'pending', 'responded', 'resolved', 'escalated'
+  
+  // Resolution
+  resolutionNotes: text("resolution_notes"),
+  resolvedBy: varchar("resolved_by").references(() => users.id), // DTDO user ID
+  resolvedDate: timestamp("resolved_date"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertObjectionSchema = createInsertSchema(objections, {
+  objectionType: z.enum(['document_incomplete', 'category_mismatch', 'safety_violation', 'amenity_mismatch', 'structural_issue', 'other']),
+  objectionTitle: z.string().min(5, "Title must be at least 5 characters"),
+  objectionDescription: z.string().min(20, "Description must be at least 20 characters"),
+  severity: z.enum(['minor', 'major', 'critical']),
+  responseDeadline: z.date().or(z.string()).optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectObjectionSchema = createSelectSchema(objections);
+export type InsertObjection = z.infer<typeof insertObjectionSchema>;
+export type Objection = typeof objections.$inferSelect;
+
+// Clarifications Table (Applicant responses to objections)
+export const clarifications = pgTable("clarifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  objectionId: varchar("objection_id").notNull().references(() => objections.id, { onDelete: 'cascade' }),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
+  
+  // Submitted by Property Owner
+  submittedBy: varchar("submitted_by").notNull().references(() => users.id), // Property owner user ID
+  submittedDate: timestamp("submitted_date").notNull(),
+  
+  // Clarification Details
+  clarificationText: text("clarification_text").notNull(),
+  
+  // Supporting Documents
+  supportingDocuments: jsonb("supporting_documents").$type<Array<{
+    fileName: string;
+    fileUrl: string;
+    documentType: string;
+    uploadedAt: string;
+  }>>(),
+  
+  // Review by DTDO
+  reviewedBy: varchar("reviewed_by").references(() => users.id), // DTDO user ID
+  reviewedDate: timestamp("reviewed_date"),
+  reviewStatus: varchar("review_status", { length: 50 }), // 'accepted', 'rejected', 'needs_revision'
+  reviewNotes: text("review_notes"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClarificationSchema = createInsertSchema(clarifications, {
+  clarificationText: z.string().min(20, "Clarification must be at least 20 characters"),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectClarificationSchema = createSelectSchema(clarifications);
+export type InsertClarification = z.infer<typeof insertClarificationSchema>;
+export type Clarification = typeof clarifications.$inferSelect;
+
+// Certificates Table (Auto-generated after successful payment)
+export const certificates = pgTable("certificates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }).unique(),
+  
+  // Certificate Details
+  certificateNumber: varchar("certificate_number", { length: 50 }).notNull().unique(), // e.g., HP/HST/2025/KLU/001
+  certificateType: varchar("certificate_type", { length: 50 }).default('homestay_registration'), // Future: renewal, amendment
+  
+  // Validity
+  issuedDate: timestamp("issued_date").notNull(),
+  validFrom: timestamp("valid_from").notNull(),
+  validUpto: timestamp("valid_upto").notNull(), // 3 years from issue date
+  
+  // Property Details (snapshot at time of issue)
+  propertyName: varchar("property_name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 20 }).notNull(), // 'diamond', 'gold', 'silver'
+  address: text("address").notNull(),
+  district: varchar("district", { length: 100 }).notNull(),
+  
+  // Owner Details (snapshot)
+  ownerName: varchar("owner_name", { length: 255 }).notNull(),
+  ownerMobile: varchar("owner_mobile", { length: 15 }).notNull(),
+  
+  // Certificate Document
+  certificatePdfUrl: text("certificate_pdf_url"), // URL to generated PDF
+  qrCodeData: text("qr_code_data"), // QR code for verification (contains certificate number + validation URL)
+  
+  // Digital Signature
+  digitalSignature: text("digital_signature"), // Future: Digital signature of issuing officer
+  issuedBy: varchar("issued_by").references(() => users.id), // System admin or auto-generated
+  
+  // Status
+  status: varchar("status", { length: 50 }).default('active'), // 'active', 'expired', 'revoked', 'suspended'
+  revocationReason: text("revocation_reason"),
+  revokedBy: varchar("revoked_by").references(() => users.id),
+  revokedDate: timestamp("revoked_date"),
+  
+  // Renewal Tracking
+  renewalReminderSent: boolean("renewal_reminder_sent").default(false),
+  renewalApplicationId: varchar("renewal_application_id").references(() => homestayApplications.id), // Link to renewal application
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCertificateSchema = createInsertSchema(certificates, {
+  certificateNumber: z.string().min(5),
+  issuedDate: z.date().or(z.string()),
+  validFrom: z.date().or(z.string()),
+  validUpto: z.date().or(z.string()),
+  propertyName: z.string().min(3),
+  category: z.enum(['diamond', 'gold', 'silver']),
+  address: z.string().min(10),
+  district: z.string().min(2),
+  ownerName: z.string().min(3),
+  ownerMobile: z.string().regex(/^[6-9]\d{9}$/),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectCertificateSchema = createSelectSchema(certificates);
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type Certificate = typeof certificates.$inferSelect;
