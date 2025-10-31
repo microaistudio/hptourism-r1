@@ -24,7 +24,12 @@ export const himkoshConfig = {
   },
 
   // Return URL for payment callback
-  returnUrl: process.env.HIMKOSH_RETURN_URL || 'https://osipl.dev/api/himkosh/callback',
+  // CRITICAL: Must be the actual URL where this app is running
+  // In Replit, use REPLIT_DEV_DOMAIN or REPL_SLUG/REPL_OWNER
+  returnUrl: process.env.HIMKOSH_RETURN_URL || 
+    (process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/himkosh/callback`
+      : `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/himkosh/callback`),
 
   // Key file path (will be provided by CTP team)
   keyFilePath: process.env.HIMKOSH_KEY_FILE_PATH || './server/himkosh/echallan.key',
