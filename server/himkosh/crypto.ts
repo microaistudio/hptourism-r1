@@ -190,6 +190,7 @@ export function buildRequestString(params: {
   returnUrl?: string;
 }): string {
   // Build base string (mandatory fields)
+  // CRITICAL: Field ORDER must match government code EXACTLY!
   let parts = [
     `DeptID=${params.deptId}`,
     `DeptRefNo=${params.deptRefNo}`,
@@ -198,17 +199,19 @@ export function buildRequestString(params: {
     `AppRefNo=${params.appRefNo}`,
     `Head1=${params.head1}`,
     `Amount1=${params.amount1}`,
-    `Ddo=${params.ddo}`,
-    `PeriodFrom=${params.periodFrom}`,
-    `PeriodTo=${params.periodTo}`,
   ];
 
-  // Add optional heads
+  // Add Head2/Amount2 BEFORE Ddo (government code order)
   // CRITICAL: Government code includes Head2/Amount2 ALWAYS (even if Amount2=0)
   if (params.head2 !== undefined && params.amount2 !== undefined) {
     parts.push(`Head2=${params.head2}`);
     parts.push(`Amount2=${params.amount2}`);
   }
+
+  // Add Ddo AFTER Head2/Amount2
+  parts.push(`Ddo=${params.ddo}`);
+  parts.push(`PeriodFrom=${params.periodFrom}`);
+  parts.push(`PeriodTo=${params.periodTo}`);
   if (params.head3 && params.amount3 && params.amount3 > 0) {
     parts.push(`Head3=${params.head3}`);
     parts.push(`Amount3=${params.amount3}`);
