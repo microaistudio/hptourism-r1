@@ -99,28 +99,38 @@ The frontend utilizes React 18+, TypeScript, and Vite, with Shadcn/ui (Radix UI)
   - **DDO Mapping Examples**: Kullu → KLU00-532, Shimla → SML00-532, Chamba → CHM00-532
   - **Integration Status**: 
     - ✅ Auto-redirect to HimKosh portal working
-    - ✅ Checksum calculation fixed to match government code (includes Service_code + return_url)
+    - ✅ Checksum calculation verified against eChallanED.dll (includes Service_code + return_url)
     - ✅ Date format corrected to DD-MM-YYYY (per government standard)
-    - ✅ Encryption logic implemented matching eChallanED.dll (AES-128-CBC, MD5)
+    - ✅ Encryption verified matching eChallanED.dll (RijndaelManaged/AES-128-CBC, MD5CryptoServiceProvider, ASCIIEncoding, PKCS7)
     - ✅ echallan.key file received and configured (32 bytes: 16-byte key + 16-byte IV)
-    - ✅ **READY FOR PRODUCTION TESTING**
+    - ✅ Successfully POST encrypted data to HimKosh and reach payment form endpoint
+    - ⏳ **BLOCKED: Awaiting return_url whitelist from NIC-HP**
   - **Reference Files Received from HP Government**:
     - `Dummy Code.txt`: C# code showing exact checksum format and integration flow
-    - `eChallanED.dll`: .NET encryption library (algorithm reverse-engineered to Node.js)
-  - **Checksum String Format** (verified from government code):
+    - `eChallanED.dll`: .NET encryption library analyzed via `strings` command to verify algorithm match
+  - **Checksum String Format** (verified from eChallanED.dll):
     ```
     DeptID=XXX|DeptRefNo=XXX|TotalAmount=XXX|TenderBy=XXX|AppRefNo=XXX|
     Head1=XXX|Amount1=XXX|Head2=XXX|Amount2=XXX|Ddo=XXX|
     PeriodFrom=DD-MM-YYYY|PeriodTo=DD-MM-YYYY|Service_code=XXX|return_url=XXX
     ```
-  - **Next Steps**:
-    1. ✅ `echallan.key` file configured successfully
-    2. Test payment flow end-to-end with real transaction
-    3. Clarify callback URL mechanism with NIC-HP (automatic POST vs manual verification API)
-  - **Encryption**: AES-128-CBC with MD5 checksums, implemented in `server/himkosh/crypto.ts`
+  - **CRITICAL DISCOVERY - return_url Security Whitelist**:
+    - The `return_url` field is NOT just for checksum integrity - it's a **security access control mechanism**
+    - HimKosh server validates return_url against a merchant-specific whitelist after decryption
+    - **Security Flow**: Decrypt request → Extract return_url → Check whitelist → If not whitelisted → Show blank payment form
+    - **Current Blocker**: `https://osipl.dev/api/himkosh/callback` not yet whitelisted for MERCHANT_CODE: HIMKOSH230
+    - **Required Action**: NIC-HP must whitelist development URL for testing: `https://osipl.dev/api/himkosh/callback`
+    - **Production URL** (to be whitelisted later): `https://eservices.himachaltourism.gov.in/api/himkosh/callback`
+  - **Encryption Implementation** (100% verified against DLL):
+    - Algorithm: RijndaelManaged (AES-128-CBC mode)
+    - Checksum: MD5CryptoServiceProvider (UPPERCASE hex output)
+    - Encoding: ASCIIEncoding
+    - Padding: PKCS7
+    - Implementation: `server/himkosh/crypto.ts`
   - **Features**: HIMGRN tracking, Bank CIN support, encrypted request/response storage, district-specific revenue routing
   - **Security**: Only transaction metadata stored (no banking credentials)
-  - **Test Status**: Ready for testing once echallan.key is provided
+  - **Deployment**: Published to https://osipl.dev/ for development testing
+  - **Next Step**: Contact NIC-HP (dto-cyt-hp@nic.in) to whitelist return_url
 
 - **UPI QR Code**: Fully functional with scannable QR codes
   - Placeholder UPI ID: hptourism.registration@sbi (replace with official HP Tourism UPI)
