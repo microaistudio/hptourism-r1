@@ -81,7 +81,54 @@ async function seed() {
     
     console.log(`✅ DDO codes seeded successfully (${ddoData.length} districts)`);
 
-    console.log('🎉 Database seed completed successfully!');
+    // Create super_admin account for system maintenance operations
+    console.log('👑 Creating super admin account...');
+    
+    const existingSuperAdmin = await db.select()
+      .from(users)
+      .where(eq(users.mobile, '9999999998'))
+      .limit(1);
+
+    if (existingSuperAdmin.length > 0) {
+      console.log('✅ Super admin user already exists (mobile: 9999999998)');
+      
+      // Update to ensure role is super_admin
+      await db.update(users)
+        .set({ role: 'super_admin', isActive: true })
+        .where(eq(users.mobile, '9999999998'));
+      
+      console.log('✅ Super admin role verified and updated');
+    } else {
+      // Create super admin user
+      const hashedSuperAdminPassword = await bcrypt.hash('SuperAdmin@2025', 10);
+      
+      await db.insert(users).values({
+        mobile: '9999999998',
+        email: 'superadmin@himachaltourism.gov.in',
+        password: hashedSuperAdminPassword,
+        fullName: 'Super Administrator',
+        role: 'super_admin',
+        isActive: true,
+      });
+      
+      console.log('✅ Super admin user created successfully');
+      console.log('   Mobile: 9999999998');
+      console.log('   Email: superadmin@himachaltourism.gov.in');
+      console.log('   Password: SuperAdmin@2025');
+      console.log('   ⚠️  IMPORTANT: This account has full system access including reset operations!');
+      console.log('   ⚠️  Change this password immediately after first login!');
+    }
+
+    console.log('\n📋 Summary of Default Accounts:');
+    console.log('┌─────────────────┬──────────────┬──────────────────┬──────────────────────┐');
+    console.log('│ Role            │ Mobile       │ Password         │ Access Level         │');
+    console.log('├─────────────────┼──────────────┼──────────────────┼──────────────────────┤');
+    console.log('│ Admin           │ 9999999999   │ admin123         │ User Management      │');
+    console.log('│ Super Admin     │ 9999999998   │ SuperAdmin@2025  │ Full System + Reset  │');
+    console.log('└─────────────────┴──────────────┴──────────────────┴──────────────────────┘');
+
+    console.log('\n🎉 Database seed completed successfully!');
+    console.log('   Run this script anytime to ensure default accounts and DDO codes exist.');
     process.exit(0);
   } catch (error) {
     console.error('❌ Database seed failed:', error);
