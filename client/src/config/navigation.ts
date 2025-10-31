@@ -1,4 +1,4 @@
-import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings } from "lucide-react";
+import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings, Database } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -65,6 +65,11 @@ export const adminNavigation: NavSection[] = [
         title: "User Management",
         url: "/admin/users",
         icon: Users,
+      },
+      {
+        title: "Admin Console",
+        url: "/admin/console",
+        icon: Database,
       },
     ],
   },

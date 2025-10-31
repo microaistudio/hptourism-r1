@@ -4,9 +4,9 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool, db } from "./db";
 import { storage } from "./storage";
-import { insertUserSchema, type User, type HomestayApplication, homestayApplications } from "@shared/schema";
+import { insertUserSchema, type User, type HomestayApplication, homestayApplications, documents, payments, productionStats, users } from "@shared/schema";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, ne } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
 import himkoshRoutes from "./himkosh/routes";
@@ -213,35 +213,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.session.userId!;
       
-      // Security: Whitelist only owner-submittable fields
+      // Security: Whitelist only owner-submittable fields (ANNEXURE-I compliant)
       // Note: Using default (non-strict) mode to allow form to send extra fields
       // that will be ignored. Only whitelisted fields are extracted below.
       const ownerSubmittableSchema = z.object({
+        // Basic property info
         propertyName: z.string(),
         category: z.enum(['diamond', 'gold', 'silver']),
-        totalRooms: z.coerce.number(),
         address: z.string(),
         district: z.string(),
         pincode: z.string(),
-        latitude: z.string().optional(),
-        longitude: z.string().optional(),
+        locationType: z.enum(['mc', 'tcp', 'gp']),
+        telephone: z.string().optional(),
+        fax: z.string().optional(),
+        
+        // Owner info
         ownerName: z.string(),
         ownerMobile: z.string(),
         ownerEmail: z.string().optional(),
         ownerAadhaar: z.string(),
+        
+        // Room & category details
+        proposedRoomRate: z.coerce.number(),
+        projectType: z.enum(['new_rooms', 'new_project']),
+        propertyArea: z.coerce.number(),
+        singleBedRooms: z.coerce.number().optional(),
+        singleBedRoomSize: z.coerce.number().optional(),
+        doubleBedRooms: z.coerce.number().optional(),
+        doubleBedRoomSize: z.coerce.number().optional(),
+        familySuites: z.coerce.number().optional(),
+        familySuiteSize: z.coerce.number().optional(),
+        attachedWashrooms: z.coerce.number(),
+        gstin: z.string().optional(),
+        
+        // Distances (in km)
+        distanceAirport: z.coerce.number().optional(),
+        distanceRailway: z.coerce.number().optional(),
+        distanceCityCenter: z.coerce.number().optional(),
+        distanceShopping: z.coerce.number().optional(),
+        distanceBusStand: z.coerce.number().optional(),
+        
+        // Public areas
+        lobbyArea: z.coerce.number().optional(),
+        diningArea: z.coerce.number().optional(),
+        parkingArea: z.string().optional(),
+        
+        // Additional facilities
+        ecoFriendlyFacilities: z.string().optional(),
+        differentlyAbledFacilities: z.string().optional(),
+        fireEquipmentDetails: z.string().optional(),
+        nearestHospital: z.string().optional(),
+        
+        // Amenities
         amenities: z.any().optional(),
-        rooms: z.any().optional(),
-        baseFee: z.string(),
-        perRoomFee: z.string(),
-        gstAmount: z.string(),
-        totalFee: z.string(),
-        // Document URLs (legacy)
-        ownershipProofUrl: z.string().optional(),
-        aadhaarCardUrl: z.string().optional(),
-        panCardUrl: z.string().optional(),
-        gstCertificateUrl: z.string().optional(),
-        propertyPhotosUrls: z.array(z.string()).optional(),
-        // New documents structure with metadata
+        
+        // Fee calculation
+        baseFee: z.coerce.number(),
+        perRoomFee: z.coerce.number(),
+        gstAmount: z.coerce.number(),
+        totalFee: z.coerce.number(),
+        
+        // Coordinates (optional)
+        latitude: z.string().optional(),
+        longitude: z.string().optional(),
+        
+        // ANNEXURE-II documents with metadata
         documents: z.array(z.object({
           filePath: z.string(),
           fileName: z.string(),
@@ -254,32 +290,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate and extract only whitelisted fields
       const validatedData = ownerSubmittableSchema.parse(req.body);
       
-      // Build payload with ONLY allowed fields (double security layer)
+      // Calculate totalRooms from individual room counts
+      const totalRooms = (validatedData.singleBedRooms || 0) + 
+                        (validatedData.doubleBedRooms || 0) + 
+                        (validatedData.familySuites || 0);
+
+      // Build payload with ONLY allowed fields (ANNEXURE-I compliant)
       // Pass trusted flag to allow server-controlled status override
       const application = await storage.createApplication({
+        // Basic property info
         propertyName: validatedData.propertyName,
         category: validatedData.category,
-        totalRooms: validatedData.totalRooms,
+        totalRooms,
         address: validatedData.address,
         district: validatedData.district,
         pincode: validatedData.pincode,
+        locationType: validatedData.locationType,
+        telephone: validatedData.telephone,
+        fax: validatedData.fax,
+        
+        // Owner info
         ownerName: validatedData.ownerName,
         ownerMobile: validatedData.ownerMobile,
         ownerEmail: validatedData.ownerEmail,
         ownerAadhaar: validatedData.ownerAadhaar,
+        
+        // Room & category details
+        proposedRoomRate: validatedData.proposedRoomRate,
+        projectType: validatedData.projectType,
+        propertyArea: validatedData.propertyArea,
+        singleBedRooms: validatedData.singleBedRooms,
+        singleBedRoomSize: validatedData.singleBedRoomSize,
+        doubleBedRooms: validatedData.doubleBedRooms,
+        doubleBedRoomSize: validatedData.doubleBedRoomSize,
+        familySuites: validatedData.familySuites,
+        familySuiteSize: validatedData.familySuiteSize,
+        attachedWashrooms: validatedData.attachedWashrooms,
+        gstin: validatedData.gstin,
+        
+        // Distances
+        distanceAirport: validatedData.distanceAirport,
+        distanceRailway: validatedData.distanceRailway,
+        distanceCityCenter: validatedData.distanceCityCenter,
+        distanceShopping: validatedData.distanceShopping,
+        distanceBusStand: validatedData.distanceBusStand,
+        
+        // Public areas
+        lobbyArea: validatedData.lobbyArea,
+        diningArea: validatedData.diningArea,
+        parkingArea: validatedData.parkingArea,
+        
+        // Additional facilities
+        ecoFriendlyFacilities: validatedData.ecoFriendlyFacilities,
+        differentlyAbledFacilities: validatedData.differentlyAbledFacilities,
+        fireEquipmentDetails: validatedData.fireEquipmentDetails,
+        nearestHospital: validatedData.nearestHospital,
+        
+        // Amenities
         amenities: validatedData.amenities,
-        rooms: validatedData.rooms,
-        baseFee: validatedData.baseFee,
-        perRoomFee: validatedData.perRoomFee,
-        gstAmount: validatedData.gstAmount,
-        totalFee: validatedData.totalFee,
+        
+        // Fee calculation (from frontend, convert to strings for DB)
+        baseFee: String(validatedData.baseFee),
+        perRoomFee: String(validatedData.perRoomFee),
+        gstAmount: String(validatedData.gstAmount),
+        totalFee: String(validatedData.totalFee),
+        
+        // Coordinates (optional)
         latitude: validatedData.latitude,
         longitude: validatedData.longitude,
-        ownershipProofUrl: validatedData.ownershipProofUrl,
-        aadhaarCardUrl: validatedData.aadhaarCardUrl,
-        panCardUrl: validatedData.panCardUrl,
-        gstCertificateUrl: validatedData.gstCertificateUrl,
-        propertyPhotosUrls: validatedData.propertyPhotosUrls,
+        
         userId,
         status: 'submitted',
         submittedAt: new Date(),
@@ -1594,6 +1673,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to update user status:", error);
       res.status(500).json({ message: "Failed to update user status" });
+    }
+  });
+
+  // RESET DATABASE - Clear all test data (admin only)
+  app.post("/api/admin/reset-db", requireRole('admin'), async (req, res) => {
+    try {
+      console.log("[admin] Starting database reset...");
+      
+      // Delete all applications
+      const deletedApplications = await db.delete(homestayApplications);
+      console.log(`[admin] Deleted all applications`);
+      
+      // Delete all documents
+      const deletedDocuments = await db.delete(documents);
+      console.log(`[admin] Deleted all documents`);
+      
+      // Delete all payments  
+      const deletedPayments = await db.delete(payments);
+      console.log(`[admin] Deleted all payments`);
+      
+      // Delete all production stats
+      const deletedStats = await db.delete(productionStats);
+      console.log(`[admin] Deleted all production stats`);
+      
+      // Delete all users EXCEPT admins
+      await db.delete(users).where(ne(users.role, 'admin'));
+      console.log(`[admin] Deleted all non-admin users`);
+      
+      // TODO: Delete uploaded files from object storage
+      // This would require listing and deleting files from GCS bucket
+      // For now, we'll just clear database records
+      
+      console.log("[admin] Database reset complete");
+      
+      res.json({ 
+        message: "Database reset successful", 
+        deleted: {
+          applications: "all",
+          documents: "all",
+          payments: "all",
+          users: "non-admin only"
+        }
+      });
+    } catch (error) {
+      console.error("[admin] Database reset failed:", error);
+      res.status(500).json({ message: "Failed to reset database" });
     }
   });
 
