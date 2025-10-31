@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +19,7 @@ import type { User, HomestayApplication } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ApplicationStepper } from "@/components/application-stepper";
 
 const HP_DISTRICTS = [
   "Bharmour", "Bilaspur", "Chamba", "Dodra Kwar", "Hamirpur", "Kangra", 
@@ -184,10 +184,51 @@ const ROOM_RATE_THRESHOLDS = {
   silver: { max: 3000, label: "Less than ₹3,000 per room per day" },
 };
 
+// Step configuration for progress tracking
+const STEP_CONFIG = [
+  {
+    id: 1,
+    label: "Property Details",
+    shortLabel: "Property",
+    requiredFields: ["propertyName", "address", "district", "pincode", "locationType"],
+  },
+  {
+    id: 2,
+    label: "Owner Information",
+    shortLabel: "Owner Info",
+    requiredFields: ["ownerName", "ownerMobile", "ownerEmail", "ownerAadhaar"],
+  },
+  {
+    id: 3,
+    label: "Rooms & Category",
+    shortLabel: "Rooms",
+    requiredFields: ["category", "proposedRoomRate", "projectType", "propertyArea", "attachedWashrooms"],
+  },
+  {
+    id: 4,
+    label: "Distances & Areas",
+    shortLabel: "Distances",
+    requiredFields: ["distanceAirport", "distanceRailway", "distanceCityCenter", "distanceShopping", "distanceBusStand"],
+  },
+  {
+    id: 5,
+    label: "Documents Upload",
+    shortLabel: "Documents",
+    requiredFields: [], // Handled separately with document arrays
+  },
+  {
+    id: 6,
+    label: "Amenities & Review",
+    shortLabel: "Review",
+    requiredFields: [], // Final review page
+  },
+];
+
 export default function NewApplication() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
+  const [maxStepReached, setMaxStepReached] = useState(1); // Track highest step visited
   const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
   const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, UploadedFileMetadata[]>>({
     revenuePapers: [],
@@ -354,6 +395,7 @@ export default function NewApplication() {
       // Restore the page/step user was on when they saved the draft
       if (draft.currentPage && draft.currentPage >= 1 && draft.currentPage <= totalSteps) {
         setStep(draft.currentPage);
+        setMaxStepReached(draft.currentPage); // Allow navigation to all previously visited steps
       }
 
       toast({
@@ -640,7 +682,11 @@ export default function NewApplication() {
       }
     }
     
-    if (step < totalSteps) setStep(step + 1);
+    if (step < totalSteps) {
+      const newStep = step + 1;
+      setStep(newStep);
+      setMaxStepReached(Math.max(maxStepReached, newStep));
+    }
   };
 
   const prevStep = () => {
@@ -662,12 +708,23 @@ export default function NewApplication() {
 
   const fees = calculateFee();
 
+  const handleStepClick = (targetStep: number) => {
+    if (targetStep <= maxStepReached) {
+      setStep(targetStep);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
-          <Progress value={(step / totalSteps) * 100} className="h-2" />
-        </div>
+        <ApplicationStepper
+          currentStep={step}
+          maxStepReached={maxStepReached}
+          totalSteps={totalSteps}
+          formData={form.getValues()}
+          onStepClick={handleStepClick}
+          steps={STEP_CONFIG}
+        />
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
