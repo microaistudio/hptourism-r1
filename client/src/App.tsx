@@ -28,6 +28,7 @@ import WorkflowMonitoring from "@/pages/workflow-monitoring";
 import PaymentVerification from "@/pages/payment-verification";
 import AdminUsers from "@/pages/admin/users";
 import AdminConsole from "@/pages/admin/console";
+import SuperAdminConsole from "@/pages/admin/super-admin-console";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -132,10 +133,15 @@ function Router() {
       
       {/* Admin Routes */}
       <Route path="/admin/users">
-        {() => <ProtectedRoute component={AdminUsers} allowedRoles={['admin']} />}
+        {() => <ProtectedRoute component={AdminUsers} allowedRoles={['admin', 'super_admin']} />}
       </Route>
       <Route path="/admin/console">
-        {() => <ProtectedRoute component={AdminConsole} allowedRoles={['admin']} />}
+        {() => <ProtectedRoute component={AdminConsole} allowedRoles={['admin', 'super_admin']} />}
+      </Route>
+      
+      {/* Super Admin Only Routes */}
+      <Route path="/admin/super-console">
+        {() => <ProtectedRoute component={SuperAdminConsole} allowedRoles={['super_admin']} />}
       </Route>
       
       <Route component={NotFound} />
