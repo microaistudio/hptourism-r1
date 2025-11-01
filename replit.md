@@ -42,6 +42,43 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
 - **Role-Specific APIs**: Backend endpoints are designed to filter data based on user role and district assignment, ensuring secure and relevant data access.
 - **Frontend Route Guards**: `ProtectedRoute` component validates user roles and redirects unauthorized access, enhancing security and user experience.
 
+## Official 2025 Policy Compliance
+
+**Reference Document:** `docs/PRD_2025_Policy_Update.md`
+
+The platform implements the **Himachal Pradesh Home Stay Rules, 2025** (Official Gazette Notification TSM-F(10)-10/2003-VI, dated June 25, 2025), which repealed the HP Homestay Scheme 2008.
+
+### Critical 2025 Policy Requirements
+
+**Room Specification (MANDATORY):**
+- Applications MUST collect breakdown: Single bed rooms, Double bed rooms, Family suites
+- Capacity limits: Maximum 6 rooms OR 12 single beds equivalent
+- Family suites: 4 beds each, maximum 3 suites allowed
+- Room sizes: New construction (Double: 120 sq ft, Single: 100 sq ft) vs Existing (Double: 100 sq ft, Single: 80 sq ft)
+
+**Fee Structure (GST Included):**
+- Diamond (>₹10k/night): MC ₹18k, TCP ₹12k, GP ₹10k
+- Gold (₹3k-₹10k/night): MC ₹12k, TCP ₹8k, GP ₹6k
+- Silver (<₹3k/night): MC ₹8k, TCP ₹5k, GP ₹3k
+
+**Discount System:**
+- 10% discount for 3-year lump sum payment
+- Additional 5% discount for female property owners
+- 50% discount for Pangi sub-division (Chamba district)
+- Discounts stack in order: Pangi → 3-year → Female
+
+**GSTIN Requirements:**
+- Diamond & Gold: Mandatory (ANNEXURE-I Section 12)
+- Silver: Exempt
+
+**Certificate Validity:**
+- User selects 1 year OR 3 years at application time
+- Renewal fee = Registration fee (same amount)
+
+**Processing Timeline:**
+- 60-day processing window with automatic approval if not processed
+- Re-registration required when changing room count
+
 ## External Dependencies
 
 - **UI Component Libraries**: `@radix-ui/*`, `cmdk`, `embla-carousel-react`, `lucide-react`, `recharts`
