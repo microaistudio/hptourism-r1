@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -14,29 +19,42 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ArrowLeft,
+  FileText,
   CheckCircle,
   XCircle,
-  FileText,
-  Download,
-  Eye,
-  Loader2,
   AlertCircle,
-  Play,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Send,
+  Save,
+  Eye,
+  Download,
 } from "lucide-react";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { HomestayApplication, Document } from "@shared/schema";
 
-interface ApplicationDetailResponse {
+interface ApplicationData {
   application: HomestayApplication;
   owner: {
     fullName: string;
     mobile: string;
-    email?: string;
+    email: string | null;
   } | null;
   documents: Document[];
+}
+
+interface DocumentVerification {
+  documentId: string;
+  status: 'pending' | 'verified' | 'rejected' | 'needs_correction';
+  notes: string;
 }
 
 export default function DAApplicationDetail() {
@@ -53,11 +71,17 @@ export default function DAApplicationDetail() {
   const [sendBackDialogOpen, setSendBackDialogOpen] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [reason, setReason] = useState("");
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  
+  // Document verification state
+  const [verifications, setVerifications] = useState<Record<string, DocumentVerification>>({});
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
 
-  const { data, isLoading } = useQuery<ApplicationDetailResponse>({
+  const { data, isLoading } = useQuery<ApplicationData>({
     queryKey: ["/api/da/applications", id],
   });
 
+  // Start Scrutiny Mutation
   const startScrutinyMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", `/api/da/applications/${id}/start-scrutiny`);
@@ -67,36 +91,85 @@ export default function DAApplicationDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/da/applications"] });
       toast({
         title: "Scrutiny Started",
-        description: "Application is now under scrutiny",
+        description: "Application is now under your review",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start scrutiny",
+        variant: "destructive",
       });
     },
   });
 
+  // Save Scrutiny Progress Mutation
+  const saveProgressMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/da/applications/${id}/save-scrutiny`, {
+        verifications: Object.values(verifications),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Progress Saved",
+        description: "Your verification progress has been saved",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save progress",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Forward to DTDO Mutation
   const forwardMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", `/api/da/applications/${id}/forward-to-dtdo`, { remarks });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/da/applications"] });
+      setForwardDialogOpen(false);
+      setRemarks("");
       toast({
         title: "Application Forwarded",
-        description: "Application has been sent to DTDO for review",
+        description: "Application has been sent to DTDO successfully",
       });
       setLocation("/da/dashboard");
     },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to forward application",
+        variant: "destructive",
+      });
+    },
   });
 
+  // Send Back Mutation
   const sendBackMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", `/api/da/applications/${id}/send-back`, { reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/da/applications"] });
+      setSendBackDialogOpen(false);
+      setReason("");
       toast({
         title: "Application Sent Back",
         description: "Application has been returned to the applicant",
       });
       setLocation("/da/dashboard");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send back application",
+        variant: "destructive",
+      });
     },
   });
 
@@ -110,11 +183,10 @@ export default function DAApplicationDetail() {
     );
   }
 
-  if (!data?.application) {
+  if (!data) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="text-center py-12">
-          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">Application not found</p>
         </div>
       </div>
@@ -123,171 +195,422 @@ export default function DAApplicationDetail() {
 
   const { application, owner, documents } = data;
 
-  const getCategoryBadge = (category: string) => {
-    const variants: Record<string, string> = {
-      diamond: "bg-blue-50 dark:bg-blue-950/20",
-      gold: "bg-yellow-50 dark:bg-yellow-950/20",
-      silver: "bg-gray-50 dark:bg-gray-950/20",
-    };
-    const variant = variants[category?.toLowerCase()] || variants.silver;
-    return <Badge variant="outline" className={`${variant} capitalize`}>{category}</Badge>;
+  // Initialize verification states for documents (in useEffect to avoid render-time state updates)
+  useEffect(() => {
+    if (documents.length > 0 && Object.keys(verifications).length === 0) {
+      const initialVerifications: Record<string, DocumentVerification> = {};
+      documents.forEach(doc => {
+        initialVerifications[doc.id] = {
+          documentId: doc.id,
+          status: doc.verificationStatus as any || 'pending',
+          notes: doc.verificationNotes || '',
+        };
+      });
+      setVerifications(initialVerifications);
+    }
+  }, [documents, verifications]);
+
+  // Calculate verification progress
+  const totalDocs = documents.length;
+  const verifiedDocs = Object.values(verifications).filter(v => v.status === 'verified').length;
+  const progress = totalDocs > 0 ? (verifiedDocs / totalDocs) * 100 : 0;
+
+  const updateVerification = (docId: string, updates: Partial<DocumentVerification>) => {
+    setVerifications(prev => ({
+      ...prev,
+      [docId]: { ...prev[docId], ...updates }
+    }));
+  };
+
+  const toggleNotes = (docId: string) => {
+    setExpandedNotes(prev => ({ ...prev, [docId]: !prev[docId] }));
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      submitted: "bg-blue-50 dark:bg-blue-950/20",
-      under_scrutiny: "bg-orange-50 dark:bg-orange-950/20",
-      forwarded_to_dtdo: "bg-green-50 dark:bg-green-950/20",
-      reverted_to_applicant: "bg-red-50 dark:bg-red-950/20",
-    };
-    const variant = variants[status] || "";
-    return <Badge variant="outline" className={variant}>{status.replace(/_/g, ' ')}</Badge>;
+    switch (status) {
+      case 'verified':
+        return <Badge className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1" />Verified</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Rejected</Badge>;
+      case 'needs_correction':
+        return <Badge variant="secondary"><AlertCircle className="w-3 h-3 mr-1" />Needs Correction</Badge>;
+      default:
+        return <Badge variant="outline">Pending Review</Badge>;
+    }
   };
 
-  const canStartScrutiny = application.status === 'submitted';
-  const canTakeAction = application.status === 'under_scrutiny';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'verified': return 'text-green-600 dark:text-green-400';
+      case 'rejected': return 'text-red-600 dark:text-red-400';
+      case 'needs_correction': return 'text-orange-600 dark:text-orange-400';
+      default: return 'text-gray-600 dark:text-gray-400';
+    }
+  };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-6 max-w-[1600px]">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" onClick={() => setLocation("/da/dashboard")} data-testid="button-back">
+      <div className="mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setLocation("/da/dashboard")}
+          className="mb-4"
+          data-testid="button-back"
+        >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Dashboard
         </Button>
-      </div>
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-3xl font-bold">{application.propertyName}</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">{application.propertyName}</h1>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span>Application #{application.applicationNumber}</span>
+              <Separator orientation="vertical" className="h-4" />
+              <span>{owner?.fullName} • {owner?.mobile}</span>
+              <Separator orientation="vertical" className="h-4" />
+              <Badge variant="outline">{application.category.toUpperCase()}</Badge>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
           <div className="flex gap-2">
-            {getCategoryBadge(application.category || 'silver')}
-            {getStatusBadge(application.status)}
+            {application.status === 'submitted' && (
+              <Button
+                onClick={() => startScrutinyMutation.mutate()}
+                disabled={startScrutinyMutation.isPending}
+                data-testid="button-start-scrutiny"
+              >
+                {startScrutinyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Start Scrutiny
+              </Button>
+            )}
+
+            {application.status === 'under_scrutiny' && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => saveProgressMutation.mutate()}
+                  disabled={saveProgressMutation.isPending}
+                  data-testid="button-save-progress"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Progress
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => setSendBackDialogOpen(true)}
+                  data-testid="button-send-back"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Send Back
+                </Button>
+                <Button
+                  onClick={() => setForwardDialogOpen(true)}
+                  data-testid="button-forward"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Forward to DTDO
+                </Button>
+              </>
+            )}
           </div>
         </div>
-        <p className="text-muted-foreground">Application ID: {application.id}</p>
       </div>
 
-      {/* Action Buttons */}
-      <div className="mb-6 flex gap-3">
-        {canStartScrutiny && (
-          <Button
-            onClick={() => startScrutinyMutation.mutate()}
-            disabled={startScrutinyMutation.isPending}
-            data-testid="button-start-scrutiny"
-          >
-            {startScrutinyMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4 mr-2" />
-            )}
-            Start Scrutiny
-          </Button>
-        )}
-        
-        {canTakeAction && (
-          <>
-            <Button
-              onClick={() => setForwardDialogOpen(true)}
-              disabled={forwardMutation.isPending}
-              data-testid="button-forward-dtdo"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Forward to DTDO
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setSendBackDialogOpen(true)}
-              disabled={sendBackMutation.isPending}
-              data-testid="button-send-back"
-            >
-              <XCircle className="w-4 h-4 mr-2" />
-              Send Back to Applicant
-            </Button>
-          </>
-        )}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Property Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Property Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <DetailRow label="Property Name" value={application.propertyName} />
-            <DetailRow label="Address" value={application.address} />
-            <DetailRow label="District" value={application.district} />
-            <DetailRow label="Pin Code" value={application.pincode} />
-            <DetailRow label="Location Type" value={application.locationType} />
-            <DetailRow label="Telephone" value={application.telephone || "N/A"} />
-            <DetailRow label="Category" value={application.category} />
-            <DetailRow label="Project Type" value={application.projectType || "N/A"} />
-            <DetailRow label="Property Area (sq m)" value={application.propertyArea?.toString() || "N/A"} />
-          </CardContent>
-        </Card>
-
-        {/* Owner Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Owner Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <DetailRow label="Owner Name" value={owner?.fullName || "N/A"} />
-            <DetailRow label="Mobile" value={owner?.mobile || "N/A"} />
-            <DetailRow label="Email" value={owner?.email || "N/A"} />
-          </CardContent>
-        </Card>
-
-        {/* Room Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Room Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <DetailRow label="Single Bed Rooms" value={application.singleBedRooms?.toString() || "0"} />
-            <DetailRow label="Double Bed Rooms" value={application.doubleBedRooms?.toString() || "0"} />
-            <DetailRow label="Total Rooms" value={application.totalRooms?.toString() || "0"} />
-            <DetailRow label="Proposed Room Rate (₹)" value={application.proposedRoomRate?.toString() || "N/A"} />
-            <DetailRow label="GSTIN" value={application.gstin || "Not Provided"} />
-          </CardContent>
-        </Card>
-
-        {/* Fees */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Fees</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <DetailRow label="Base Fee (₹)" value={application.baseFee?.toString() || "N/A"} />
-            <DetailRow label="Per Room Fee (₹)" value={application.perRoomFee?.toString() || "N/A"} />
-            <DetailRow label="GST (₹)" value={application.gstAmount?.toString() || "N/A"} />
-            <DetailRow label="Total Fee (₹)" value={application.totalFee?.toString() || "N/A"} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Documents Section */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>ANNEXURE-II Documents ({documents.length})</CardTitle>
-          <CardDescription>Required documents uploaded by the applicant</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {documents.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No documents uploaded yet</p>
+      {/* Progress Bar */}
+      {application.status === 'under_scrutiny' && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <Label>Document Verification Progress</Label>
+              <span className="text-sm font-medium">{verifiedDocs} / {totalDocs} documents verified</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {documents.map((doc) => (
-                <DocumentRow key={doc.id} document={doc} />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <Progress value={progress} className="h-2" />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Main Content - Tabs */}
+      <Tabs defaultValue="documents" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="documents" data-testid="tab-documents">
+            <FileText className="w-4 h-4 mr-2" />
+            Document Verification ({documents.length})
+          </TabsTrigger>
+          <TabsTrigger value="details" data-testid="tab-details">
+            Property & Owner Details
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Documents Tab - Split Screen */}
+        <TabsContent value="documents" className="space-y-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Side - Document Preview */}
+            <Card className="h-[calc(100vh-320px)]">
+              <CardHeader>
+                <CardTitle>Document Preview</CardTitle>
+                <CardDescription>
+                  {selectedDocument ? selectedDocument.fileName : "Select a document to preview"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[calc(100%-100px)] overflow-auto">
+                {selectedDocument ? (
+                  <div className="space-y-4">
+                    {/* Document Info */}
+                    <div className="p-4 bg-muted rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{selectedDocument.documentType}</span>
+                        {getStatusBadge(verifications[selectedDocument.id]?.status || 'pending')}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Size: {(selectedDocument.fileSize / 1024).toFixed(2)} KB
+                      </div>
+                    </div>
+
+                    {/* Document Viewer */}
+                    <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
+                      {selectedDocument.mimeType.startsWith('image/') ? (
+                        <img
+                          src={selectedDocument.filePath}
+                          alt={selectedDocument.fileName}
+                          className="w-full h-auto"
+                        />
+                      ) : selectedDocument.mimeType === 'application/pdf' ? (
+                        <iframe
+                          src={selectedDocument.filePath}
+                          className="w-full h-[600px]"
+                          title={selectedDocument.fileName}
+                        />
+                      ) : (
+                        <div className="p-8 text-center">
+                          <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Preview not available for this file type
+                          </p>
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={selectedDocument.filePath} download>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download File
+                            </a>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <Eye className="w-16 h-16 mb-4 opacity-20" />
+                    <p>Select a document from the list to preview</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Right Side - Document Checklist & Verification */}
+            <Card className="h-[calc(100vh-320px)]">
+              <CardHeader>
+                <CardTitle>Document Checklist</CardTitle>
+                <CardDescription>Review and verify each document</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[calc(100%-100px)] overflow-auto">
+                {documents.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No documents uploaded</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((doc, index) => (
+                      <Collapsible
+                        key={doc.id}
+                        open={expandedNotes[doc.id]}
+                        onOpenChange={() => toggleNotes(doc.id)}
+                      >
+                        <Card className={`border-2 transition-colors ${
+                          selectedDocument?.id === doc.id ? 'border-primary' : 'border-border'
+                        }`}>
+                          <CardHeader className="p-4 space-y-3">
+                            <div className="flex items-start gap-3">
+                              {/* Checkbox */}
+                              <Checkbox
+                                checked={verifications[doc.id]?.status === 'verified'}
+                                onCheckedChange={(checked) => {
+                                  updateVerification(doc.id, {
+                                    status: checked ? 'verified' : 'pending'
+                                  });
+                                }}
+                                className="mt-1"
+                                data-testid={`checkbox-verify-${doc.id}`}
+                              />
+
+                              {/* Document Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-sm mb-1">{doc.documentType}</h4>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {doc.fileName}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setSelectedDocument(doc)}
+                                    data-testid={`button-view-${doc.id}`}
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </div>
+
+                                {/* Status Selection */}
+                                <div className="flex gap-2 mt-3">
+                                  <Button
+                                    size="sm"
+                                    variant={verifications[doc.id]?.status === 'verified' ? 'default' : 'outline'}
+                                    className={verifications[doc.id]?.status === 'verified' ? 'bg-green-600' : ''}
+                                    onClick={() => updateVerification(doc.id, { status: 'verified' })}
+                                    data-testid={`button-verify-${doc.id}`}
+                                  >
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Verify
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={verifications[doc.id]?.status === 'needs_correction' ? 'secondary' : 'outline'}
+                                    onClick={() => updateVerification(doc.id, { status: 'needs_correction' })}
+                                    data-testid={`button-correction-${doc.id}`}
+                                  >
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Correction
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={verifications[doc.id]?.status === 'rejected' ? 'destructive' : 'outline'}
+                                    onClick={() => updateVerification(doc.id, { status: 'rejected' })}
+                                    data-testid={`button-reject-${doc.id}`}
+                                  >
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Toggle Notes Button */}
+                            <CollapsibleTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-between"
+                                data-testid={`button-toggle-notes-${doc.id}`}
+                              >
+                                <span className="text-xs">Add Notes/Remarks</span>
+                                {expandedNotes[doc.id] ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                          </CardHeader>
+
+                          {/* Expandable Notes Section */}
+                          <CollapsibleContent>
+                            <CardContent className="pt-0 px-4 pb-4">
+                              <Textarea
+                                placeholder="Enter your observations, remarks, or required corrections..."
+                                value={verifications[doc.id]?.notes || ''}
+                                onChange={(e) => updateVerification(doc.id, { notes: e.target.value })}
+                                rows={3}
+                                className="text-sm"
+                                data-testid={`textarea-notes-${doc.id}`}
+                              />
+                              {verifications[doc.id]?.notes && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="mt-2"
+                                  onClick={() => updateVerification(doc.id, { notes: '' })}
+                                  data-testid={`button-clear-notes-${doc.id}`}
+                                >
+                                  Clear Notes
+                                </Button>
+                              )}
+                            </CardContent>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Details Tab - Property & Owner Information */}
+        <TabsContent value="details" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Property Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DetailRow label="Property Name" value={application.propertyName} />
+                <DetailRow label="Category" value={application.category.toUpperCase()} />
+                <DetailRow label="Location Type" value={application.locationType.toUpperCase()} />
+                <DetailRow label="Address" value={application.address} />
+                <DetailRow label="District" value={application.district} />
+                <DetailRow label="Pincode" value={application.pincode} />
+                <DetailRow label="Telephone" value={application.telephone || "N/A"} />
+              </CardContent>
+            </Card>
+
+            {/* Owner Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Owner Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DetailRow label="Full Name" value={owner?.fullName || "N/A"} />
+                <DetailRow label="Mobile" value={owner?.mobile || "N/A"} />
+                <DetailRow label="Email" value={owner?.email || "Not Provided"} />
+              </CardContent>
+            </Card>
+
+            {/* Room Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Room Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DetailRow label="Single Bed Rooms" value={application.singleBedRooms?.toString() || "0"} />
+                <DetailRow label="Double Bed Rooms" value={application.doubleBedRooms?.toString() || "0"} />
+                <DetailRow label="Total Rooms" value={application.totalRooms?.toString() || "0"} />
+                <DetailRow label="Proposed Room Rate (₹)" value={application.proposedRoomRate?.toString() || "N/A"} />
+                <DetailRow label="GSTIN" value={application.gstin || "Not Provided"} />
+              </CardContent>
+            </Card>
+
+            {/* Fees */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Fees</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DetailRow label="Base Fee (₹)" value={application.baseFee?.toString() || "N/A"} />
+                <DetailRow label="Per Room Fee (₹)" value={application.perRoomFee?.toString() || "N/A"} />
+                <DetailRow label="GST (₹)" value={application.gstAmount?.toString() || "N/A"} />
+                <DetailRow label="Total Fee (₹)" value={application.totalFee?.toString() || "N/A"} />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Forward to DTDO Dialog */}
       <Dialog open={forwardDialogOpen} onOpenChange={setForwardDialogOpen}>
@@ -295,15 +618,15 @@ export default function DAApplicationDetail() {
           <DialogHeader>
             <DialogTitle>Forward to DTDO</DialogTitle>
             <DialogDescription>
-              Add your scrutiny remarks before forwarding this application to the District Tourism Development Officer.
+              Add your overall scrutiny remarks before forwarding this application to the District Tourism Development Officer.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="remarks">Scrutiny Remarks (Optional)</Label>
+              <Label htmlFor="remarks">Overall Scrutiny Remarks (Optional)</Label>
               <Textarea
                 id="remarks"
-                placeholder="Enter any observations or recommendations..."
+                placeholder="Summary of your scrutiny, any observations or recommendations..."
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 rows={4}
@@ -374,47 +697,6 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
     <div className="flex justify-between text-sm">
       <span className="text-muted-foreground">{label}:</span>
       <span className="font-medium">{value || "N/A"}</span>
-    </div>
-  );
-}
-
-function AmenityBadge({ label, enabled }: { label: string; enabled?: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      {enabled ? (
-        <CheckCircle className="w-4 h-4 text-green-600" />
-      ) : (
-        <XCircle className="w-4 h-4 text-gray-400" />
-      )}
-      <span className="text-sm">{label}</span>
-    </div>
-  );
-}
-
-function DocumentRow({ document }: { document: Document }) {
-  const getDocIcon = () => {
-    if (document.documentType.includes('photo') || document.fileName.match(/\.(jpg|jpeg|png)$/i)) {
-      return <Eye className="w-4 h-4" />;
-    }
-    return <FileText className="w-4 h-4" />;
-  };
-
-  return (
-    <div className="flex items-center justify-between p-3 border rounded-lg">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/10 rounded-lg">
-          {getDocIcon()}
-        </div>
-        <div>
-          <p className="font-medium text-sm">{document.documentType.replace(/_/g, ' ')}</p>
-          <p className="text-xs text-muted-foreground">{document.fileName}</p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" variant="ghost" data-testid={`button-download-${document.id}`}>
-          <Download className="w-4 h-4" />
-        </Button>
-      </div>
     </div>
   );
 }

@@ -20,23 +20,37 @@ Preferred communication style: Simple, everyday language.
    - Four status tabs: New, Under Scrutiny, Forwarded to DTDO, Sent Back
    - Quick stats cards showing counts for each status category
    
-2. **Application Scrutiny Interface** (`/da/applications/:id`) - Complete application review page
-   - Property details, owner information, room configuration, fees display
-   - Document verification section for ANNEXURE-II documents
-   - Actions: Start Scrutiny, Forward to DTDO (with remarks), Send Back (with reason)
+2. **Enhanced Document Scrutiny Interface** (`/da/applications/:id`) - Professional split-screen layout
+   - **Left Side**: Document preview with scroll (images, PDFs, with download option)
+   - **Right Side**: Document verification checklist with:
+     - Checkbox for each document with status badges (Verified, Rejected, Needs Correction, Pending)
+     - Quick action buttons: Verify, Correction Needed, Reject
+     - Expandable notes section for per-document remarks
+     - Clear notes functionality
+   - **Progress Tracking**: Visual progress bar showing verification completion percentage
+   - **Save Draft**: Save verification progress and resume later
+   - **Dual Tabs**: Document Verification tab + Property/Owner Details tab
+   - Actions: Start Scrutiny, Save Progress, Forward to DTDO (with overall remarks), Send Back (with reason)
    
 3. **Backend API Routes** - Secure, role-based endpoints
    - `GET /api/da/applications` - District-filtered application list
    - `GET /api/da/applications/:id` - Single application with district verification
    - `POST /api/da/applications/:id/start-scrutiny` - Begin review process
+   - `POST /api/da/applications/:id/save-scrutiny` - Save document verification progress
    - `POST /api/da/applications/:id/forward-to-dtdo` - Forward with remarks
    - `POST /api/da/applications/:id/send-back` - Revert with corrections needed
    
-4. **Navigation & Access Control** - Role-specific routing
+4. **Document Verification Schema** - Per-document tracking
+   - `verificationStatus`: pending, verified, rejected, needs_correction
+   - `verificationNotes`: DA's remarks for each document
+   - `verifiedBy`: Officer who verified
+   - `verificationDate`: Timestamp of verification
+   
+5. **Navigation & Access Control** - Role-specific routing
    - Updated navigation system for `dealing_assistant` role
    - Route guards enforce district-based access
    
-5. **Test Account Created** - Ready for testing
+6. **Test Account Created** - Ready for testing
    - Mobile: 9876543210
    - Password: da123
    - District: Shimla

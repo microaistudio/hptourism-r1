@@ -1057,6 +1057,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Save scrutiny progress (document verifications)
+  app.post("/api/da/applications/:id/save-scrutiny", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const { verifications } = req.body;
+      const userId = req.session.userId!;
+      
+      if (!verifications || !Array.isArray(verifications)) {
+        return res.status(400).json({ message: "Invalid verification data" });
+      }
+
+      // Update each document's verification status
+      for (const verification of verifications) {
+        await db.update(documents)
+          .set({
+            verificationStatus: verification.status,
+            verificationNotes: verification.notes || null,
+            isVerified: verification.status === 'verified',
+            verifiedBy: verification.status !== 'pending' ? userId : null,
+            verificationDate: verification.status !== 'pending' ? new Date() : null,
+          })
+          .where(eq(documents.id, verification.documentId));
+      }
+      
+      res.json({ message: "Scrutiny progress saved successfully" });
+    } catch (error) {
+      console.error("[da] Failed to save scrutiny progress:", error);
+      res.status(500).json({ message: "Failed to save scrutiny progress" });
+    }
+  });
+
   // Forward to DTDO
   app.post("/api/da/applications/:id/forward-to-dtdo", requireRole('dealing_assistant'), async (req, res) => {
     try {

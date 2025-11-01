@@ -286,6 +286,7 @@ export const documents = pgTable("documents", {
   
   // Officer Verification
   isVerified: boolean("is_verified").default(false),
+  verificationStatus: varchar("verification_status", { length: 50 }).default('pending'), // 'pending', 'verified', 'rejected', 'needs_correction'
   verifiedBy: varchar("verified_by").references(() => users.id),
   verificationDate: timestamp("verification_date"),
   verificationNotes: text("verification_notes"),
