@@ -265,10 +265,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fireEquipmentDetails: z.string().optional(),
         nearestHospital: z.string().optional(),
         amenities: z.any().optional(),
+        // 2025 Fee Structure
         baseFee: z.coerce.number().optional(),
+        totalBeforeDiscounts: z.coerce.number().optional(),
+        validityDiscount: z.coerce.number().optional(),
+        femaleOwnerDiscount: z.coerce.number().optional(),
+        pangiDiscount: z.coerce.number().optional(),
+        totalDiscount: z.coerce.number().optional(),
+        totalFee: z.coerce.number().optional(),
+        // Legacy fields
         perRoomFee: z.coerce.number().optional(),
         gstAmount: z.coerce.number().optional(),
-        totalFee: z.coerce.number().optional(),
+        // 2025 Fields
+        certificateValidityYears: z.coerce.number().optional(),
+        isPangiSubDivision: z.boolean().optional(),
+        ownerGender: z.enum(['male', 'female', 'other']).optional(),
         latitude: z.string().optional(),
         longitude: z.string().optional(),
         currentPage: z.coerce.number().optional(), // Track which page user was on
@@ -362,10 +373,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fireEquipmentDetails: z.string().optional(),
         nearestHospital: z.string().optional(),
         amenities: z.any().optional(),
+        // 2025 Fee Structure
         baseFee: z.coerce.number().optional(),
+        totalBeforeDiscounts: z.coerce.number().optional(),
+        validityDiscount: z.coerce.number().optional(),
+        femaleOwnerDiscount: z.coerce.number().optional(),
+        pangiDiscount: z.coerce.number().optional(),
+        totalDiscount: z.coerce.number().optional(),
+        totalFee: z.coerce.number().optional(),
+        // Legacy fields
         perRoomFee: z.coerce.number().optional(),
         gstAmount: z.coerce.number().optional(),
-        totalFee: z.coerce.number().optional(),
+        // 2025 Fields
+        certificateValidityYears: z.coerce.number().optional(),
+        isPangiSubDivision: z.boolean().optional(),
+        ownerGender: z.enum(['male', 'female', 'other']).optional(),
         latitude: z.string().optional(),
         longitude: z.string().optional(),
         currentPage: z.coerce.number().optional(), // Track which page user was on
@@ -460,11 +482,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Amenities
         amenities: z.any().optional(),
         
-        // Fee calculation
+        // 2025 Fee Structure
         baseFee: z.coerce.number(),
-        perRoomFee: z.coerce.number(),
-        gstAmount: z.coerce.number(),
+        totalBeforeDiscounts: z.coerce.number().optional(),
+        validityDiscount: z.coerce.number().optional(),
+        femaleOwnerDiscount: z.coerce.number().optional(),
+        pangiDiscount: z.coerce.number().optional(),
+        totalDiscount: z.coerce.number().optional(),
         totalFee: z.coerce.number(),
+        // Legacy fields
+        perRoomFee: z.coerce.number().optional(),
+        gstAmount: z.coerce.number().optional(),
+        
+        // 2025 Fields
+        certificateValidityYears: z.coerce.number().optional(),
+        isPangiSubDivision: z.boolean().optional(),
+        ownerGender: z.enum(['male', 'female', 'other']).optional(),
+        tehsil: z.string().optional(),
         
         // Coordinates (optional)
         latitude: z.string().optional(),
@@ -542,11 +576,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Amenities
         amenities: validatedData.amenities,
         
-        // Fee calculation (from frontend, convert to strings for DB)
+        // 2025 Fee Structure (from frontend, convert to strings for DB)
         baseFee: String(validatedData.baseFee),
-        perRoomFee: String(validatedData.perRoomFee),
-        gstAmount: String(validatedData.gstAmount),
+        totalBeforeDiscounts: validatedData.totalBeforeDiscounts ? String(validatedData.totalBeforeDiscounts) : undefined,
+        validityDiscount: validatedData.validityDiscount ? String(validatedData.validityDiscount) : undefined,
+        femaleOwnerDiscount: validatedData.femaleOwnerDiscount ? String(validatedData.femaleOwnerDiscount) : undefined,
+        pangiDiscount: validatedData.pangiDiscount ? String(validatedData.pangiDiscount) : undefined,
+        totalDiscount: validatedData.totalDiscount ? String(validatedData.totalDiscount) : undefined,
         totalFee: String(validatedData.totalFee),
+        // Legacy fields
+        perRoomFee: validatedData.perRoomFee ? String(validatedData.perRoomFee) : undefined,
+        gstAmount: validatedData.gstAmount ? String(validatedData.gstAmount) : undefined,
+        
+        // 2025 Fields
+        certificateValidityYears: validatedData.certificateValidityYears,
+        isPangiSubDivision: validatedData.isPangiSubDivision,
+        ownerGender: validatedData.ownerGender,
+        tehsil: validatedData.tehsil,
         
         // Coordinates (optional)
         latitude: validatedData.latitude,
