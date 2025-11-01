@@ -84,6 +84,16 @@ export const homestayApplications = pgTable("homestay_applications", {
   attachedWashrooms: integer("attached_washrooms").notNull(),
   gstin: varchar("gstin", { length: 15 }), // Mandatory for Diamond/Gold, optional for Silver
   
+  // 2025 Rules - Category Selection & Room Rate Analysis
+  selectedCategory: varchar("selected_category", { length: 20 }), // User-selected category (may differ from final approved category)
+  averageRoomRate: decimal("average_room_rate", { precision: 10, scale: 2 }), // Auto-calculated from room rates
+  highestRoomRate: decimal("highest_room_rate", { precision: 10, scale: 2 }), // For category validation
+  lowestRoomRate: decimal("lowest_room_rate", { precision: 10, scale: 2 }), // For consistency check
+  
+  // 2025 Rules - Certificate Validity & Location-based Discounts
+  certificateValidityYears: integer("certificate_validity_years").default(1), // 1 or 3 years
+  isPangiSubDivision: boolean("is_pangi_sub_division").default(false), // Pangi (Chamba) gets 50% discount
+  
   // Distances from key locations (ANNEXURE-I) - in km
   distanceAirport: decimal("distance_airport", { precision: 10, scale: 2 }),
   distanceRailway: decimal("distance_railway", { precision: 10, scale: 2 }),
@@ -122,11 +132,18 @@ export const homestayApplications = pgTable("homestay_applications", {
     count: number;
   }>>(),
   
-  // Fee Calculation
-  baseFee: decimal("base_fee", { precision: 10, scale: 2 }).notNull(),
-  perRoomFee: decimal("per_room_fee", { precision: 10, scale: 2 }).notNull(),
-  gstAmount: decimal("gst_amount", { precision: 10, scale: 2 }).notNull(),
-  totalFee: decimal("total_fee", { precision: 10, scale: 2 }).notNull(),
+  // Fee Calculation (2025 Rules - Flat fees, GST included)
+  baseFee: decimal("base_fee", { precision: 10, scale: 2 }), // Annual base fee from category + location matrix
+  totalBeforeDiscounts: decimal("total_before_discounts", { precision: 10, scale: 2 }), // baseFee × validityYears
+  validityDiscount: decimal("validity_discount", { precision: 10, scale: 2 }).default('0'), // 10% for 3-year lump sum
+  femaleOwnerDiscount: decimal("female_owner_discount", { precision: 10, scale: 2 }).default('0'), // 5% for female owners
+  pangiDiscount: decimal("pangi_discount", { precision: 10, scale: 2 }).default('0'), // 50% for Pangi sub-division
+  totalDiscount: decimal("total_discount", { precision: 10, scale: 2 }).default('0'), // Sum of all discounts
+  totalFee: decimal("total_fee", { precision: 10, scale: 2 }), // Final payable amount
+  
+  // Legacy fields (keeping for backward compatibility - can be removed in future migration)
+  perRoomFee: decimal("per_room_fee", { precision: 10, scale: 2 }),
+  gstAmount: decimal("gst_amount", { precision: 10, scale: 2 }),
   
   // Workflow
   status: varchar("status", { length: 50 }).default('draft'), // 'draft', 'submitted', 'document_verification', 'clarification_requested', 'site_inspection_scheduled', 'site_inspection_complete', 'payment_pending', 'approved', 'rejected'
@@ -228,6 +245,15 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   familySuiteSize: z.number().min(0).optional(),
   attachedWashrooms: z.number().int().min(0),
   gstin: z.string().optional().or(z.literal('')),
+  
+  // 2025 Rules - New fields
+  selectedCategory: z.enum(['diamond', 'gold', 'silver']).optional(),
+  averageRoomRate: z.number().min(0).optional(),
+  highestRoomRate: z.number().min(0).optional(),
+  lowestRoomRate: z.number().min(0).optional(),
+  certificateValidityYears: z.number().int().min(1).max(3).default(1),
+  isPangiSubDivision: z.boolean().default(false),
+  
   distanceAirport: z.number().min(0).optional(),
   distanceRailway: z.number().min(0).optional(),
   distanceCityCenter: z.number().min(0).optional(),
@@ -277,6 +303,15 @@ export const draftHomestayApplicationSchema = createInsertSchema(homestayApplica
   familySuiteSize: z.number().optional(),
   attachedWashrooms: z.number().int().optional(),
   gstin: z.string().optional().or(z.literal('')),
+  
+  // 2025 Rules - New fields (all optional for drafts)
+  selectedCategory: z.enum(['diamond', 'gold', 'silver']).optional(),
+  averageRoomRate: z.number().optional(),
+  highestRoomRate: z.number().optional(),
+  lowestRoomRate: z.number().optional(),
+  certificateValidityYears: z.number().int().optional(),
+  isPangiSubDivision: z.boolean().optional(),
+  
   distanceAirport: z.number().optional(),
   distanceRailway: z.number().optional(),
   distanceCityCenter: z.number().optional(),
@@ -289,10 +324,17 @@ export const draftHomestayApplicationSchema = createInsertSchema(homestayApplica
   differentlyAbledFacilities: z.string().optional().or(z.literal('')),
   fireEquipmentDetails: z.string().optional().or(z.literal('')),
   nearestHospital: z.string().optional().or(z.literal('')),
+  
+  // Fee fields (all optional for drafts)
   baseFee: z.number().optional(),
-  perRoomFee: z.number().optional(),
-  gstAmount: z.number().optional(),
+  totalBeforeDiscounts: z.number().optional(),
+  validityDiscount: z.number().optional(),
+  femaleOwnerDiscount: z.number().optional(),
+  pangiDiscount: z.number().optional(),
+  totalDiscount: z.number().optional(),
   totalFee: z.number().optional(),
+  perRoomFee: z.number().optional(), // Legacy
+  gstAmount: z.number().optional(), // Legacy
 }).omit({ id: true, applicationNumber: true, createdAt: true, updatedAt: true });
 
 export const selectHomestayApplicationSchema = createSelectSchema(homestayApplications);
