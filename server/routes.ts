@@ -1667,6 +1667,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get inspection report for DTDO review
+  app.get("/api/dtdo/inspection-report/:applicationId", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      // Get application
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only review applications from your district" });
+      }
+
+      // Get inspection order
+      const inspectionOrder = await db
+        .select()
+        .from(inspectionOrders)
+        .where(eq(inspectionOrders.applicationId, applicationId))
+        .orderBy(desc(inspectionOrders.createdAt))
+        .limit(1);
+
+      if (inspectionOrder.length === 0) {
+        return res.status(404).json({ message: "No inspection order found" });
+      }
+
+      // Get inspection report
+      const report = await db
+        .select()
+        .from(inspectionReports)
+        .where(eq(inspectionReports.inspectionOrderId, inspectionOrder[0].id))
+        .limit(1);
+
+      if (report.length === 0) {
+        return res.status(404).json({ message: "Inspection report not found" });
+      }
+
+      // Get DA who submitted the report
+      const da = await storage.getUser(report[0].submittedBy);
+
+      // Get property owner
+      const owner = await storage.getUser(application.userId);
+
+      res.json({
+        report: report[0],
+        application,
+        inspectionOrder: inspectionOrder[0],
+        owner: owner ? {
+          fullName: owner.fullName,
+          mobile: owner.mobile,
+          email: owner.email,
+        } : null,
+        da: da ? {
+          fullName: da.fullName,
+          mobile: da.mobile,
+        } : null,
+      });
+    } catch (error) {
+      console.error("[dtdo] Failed to fetch inspection report:", error);
+      res.status(500).json({ message: "Failed to fetch inspection report" });
+    }
+  });
+
+  // DTDO approve inspection report
+  app.post("/api/dtdo/inspection-report/:applicationId/approve", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const { remarks } = req.body;
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only process applications from your district" });
+      }
+
+      // Update application status to verified_for_payment
+      await storage.updateApplication(applicationId, {
+        status: 'verified_for_payment',
+        dtdoRemarks: remarks || 'Inspection report approved. Property meets all requirements.',
+        dtdoId: userId,
+        dtdoReviewDate: new Date(),
+      });
+
+      res.json({ message: "Inspection report approved successfully" });
+    } catch (error) {
+      console.error("[dtdo] Failed to approve inspection report:", error);
+      res.status(500).json({ message: "Failed to approve inspection report" });
+    }
+  });
+
+  // DTDO reject inspection report
+  app.post("/api/dtdo/inspection-report/:applicationId/reject", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const { remarks } = req.body;
+      
+      if (!remarks || remarks.trim().length === 0) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only process applications from your district" });
+      }
+
+      // Update application status to rejected
+      await storage.updateApplication(applicationId, {
+        status: 'rejected',
+        rejectionReason: remarks,
+        dtdoRemarks: remarks,
+        dtdoId: userId,
+        dtdoReviewDate: new Date(),
+      });
+
+      res.json({ message: "Application rejected successfully" });
+    } catch (error) {
+      console.error("[dtdo] Failed to reject inspection report:", error);
+      res.status(500).json({ message: "Failed to reject inspection report" });
+    }
+  });
+
+  // DTDO raise objections on inspection report
+  app.post("/api/dtdo/inspection-report/:applicationId/raise-objections", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const { remarks } = req.body;
+      
+      if (!remarks || remarks.trim().length === 0) {
+        return res.status(400).json({ message: "Please specify the objections" });
+      }
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only process applications from your district" });
+      }
+
+      // Update application status to objection_raised
+      await storage.updateApplication(applicationId, {
+        status: 'objection_raised',
+        clarificationRequested: remarks,
+        dtdoRemarks: remarks,
+        dtdoId: userId,
+        dtdoReviewDate: new Date(),
+      });
+
+      res.json({ message: "Objections raised successfully. Application will require re-inspection." });
+    } catch (error) {
+      console.error("[dtdo] Failed to raise objections:", error);
+      res.status(500).json({ message: "Failed to raise objections" });
+    }
+  });
+
   // ====================================================================
   // DA INSPECTION ROUTES
   // ====================================================================
@@ -1857,18 +2035,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ status: 'completed', updatedAt: new Date() })
         .where(eq(inspectionOrders.id, orderId));
 
-      // Update application status based on recommendation
-      const statusMap: Record<string, string> = {
-        'approve': 'inspection_approved',
-        'approve_with_conditions': 'inspection_approved_with_conditions',
-        'raise_objections': 'objection_raised',
-        'reject': 'rejected',
-      };
-
-      const newStatus = statusMap[req.body.recommendation] || 'inspection_completed';
-      
+      // Update application status to inspection_under_review for DTDO to review
+      // According to PRD_2.0.md workflow: inspection_completed → inspection_under_review → DTDO decision
       await storage.updateApplication(order[0].applicationId, {
-        status: newStatus,
+        status: 'inspection_under_review',
         currentStage: 'inspection_completed',
       });
 
