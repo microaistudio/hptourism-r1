@@ -39,7 +39,7 @@ export default function PaymentPage() {
 
   // Generate UPI QR Code
   useEffect(() => {
-    if (application) {
+    if (application && application.totalFee) {
       const totalFee = parseFloat(application.totalFee);
       const upiString = `upi://pay?pa=${UPI_ID}&pn=HP%20Tourism&am=${totalFee}&cu=INR&tn=Homestay%20Registration%20${application.applicationNumber}`;
       
@@ -156,17 +156,20 @@ export default function PaymentPage() {
   const category = application.category || 'silver';
   const totalRooms = parseInt(String(application.totalRooms || '0'));
   
-  // Get fee breakdown from application (2025 structure)
-  const baseFee = parseFloat(application.baseFee || '0');
-  const totalBeforeDiscounts = parseFloat(application.totalBeforeDiscounts || '0');
-  const validityDiscount = parseFloat(application.validityDiscount || '0');
-  const femaleOwnerDiscount = parseFloat(application.femaleOwnerDiscount || '0');
-  const pangiDiscount = parseFloat(application.pangiDiscount || '0');
-  const totalDiscount = parseFloat(application.totalDiscount || '0');
-  const totalFee = parseFloat(application.totalFee);
+  // Get fee breakdown from application (2025 structure) with null guards
+  const baseFee = application.baseFee ? parseFloat(application.baseFee) : 0;
+  const totalBeforeDiscounts = application.totalBeforeDiscounts ? parseFloat(application.totalBeforeDiscounts) : 0;
+  const validityDiscount = application.validityDiscount ? parseFloat(application.validityDiscount) : 0;
+  const femaleOwnerDiscount = application.femaleOwnerDiscount ? parseFloat(application.femaleOwnerDiscount) : 0;
+  const pangiDiscount = application.pangiDiscount ? parseFloat(application.pangiDiscount) : 0;
+  const totalDiscount = application.totalDiscount ? parseFloat(application.totalDiscount) : 0;
+  const totalFee = application.totalFee ? parseFloat(application.totalFee) : 0;
   const certificateValidityYears = application.certificateValidityYears || 1;
   
   const hasDiscounts = validityDiscount > 0 || femaleOwnerDiscount > 0 || pangiDiscount > 0;
+  
+  // Check if fee data is missing (legacy applications)
+  const hasFeeData = baseFee > 0 && totalFee > 0;
 
   const isPending = existingPayment?.paymentStatus === "pending_verification";
 
@@ -191,6 +194,15 @@ export default function PaymentPage() {
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
             Your payment is pending verification by district officer. You will be notified once verified.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!hasFeeData && (
+        <Alert className="mb-6 border-red-500 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            Fee information is missing for this application. Please contact the tourism department for assistance.
           </AlertDescription>
         </Alert>
       )}
