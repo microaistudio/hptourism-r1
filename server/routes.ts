@@ -1142,6 +1142,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ====================================================================
+  // DA INSPECTION ROUTES
+  // ====================================================================
+
+  // Get all inspection orders assigned to this DA
+  app.get("/api/da/inspections", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(400).json({ message: "User not found" });
+      }
+
+      // Get all inspection orders assigned to this DA
+      const inspectionOrdersData = await db
+        .select()
+        .from(inspectionOrders)
+        .where(eq(inspectionOrders.assignedTo, userId))
+        .orderBy(desc(inspectionOrders.createdAt));
+
+      // Enrich with application and property details
+      const enrichedOrders = await Promise.all(
+        inspectionOrdersData.map(async (order) => {
+          const application = await storage.getApplication(order.applicationId);
+          const owner = application ? await storage.getUser(application.userId) : null;
+          
+          // Check if report already exists
+          const existingReport = await db
+            .select()
+            .from(inspectionReports)
+            .where(eq(inspectionReports.inspectionOrderId, order.id))
+            .limit(1);
+
+          return {
+            ...order,
+            application: application ? {
+              id: application.id,
+              applicationNumber: application.applicationNumber,
+              propertyName: application.propertyName,
+              category: application.category,
+              status: application.status,
+            } : null,
+            owner: owner ? {
+              fullName: owner.fullName,
+              mobile: owner.mobile,
+            } : null,
+            reportSubmitted: existingReport.length > 0,
+          };
+        })
+      );
+
+      res.json(enrichedOrders);
+    } catch (error) {
+      console.error("[da] Failed to fetch inspections:", error);
+      res.status(500).json({ message: "Failed to fetch inspections" });
+    }
+  });
+
+  // Get single inspection order details
+  app.get("/api/da/inspections/:id", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      
+      const order = await db
+        .select()
+        .from(inspectionOrders)
+        .where(eq(inspectionOrders.id, req.params.id))
+        .limit(1);
+
+      if (order.length === 0) {
+        return res.status(404).json({ message: "Inspection order not found" });
+      }
+
+      // Verify this inspection is assigned to the logged-in DA
+      if (order[0].assignedTo !== userId) {
+        return res.status(403).json({ message: "You can only access inspections assigned to you" });
+      }
+
+      // Get application details
+      const application = await storage.getApplication(order[0].applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Get owner details
+      const owner = await storage.getUser(application.userId);
+
+      // Get documents
+      const documents = await storage.getDocumentsByApplication(application.id);
+
+      // Check if report already submitted
+      const existingReport = await db
+        .select()
+        .from(inspectionReports)
+        .where(eq(inspectionReports.inspectionOrderId, req.params.id))
+        .limit(1);
+
+      res.json({
+        order: order[0],
+        application,
+        owner: owner ? {
+          fullName: owner.fullName,
+          mobile: owner.mobile,
+          email: owner.email,
+        } : null,
+        documents,
+        reportSubmitted: existingReport.length > 0,
+        existingReport: existingReport.length > 0 ? existingReport[0] : null,
+      });
+    } catch (error) {
+      console.error("[da] Failed to fetch inspection details:", error);
+      res.status(500).json({ message: "Failed to fetch inspection details" });
+    }
+  });
+
+  // Submit inspection report
+  app.post("/api/da/inspections/:id/submit-report", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const orderId = req.params.id;
+      
+      // Validate the inspection order exists and is assigned to this DA
+      const order = await db
+        .select()
+        .from(inspectionOrders)
+        .where(eq(inspectionOrders.id, orderId))
+        .limit(1);
+
+      if (order.length === 0) {
+        return res.status(404).json({ message: "Inspection order not found" });
+      }
+
+      if (order[0].assignedTo !== userId) {
+        return res.status(403).json({ message: "You can only submit reports for inspections assigned to you" });
+      }
+
+      // Check if report already exists
+      const existingReport = await db
+        .select()
+        .from(inspectionReports)
+        .where(eq(inspectionReports.inspectionOrderId, orderId))
+        .limit(1);
+
+      if (existingReport.length > 0) {
+        return res.status(400).json({ message: "Inspection report already submitted for this order" });
+      }
+
+      // Validate request body using Zod schema
+      const reportData = {
+        inspectionOrderId: orderId,
+        applicationId: order[0].applicationId,
+        submittedBy: userId,
+        submittedDate: new Date(),
+        ...req.body,
+      };
+
+      // Insert inspection report
+      const [newReport] = await db.insert(inspectionReports).values(reportData).returning();
+
+      // Update inspection order status to completed
+      await db.update(inspectionOrders)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .where(eq(inspectionOrders.id, orderId));
+
+      // Update application status based on recommendation
+      const statusMap: Record<string, string> = {
+        'approve': 'inspection_approved',
+        'approve_with_conditions': 'inspection_approved_with_conditions',
+        'raise_objections': 'objection_raised',
+        'reject': 'rejected',
+      };
+
+      const newStatus = statusMap[req.body.recommendation] || 'inspection_completed';
+      
+      await storage.updateApplication(order[0].applicationId, {
+        status: newStatus,
+        currentStage: 'inspection_completed',
+      });
+
+      res.json({ report: newReport, message: "Inspection report submitted successfully" });
+    } catch (error) {
+      console.error("[da] Failed to submit inspection report:", error);
+      res.status(500).json({ message: "Failed to submit inspection report" });
+    }
+  });
+
   // Document Routes
   
   // Get documents for application

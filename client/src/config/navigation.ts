@@ -1,4 +1,4 @@
-import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings, Database } from "lucide-react";
+import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings, Database, ClipboardCheck } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -128,6 +128,11 @@ export const daNavigation: NavSection[] = [
         title: "Application Queue",
         url: "/da/dashboard",
         icon: FileText,
+      },
+      {
+        title: "Inspections",
+        url: "/da/inspections",
+        icon: ClipboardCheck,
       },
     ],
   },

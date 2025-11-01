@@ -32,6 +32,8 @@ import SuperAdminConsole from "@/pages/admin/super-admin-console";
 import SuperAdminDashboard from "@/pages/admin/super-admin-dashboard";
 import DADashboard from "@/pages/da/dashboard";
 import DAApplicationDetail from "@/pages/da/application-detail";
+import DAInspections from "@/pages/da/inspections";
+import DAInspectionReport from "@/pages/da/inspection-report";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -156,6 +158,12 @@ function Router() {
       </Route>
       <Route path="/da/applications/:id">
         {() => <ProtectedRoute component={DAApplicationDetail} allowedRoles={['dealing_assistant']} />}
+      </Route>
+      <Route path="/da/inspections">
+        {() => <ProtectedRoute component={DAInspections} allowedRoles={['dealing_assistant']} />}
+      </Route>
+      <Route path="/da/inspections/:id">
+        {() => <ProtectedRoute component={DAInspectionReport} allowedRoles={['dealing_assistant']} />}
       </Route>
       
       <Route component={NotFound} />
