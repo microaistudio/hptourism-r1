@@ -196,8 +196,9 @@ export default function DAApplicationDetail() {
   const { application, owner, documents } = data;
 
   // Initialize verification states for documents (in useEffect to avoid render-time state updates)
+  // Re-hydrate whenever documents change to ensure synchronization
   useEffect(() => {
-    if (documents.length > 0 && Object.keys(verifications).length === 0) {
+    if (documents.length > 0) {
       const initialVerifications: Record<string, DocumentVerification> = {};
       documents.forEach(doc => {
         initialVerifications[doc.id] = {
@@ -208,12 +209,12 @@ export default function DAApplicationDetail() {
       });
       setVerifications(initialVerifications);
     }
-  }, [documents, verifications]);
+  }, [documents]);
 
-  // Calculate verification progress
+  // Calculate verification progress - count any non-pending status as complete (verified, rejected, needs_correction)
   const totalDocs = documents.length;
-  const verifiedDocs = Object.values(verifications).filter(v => v.status === 'verified').length;
-  const progress = totalDocs > 0 ? (verifiedDocs / totalDocs) * 100 : 0;
+  const completedDocs = Object.values(verifications).filter(v => v.status !== 'pending').length;
+  const progress = totalDocs > 0 ? Math.round((completedDocs / totalDocs) * 100) : 0;
 
   const updateVerification = (docId: string, updates: Partial<DocumentVerification>) => {
     setVerifications(prev => ({
