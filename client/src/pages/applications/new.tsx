@@ -20,17 +20,27 @@ import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ApplicationStepper } from "@/components/application-stepper";
+import { 
+  getDistricts, 
+  getTehsilsForDistrict, 
+  getBlocksForTehsil, 
+  getUrbanBodiesForDistrict, 
+  getWardsForUrbanBody,
+  LOCATION_TYPE_LABELS 
+} from "@shared/lgd-data";
 
-const HP_DISTRICTS = [
-  "Bharmour", "Bilaspur", "Chamba", "Dodra Kwar", "Hamirpur", "Kangra", 
-  "Kinnaur", "Kullu", "Lahaul and Spiti", "Mandi", "Pangi", "Shimla", 
-  "Sirmaur", "Solan", "Una"
-];
+const HP_DISTRICTS = getDistricts();
 
 const LOCATION_TYPES = [
-  { value: "mc", label: "Municipal Corporation (MC)" },
-  { value: "tcp", label: "Town & Country Planning / SADA / Nagar Panchayat" },
-  { value: "gp", label: "Gram Panchayat" },
+  { value: "gp", label: LOCATION_TYPE_LABELS.gp },
+  { value: "mc", label: LOCATION_TYPE_LABELS.mc },
+  { value: "tcp", label: LOCATION_TYPE_LABELS.tcp },
+];
+
+const GENDER_OPTIONS = [
+  { value: "female", label: "Female (10% fee discount for 3 years)" },
+  { value: "male", label: "Male" },
+  { value: "other", label: "Other" },
 ];
 
 // District-based typical distances (user can override)
@@ -56,10 +66,17 @@ const DISTRICT_DISTANCES: Record<string, { airport: number; railway: number; cit
 const applicationSchema = z.object({
   // Basic property info
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
-  address: z.string().min(10, "Address must be at least 10 characters"),
-  district: z.string().min(1, "District is required"),
-  pincode: z.string().regex(/^[1-9]\d{5}$/, "Enter valid 6-digit pincode"),
   locationType: z.enum(["mc", "tcp", "gp"]),
+  
+  // LGD Hierarchical Address
+  district: z.string().min(1, "District is required"),
+  tehsil: z.string().min(1, "Tehsil is required"),
+  block: z.string().optional(),
+  gramPanchayat: z.string().optional(),
+  urbanBody: z.string().optional(),
+  ward: z.string().optional(),
+  address: z.string().min(10, "House/Building number and street required"),
+  pincode: z.string().regex(/^[1-9]\d{5}$/, "Enter valid 6-digit pincode"),
   
   // Contact details
   telephone: z.string().optional().or(z.literal("")),
@@ -69,6 +86,7 @@ const applicationSchema = z.object({
   
   // Owner info
   ownerName: z.string().min(3, "Owner name is required"),
+  ownerGender: z.enum(["male", "female", "other"]),
   ownerAadhaar: z.string().min(1, "Aadhaar is required").regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
   
   // Category & room rate
@@ -117,15 +135,21 @@ const applicationSchema = z.object({
 // Fully relaxed schema for draft saves - all fields optional with no constraints
 const draftSchema = z.object({
   propertyName: z.string().optional(),
-  address: z.string().optional(),
-  district: z.string().optional(),
-  pincode: z.string().optional(),
   locationType: z.enum(["mc", "tcp", "gp"]).optional(),
+  district: z.string().optional(),
+  tehsil: z.string().optional(),
+  block: z.string().optional(),
+  gramPanchayat: z.string().optional(),
+  urbanBody: z.string().optional(),
+  ward: z.string().optional(),
+  address: z.string().optional(),
+  pincode: z.string().optional(),
   telephone: z.string().optional(),
   fax: z.string().optional(),
   ownerEmail: z.string().optional(),
   ownerMobile: z.string().optional(),
   ownerName: z.string().optional(),
+  ownerGender: z.enum(["male", "female", "other"]).optional(),
   ownerAadhaar: z.string().optional(),
   category: z.enum(["diamond", "gold", "silver"]).optional(),
   proposedRoomRate: z.number().optional(),

@@ -66,6 +66,7 @@ export const homestayApplications = pgTable("homestay_applications", {
   
   // Owner Details (ANNEXURE-I)
   ownerName: varchar("owner_name", { length: 255 }).notNull(),
+  ownerGender: varchar("owner_gender", { length: 10 }).notNull(), // 'male', 'female', 'other' - affects fee (female gets 10% discount for 3 years)
   ownerMobile: varchar("owner_mobile", { length: 15 }).notNull(),
   ownerEmail: varchar("owner_email", { length: 255 }),
   ownerAadhaar: varchar("owner_aadhaar", { length: 12 }).notNull(),
@@ -212,6 +213,7 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   telephone: z.string().optional(),
   fax: z.string().optional(),
   ownerName: z.string().min(3),
+  ownerGender: z.enum(['male', 'female', 'other']),
   ownerMobile: z.string().regex(/^[6-9]\d{9}$/),
   ownerEmail: z.string().email().optional().or(z.literal('')),
   ownerAadhaar: z.string().regex(/^\d{12}$/),
@@ -260,6 +262,7 @@ export const draftHomestayApplicationSchema = createInsertSchema(homestayApplica
   telephone: z.string().optional().or(z.literal('')),
   fax: z.string().optional().or(z.literal('')),
   ownerName: z.string().optional().or(z.literal('')),
+  ownerGender: z.enum(['male', 'female', 'other']).optional(),
   ownerMobile: z.string().optional().or(z.literal('')),
   ownerEmail: z.string().optional().or(z.literal('')),
   ownerAadhaar: z.string().optional().or(z.literal('')),
