@@ -756,7 +756,54 @@ export const inspectionReports = pgTable("inspection_reports", {
   categoryMeetsStandards: boolean("category_meets_standards").notNull(),
   recommendedCategory: varchar("recommended_category", { length: 20 }), // 'diamond', 'gold', 'silver'
   
-  // Amenities Verification
+  // ANNEXURE-III Compliance Checklist (HP Homestay Rules 2025)
+  // Section A: Mandatory Requirements (18 points)
+  mandatoryChecklist: jsonb("mandatory_checklist").$type<{
+    applicationForm: boolean; // 1. Application form as per ANNEXURE I
+    documents: boolean; // 2. Documents list as per ANNEXURE II
+    onlinePayment: boolean; // 3. Online payment facility (UPI/card)
+    wellMaintained: boolean; // 4. Well-maintained furnished home with quality flooring
+    cleanRooms: boolean; // 5. Clean, airy, pest-free rooms with ventilation
+    comfortableBedding: boolean; // 6. Comfortable bedding with quality fabrics
+    roomSize: boolean; // 7. Minimum room/bathroom size compliance
+    cleanKitchen: boolean; // 8. Smoke-free, clean, hygienic kitchen
+    cutleryCrockery: boolean; // 9. Good quality cutlery and crockery
+    waterFacility: boolean; // 10. RO/Aquaguard/mineral water
+    wasteDisposal: boolean; // 11. Waste disposal as per municipal laws
+    energySavingLights: boolean; // 12. Energy-saving lights (CFL/LED)
+    visitorBook: boolean; // 13. Visitor book and feedback facilities
+    doctorDetails: boolean; // 14. Doctor names, addresses, phone numbers
+    luggageAssistance: boolean; // 15. Lost luggage assistance facilities
+    fireEquipment: boolean; // 16. Basic fire equipment
+    guestRegister: boolean; // 17. Guest check-in/out register with passport details
+    cctvCameras: boolean; // 18. CCTV cameras in common areas
+  }>(),
+  mandatoryRemarks: text("mandatory_remarks"),
+  
+  // Section B: Desirable Requirements (18 points)
+  desirableChecklist: jsonb("desirable_checklist").$type<{
+    parking: boolean; // 1. Parking with adequate road width
+    attachedBathroom: boolean; // 2. Attached private bathroom with toiletries
+    toiletAmenities: boolean; // 3. Toilet with seat, lid, toilet paper
+    hotColdWater: boolean; // 4. Hot and cold running water with sewage
+    waterConservation: boolean; // 5. Water conservation taps/showers
+    diningArea: boolean; // 6. Dining area serving fresh hygienic food
+    wardrobe: boolean; // 7. Wardrobe with minimum 4 hangers
+    storage: boolean; // 8. Cabinets or drawers for storage
+    furniture: boolean; // 9. Quality chairs, work desk, furniture
+    laundry: boolean; // 10. Washing machine/dryer or laundry services
+    refrigerator: boolean; // 11. Refrigerator in homestay
+    lounge: boolean; // 12. Lounge or sitting arrangement in lobby
+    heatingCooling: boolean; // 13. Heating and cooling in public rooms
+    luggageHelp: boolean; // 14. Assistance with luggage on request
+    safeStorage: boolean; // 15. Safe storage facilities in rooms
+    securityGuard: boolean; // 16. Security guard facilities
+    himachaliCrafts: boolean; // 17. Promotion of Himachali handicrafts
+    rainwaterHarvesting: boolean; // 18. Rainwater harvesting system
+  }>(),
+  desirableRemarks: text("desirable_remarks"),
+  
+  // Legacy fields (kept for backward compatibility)
   amenitiesVerified: jsonb("amenities_verified").$type<{
     wifi?: boolean;
     parking?: boolean;
@@ -766,11 +813,9 @@ export const inspectionReports = pgTable("inspection_reports", {
     [key: string]: boolean | undefined;
   }>(),
   amenitiesIssues: text("amenities_issues"),
-  
-  // Safety & Compliance
-  fireSafetyCompliant: boolean("fire_safety_compliant").notNull(),
+  fireSafetyCompliant: boolean("fire_safety_compliant"),
   fireSafetyIssues: text("fire_safety_issues"),
-  structuralSafety: boolean("structural_safety").notNull(),
+  structuralSafety: boolean("structural_safety"),
   structuralIssues: text("structural_issues"),
   
   // Overall Assessment
@@ -800,8 +845,48 @@ export const insertInspectionReportSchema = createInsertSchema(inspectionReports
   actualRoomCount: z.number().int().min(0).optional(),
   categoryMeetsStandards: z.boolean(),
   recommendedCategory: z.enum(['diamond', 'gold', 'silver']).optional().or(z.literal('')),
-  fireSafetyCompliant: z.boolean(),
-  structuralSafety: z.boolean(),
+  mandatoryChecklist: z.object({
+    applicationForm: z.boolean(),
+    documents: z.boolean(),
+    onlinePayment: z.boolean(),
+    wellMaintained: z.boolean(),
+    cleanRooms: z.boolean(),
+    comfortableBedding: z.boolean(),
+    roomSize: z.boolean(),
+    cleanKitchen: z.boolean(),
+    cutleryCrockery: z.boolean(),
+    waterFacility: z.boolean(),
+    wasteDisposal: z.boolean(),
+    energySavingLights: z.boolean(),
+    visitorBook: z.boolean(),
+    doctorDetails: z.boolean(),
+    luggageAssistance: z.boolean(),
+    fireEquipment: z.boolean(),
+    guestRegister: z.boolean(),
+    cctvCameras: z.boolean(),
+  }).optional(),
+  desirableChecklist: z.object({
+    parking: z.boolean(),
+    attachedBathroom: z.boolean(),
+    toiletAmenities: z.boolean(),
+    hotColdWater: z.boolean(),
+    waterConservation: z.boolean(),
+    diningArea: z.boolean(),
+    wardrobe: z.boolean(),
+    storage: z.boolean(),
+    furniture: z.boolean(),
+    laundry: z.boolean(),
+    refrigerator: z.boolean(),
+    lounge: z.boolean(),
+    heatingCooling: z.boolean(),
+    luggageHelp: z.boolean(),
+    safeStorage: z.boolean(),
+    securityGuard: z.boolean(),
+    himachaliCrafts: z.boolean(),
+    rainwaterHarvesting: z.boolean(),
+  }).optional(),
+  fireSafetyCompliant: z.boolean().optional(),
+  structuralSafety: z.boolean().optional(),
   overallSatisfactory: z.boolean(),
   recommendation: z.enum(['approve', 'approve_with_conditions', 'raise_objections', 'reject']),
   detailedFindings: z.string().min(20, "Detailed findings must be at least 20 characters"),

@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ArrowLeft, Save, Send, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, User, FileText } from "lucide-react";
+import { ArrowLeft, Save, Send, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, User, FileText, Shield, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -25,12 +26,56 @@ const inspectionReportSchema = z.object({
   actualRoomCount: z.number().int().min(0).optional(),
   categoryMeetsStandards: z.boolean(),
   recommendedCategory: z.enum(['diamond', 'gold', 'silver']).optional(),
-  fireSafetyCompliant: z.boolean(),
-  fireSafetyIssues: z.string().optional(),
-  structuralSafety: z.boolean(),
-  structuralIssues: z.string().optional(),
-  cleanlinessStandard: z.boolean(),
-  cleanlinessIssues: z.string().optional(),
+  
+  // ANNEXURE-III Mandatory Checklist (18 points)
+  mandatoryChecklist: z.object({
+    applicationForm: z.boolean(),
+    documents: z.boolean(),
+    onlinePayment: z.boolean(),
+    wellMaintained: z.boolean(),
+    cleanRooms: z.boolean(),
+    comfortableBedding: z.boolean(),
+    roomSize: z.boolean(),
+    cleanKitchen: z.boolean(),
+    cutleryCrockery: z.boolean(),
+    waterFacility: z.boolean(),
+    wasteDisposal: z.boolean(),
+    energySavingLights: z.boolean(),
+    visitorBook: z.boolean(),
+    doctorDetails: z.boolean(),
+    luggageAssistance: z.boolean(),
+    fireEquipment: z.boolean(),
+    guestRegister: z.boolean(),
+    cctvCameras: z.boolean(),
+  }),
+  mandatoryRemarks: z.string().optional(),
+  
+  // ANNEXURE-III Desirable Checklist (18 points)
+  desirableChecklist: z.object({
+    parking: z.boolean(),
+    attachedBathroom: z.boolean(),
+    toiletAmenities: z.boolean(),
+    hotColdWater: z.boolean(),
+    waterConservation: z.boolean(),
+    diningArea: z.boolean(),
+    wardrobe: z.boolean(),
+    storage: z.boolean(),
+    furniture: z.boolean(),
+    laundry: z.boolean(),
+    refrigerator: z.boolean(),
+    lounge: z.boolean(),
+    heatingCooling: z.boolean(),
+    luggageHelp: z.boolean(),
+    safeStorage: z.boolean(),
+    securityGuard: z.boolean(),
+    himachaliCrafts: z.boolean(),
+    rainwaterHarvesting: z.boolean(),
+  }),
+  desirableRemarks: z.string().optional(),
+  
+  // Legacy fields for compatibility
+  fireSafetyCompliant: z.boolean().optional(),
+  structuralSafety: z.boolean().optional(),
   overallSatisfactory: z.boolean(),
   recommendation: z.enum(['approve', 'approve_with_conditions', 'raise_objections', 'reject']),
   detailedFindings: z.string().min(20, "Detailed findings must be at least 20 characters"),
@@ -62,6 +107,48 @@ type InspectionData = {
   existingReport?: any;
 };
 
+const MANDATORY_CHECKPOINTS = [
+  { key: 'applicationForm', label: 'Application form as per ANNEXURE I' },
+  { key: 'documents', label: 'Documents list as per ANNEXURE II' },
+  { key: 'onlinePayment', label: 'Online payment facility (UPI/Net Banking/Cards)' },
+  { key: 'wellMaintained', label: 'Well-maintained furnished home with quality flooring' },
+  { key: 'cleanRooms', label: 'Clean, airy, pest-free rooms with external ventilation' },
+  { key: 'comfortableBedding', label: 'Comfortable bedding with quality fabrics' },
+  { key: 'roomSize', label: 'Minimum room & bathroom size compliance' },
+  { key: 'cleanKitchen', label: 'Smoke-free, clean, hygienic, odor-free kitchen' },
+  { key: 'cutleryCrockery', label: 'Good quality cutlery and crockery' },
+  { key: 'waterFacility', label: 'RO/Aquaguard/Mineral water availability' },
+  { key: 'wasteDisposal', label: 'Waste disposal as per municipal laws' },
+  { key: 'energySavingLights', label: 'Energy-saving lights (CFL/LED) in rooms & public areas' },
+  { key: 'visitorBook', label: 'Visitor book and feedback facilities' },
+  { key: 'doctorDetails', label: 'Doctor names, addresses, phone numbers displayed' },
+  { key: 'luggageAssistance', label: 'Lost luggage assistance facilities' },
+  { key: 'fireEquipment', label: 'Basic fire equipment available' },
+  { key: 'guestRegister', label: 'Guest check-in/out register (with passport details for foreigners)' },
+  { key: 'cctvCameras', label: 'CCTV cameras in common areas' },
+] as const;
+
+const DESIRABLE_CHECKPOINTS = [
+  { key: 'parking', label: 'Parking with adequate road width' },
+  { key: 'attachedBathroom', label: 'Attached private bathroom with toiletries' },
+  { key: 'toiletAmenities', label: 'Toilet with seat, lid, and toilet paper' },
+  { key: 'hotColdWater', label: 'Hot & cold running water with sewage connection' },
+  { key: 'waterConservation', label: 'Water conservation taps/showers' },
+  { key: 'diningArea', label: 'Dining area serving fresh & hygienic food' },
+  { key: 'wardrobe', label: 'Wardrobe with minimum 4 hangers in guest rooms' },
+  { key: 'storage', label: 'Cabinets or drawers for storage in rooms' },
+  { key: 'furniture', label: 'Quality chairs, work desk, and furniture' },
+  { key: 'laundry', label: 'Washing machine/dryer or laundry services' },
+  { key: 'refrigerator', label: 'Refrigerator in homestay' },
+  { key: 'lounge', label: 'Lounge or sitting arrangement in lobby' },
+  { key: 'heatingCooling', label: 'Heating & cooling in closed public rooms' },
+  { key: 'luggageHelp', label: 'Assistance with luggage on request' },
+  { key: 'safeStorage', label: 'Safe storage facilities in rooms' },
+  { key: 'securityGuard', label: 'Security guard facilities' },
+  { key: 'himachaliCrafts', label: 'Promotion of Himachali handicrafts & architecture' },
+  { key: 'rainwaterHarvesting', label: 'Rainwater harvesting system' },
+] as const;
+
 export default function DAInspectionReport() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
@@ -78,9 +165,50 @@ export default function DAInspectionReport() {
       actualInspectionDate: format(new Date(), 'yyyy-MM-dd'),
       roomCountVerified: false,
       categoryMeetsStandards: false,
+      mandatoryChecklist: {
+        applicationForm: false,
+        documents: false,
+        onlinePayment: false,
+        wellMaintained: false,
+        cleanRooms: false,
+        comfortableBedding: false,
+        roomSize: false,
+        cleanKitchen: false,
+        cutleryCrockery: false,
+        waterFacility: false,
+        wasteDisposal: false,
+        energySavingLights: false,
+        visitorBook: false,
+        doctorDetails: false,
+        luggageAssistance: false,
+        fireEquipment: false,
+        guestRegister: false,
+        cctvCameras: false,
+      },
+      mandatoryRemarks: '',
+      desirableChecklist: {
+        parking: false,
+        attachedBathroom: false,
+        toiletAmenities: false,
+        hotColdWater: false,
+        waterConservation: false,
+        diningArea: false,
+        wardrobe: false,
+        storage: false,
+        furniture: false,
+        laundry: false,
+        refrigerator: false,
+        lounge: false,
+        heatingCooling: false,
+        luggageHelp: false,
+        safeStorage: false,
+        securityGuard: false,
+        himachaliCrafts: false,
+        rainwaterHarvesting: false,
+      },
+      desirableRemarks: '',
       fireSafetyCompliant: false,
       structuralSafety: false,
-      cleanlinessStandard: false,
       overallSatisfactory: false,
       recommendation: 'approve',
       detailedFindings: '',
@@ -160,6 +288,17 @@ export default function DAInspectionReport() {
 
   const { order, application, owner } = data;
 
+  // Calculate compliance percentages
+  const mandatoryValues = Object.values(form.watch('mandatoryChecklist') || {});
+  const mandatoryCompliance = mandatoryValues.length > 0 
+    ? Math.round((mandatoryValues.filter(Boolean).length / mandatoryValues.length) * 100)
+    : 0;
+    
+  const desirableValues = Object.values(form.watch('desirableChecklist') || {});
+  const desirableCompliance = desirableValues.length > 0
+    ? Math.round((desirableValues.filter(Boolean).length / desirableValues.length) * 100)
+    : 0;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -176,7 +315,7 @@ export default function DAInspectionReport() {
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Inspection Report</h1>
           <p className="text-muted-foreground mt-1">
-            Submit your field inspection findings
+            Submit ANNEXURE-III compliant inspection findings
           </p>
         </div>
       </div>
@@ -255,58 +394,56 @@ export default function DAInspectionReport() {
             </CardContent>
           </Card>
 
-          {/* Verification Checklist */}
+          {/* Basic Verification */}
           <Card>
             <CardHeader>
-              <CardTitle>Verification Checklist</CardTitle>
-              <CardDescription>Verify each aspect during your site visit</CardDescription>
+              <CardTitle>Basic Verification</CardTitle>
+              <CardDescription>Verify room count and category</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               {/* Room Count Verification */}
-              <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="roomCountVerified"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Room Count Matches</FormLabel>
+                      <FormDescription>
+                        Does the actual room count match the application? (Applied: {application?.totalRooms} rooms)
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-room-count"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {!form.watch('roomCountVerified') && (
                 <FormField
                   control={form.control}
-                  name="roomCountVerified"
+                  name="actualRoomCount"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Room Count Matches</FormLabel>
-                        <FormDescription>
-                          Does the actual room count match the application? (Applied: {application?.totalRooms} rooms)
-                        </FormDescription>
-                      </div>
+                    <FormItem>
+                      <FormLabel>Actual Room Count</FormLabel>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-room-count"
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          data-testid="input-actual-room-count"
                         />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {!form.watch('roomCountVerified') && (
-                  <FormField
-                    control={form.control}
-                    name="actualRoomCount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Actual Room Count</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            data-testid="input-actual-room-count"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
+              )}
 
               <Separator />
 
@@ -365,151 +502,164 @@ export default function DAInspectionReport() {
                   )}
                 />
               )}
+            </CardContent>
+          </Card>
 
-              <Separator />
+          {/* ANNEXURE-III Compliance Checklist */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-primary" />
+                ANNEXURE-III Compliance Checklist
+              </CardTitle>
+              <CardDescription>
+                HP Homestay Rules 2025 - Official Inspection Requirements
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="mandatory" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="mandatory" className="flex items-center gap-2" data-testid="tab-mandatory">
+                    <Shield className="w-4 h-4" />
+                    <span>Section A: Mandatory</span>
+                    <Badge variant="secondary" className="ml-auto">{mandatoryCompliance}%</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="desirable" className="flex items-center gap-2" data-testid="tab-desirable">
+                    <Star className="w-4 h-4" />
+                    <span>Section B: Desirable</span>
+                    <Badge variant="secondary" className="ml-auto">{desirableCompliance}%</Badge>
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Fire Safety */}
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="fireSafetyCompliant"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Fire Safety Compliant</FormLabel>
-                        <FormDescription>
-                          Fire extinguishers, emergency exits, and signage present
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-fire-safety"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <TabsContent value="mandatory" className="space-y-4 mt-6">
+                  <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-red-800 dark:text-red-200 font-medium">
+                      <Shield className="w-4 h-4 inline mr-2" />
+                      All 18 mandatory requirements must be met for homestay approval
+                    </p>
+                  </div>
 
-                {!form.watch('fireSafetyCompliant') && (
+                  <div className="grid grid-cols-1 gap-3">
+                    {MANDATORY_CHECKPOINTS.map((checkpoint, index) => (
+                      <FormField
+                        key={checkpoint.key}
+                        control={form.control}
+                        name={`mandatoryChecklist.${checkpoint.key}`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 hover-elevate">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid={`switch-mandatory-${checkpoint.key}`}
+                              />
+                            </FormControl>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>
+                                <FormLabel className="text-base font-normal cursor-pointer">
+                                  {checkpoint.label}
+                                </FormLabel>
+                              </div>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="fireSafetyIssues"
+                    name="mandatoryRemarks"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fire Safety Issues</FormLabel>
+                      <FormItem className="mt-4">
+                        <FormLabel>Mandatory Section Remarks</FormLabel>
+                        <FormDescription>
+                          Add any notes about mandatory requirements
+                        </FormDescription>
                         <FormControl>
                           <Textarea
-                            placeholder="Describe fire safety violations..."
+                            placeholder="Any observations or issues with mandatory requirements..."
+                            className="min-h-[100px]"
                             {...field}
-                            data-testid="textarea-fire-issues"
+                            data-testid="textarea-mandatory-remarks"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
-              </div>
+                </TabsContent>
 
-              <Separator />
+                <TabsContent value="desirable" className="space-y-4 mt-6">
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+                      <Star className="w-4 h-4 inline mr-2" />
+                      Desirable requirements enhance guest experience and property rating
+                    </p>
+                  </div>
 
-              {/* Structural Safety */}
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="structuralSafety"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Structural Safety</FormLabel>
-                        <FormDescription>
-                          Building structure is sound and safe
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-structural-safety"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <div className="grid grid-cols-1 gap-3">
+                    {DESIRABLE_CHECKPOINTS.map((checkpoint, index) => (
+                      <FormField
+                        key={checkpoint.key}
+                        control={form.control}
+                        name={`desirableChecklist.${checkpoint.key}`}
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 hover-elevate">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid={`switch-desirable-${checkpoint.key}`}
+                              />
+                            </FormControl>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>
+                                <FormLabel className="text-base font-normal cursor-pointer">
+                                  {checkpoint.label}
+                                </FormLabel>
+                              </div>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
 
-                {!form.watch('structuralSafety') && (
                   <FormField
                     control={form.control}
-                    name="structuralIssues"
+                    name="desirableRemarks"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Structural Issues</FormLabel>
+                      <FormItem className="mt-4">
+                        <FormLabel>Desirable Section Remarks</FormLabel>
+                        <FormDescription>
+                          Add any notes about desirable amenities
+                        </FormDescription>
                         <FormControl>
                           <Textarea
-                            placeholder="Describe structural problems..."
+                            placeholder="Any observations about desirable amenities..."
+                            className="min-h-[100px]"
                             {...field}
-                            data-testid="textarea-structural-issues"
+                            data-testid="textarea-desirable-remarks"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
-              </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
-              <Separator />
-
-              {/* Cleanliness */}
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="cleanlinessStandard"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Cleanliness Standard</FormLabel>
-                        <FormDescription>
-                          Property meets cleanliness and hygiene standards
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-cleanliness"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {!form.watch('cleanlinessStandard') && (
-                  <FormField
-                    control={form.control}
-                    name="cleanlinessIssues"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cleanliness Issues</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe cleanliness concerns..."
-                            {...field}
-                            data-testid="textarea-cleanliness-issues"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Overall Satisfaction */}
+          {/* Overall Assessment */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Overall Assessment</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <FormField
                 control={form.control}
                 name="overallSatisfactory"
@@ -580,30 +730,30 @@ export default function DAInspectionReport() {
                           <FormLabel htmlFor="approve" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
                             <CheckCircle className="w-5 h-5 text-green-600" />
                             <div>
-                              <div className="font-semibold">Approve</div>
-                              <div className="text-xs text-muted-foreground">Ready for certificate</div>
+                              <div className="font-medium">Approve</div>
+                              <div className="text-xs text-muted-foreground">Meets all requirements</div>
                             </div>
                           </FormLabel>
                         </div>
 
                         <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover-elevate">
-                          <RadioGroupItem value="approve_with_conditions" id="conditions" />
-                          <FormLabel htmlFor="conditions" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
+                          <RadioGroupItem value="approve_with_conditions" id="approve_with_conditions" />
+                          <FormLabel htmlFor="approve_with_conditions" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
+                            <AlertCircle className="w-5 h-5 text-yellow-600" />
+                            <div>
+                              <div className="font-medium">Approve with Conditions</div>
+                              <div className="text-xs text-muted-foreground">Minor issues to address</div>
+                            </div>
+                          </FormLabel>
+                        </div>
+
+                        <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover-elevate">
+                          <RadioGroupItem value="raise_objections" id="raise_objections" />
+                          <FormLabel htmlFor="raise_objections" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
                             <AlertCircle className="w-5 h-5 text-orange-600" />
                             <div>
-                              <div className="font-semibold">Approve with Conditions</div>
-                              <div className="text-xs text-muted-foreground">Minor improvements needed</div>
-                            </div>
-                          </FormLabel>
-                        </div>
-
-                        <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover-elevate">
-                          <RadioGroupItem value="raise_objections" id="objections" />
-                          <FormLabel htmlFor="objections" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
-                            <AlertCircle className="w-5 h-5 text-amber-600" />
-                            <div>
-                              <div className="font-semibold">Raise Objections</div>
-                              <div className="text-xs text-muted-foreground">Significant issues found</div>
+                              <div className="font-medium">Raise Objections</div>
+                              <div className="text-xs text-muted-foreground">Issues need resolution</div>
                             </div>
                           </FormLabel>
                         </div>
@@ -613,8 +763,8 @@ export default function DAInspectionReport() {
                           <FormLabel htmlFor="reject" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
                             <XCircle className="w-5 h-5 text-red-600" />
                             <div>
-                              <div className="font-semibold">Reject</div>
-                              <div className="text-xs text-muted-foreground">Does not meet requirements</div>
+                              <div className="font-medium">Reject</div>
+                              <div className="text-xs text-muted-foreground">Does not meet standards</div>
                             </div>
                           </FormLabel>
                         </div>
@@ -630,13 +780,11 @@ export default function DAInspectionReport() {
                 name="daRemarks"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Additional Remarks</FormLabel>
-                    <FormDescription>
-                      Any other observations or comments
-                    </FormDescription>
+                    <FormLabel>Additional Remarks (Optional)</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Optional remarks..."
+                        placeholder="Any additional comments or recommendations..."
+                        className="min-h-[100px]"
                         {...field}
                         data-testid="textarea-da-remarks"
                       />

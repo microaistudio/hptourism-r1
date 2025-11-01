@@ -1815,13 +1815,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Inspection report already submitted for this order" });
       }
 
-      // Validate request body using Zod schema
+      // Validate and prepare report data
       const reportData = {
         inspectionOrderId: orderId,
         applicationId: order[0].applicationId,
         submittedBy: userId,
         submittedDate: new Date(),
-        ...req.body,
+        // Convert date string to Date object
+        actualInspectionDate: req.body.actualInspectionDate ? new Date(req.body.actualInspectionDate) : new Date(),
+        // Basic verification fields
+        roomCountVerified: req.body.roomCountVerified ?? false,
+        actualRoomCount: req.body.actualRoomCount || null,
+        categoryMeetsStandards: req.body.categoryMeetsStandards ?? false,
+        recommendedCategory: req.body.recommendedCategory || null,
+        // ANNEXURE-III Checklists
+        mandatoryChecklist: req.body.mandatoryChecklist || null,
+        mandatoryRemarks: req.body.mandatoryRemarks || null,
+        desirableChecklist: req.body.desirableChecklist || null,
+        desirableRemarks: req.body.desirableRemarks || null,
+        // Legacy compatibility fields
+        amenitiesVerified: req.body.amenitiesVerified || null,
+        amenitiesIssues: req.body.amenitiesIssues || null,
+        fireSafetyCompliant: req.body.fireSafetyCompliant ?? false,
+        fireSafetyIssues: req.body.fireSafetyIssues || null,
+        structuralSafety: req.body.structuralSafety ?? false,
+        structuralIssues: req.body.structuralIssues || null,
+        // Overall assessment
+        overallSatisfactory: req.body.overallSatisfactory ?? false,
+        recommendation: req.body.recommendation || 'approve',
+        detailedFindings: req.body.detailedFindings || '',
+        // Additional fields
+        inspectionPhotos: req.body.inspectionPhotos || null,
+        reportDocumentUrl: req.body.reportDocumentUrl || null,
       };
 
       // Insert inspection report
