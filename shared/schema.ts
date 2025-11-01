@@ -43,8 +43,21 @@ export const homestayApplications = pgTable("homestay_applications", {
   category: varchar("category", { length: 20 }).notNull(), // 'diamond', 'gold', 'silver'
   locationType: varchar("location_type", { length: 10 }).notNull(), // 'mc', 'tcp', 'gp' - CRITICAL for fee calculation
   totalRooms: integer("total_rooms").notNull(),
-  address: text("address").notNull(),
+  
+  // LGD Hierarchical Address Fields
   district: varchar("district", { length: 100 }).notNull(),
+  tehsil: varchar("tehsil", { length: 100 }).notNull(),
+  
+  // Rural Address (for GP - Gram Panchayat)
+  block: varchar("block", { length: 100 }), // Mandatory for rural (gp)
+  gramPanchayat: varchar("gram_panchayat", { length: 100 }), // Mandatory for rural (gp)
+  
+  // Urban Address (for MC/TCP)
+  urbanBody: varchar("urban_body", { length: 200 }), // Name of MC/TCP/Nagar Panchayat - Mandatory for urban
+  ward: varchar("ward", { length: 50 }), // Ward/Zone number - Mandatory for urban
+  
+  // Additional address details
+  address: text("address").notNull(), // House/building number, street, locality
   pincode: varchar("pincode", { length: 10 }).notNull(),
   telephone: varchar("telephone", { length: 20 }),
   fax: varchar("fax", { length: 20 }),
@@ -185,8 +198,16 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   category: z.enum(['diamond', 'gold', 'silver']),
   locationType: z.enum(['mc', 'tcp', 'gp']),
   totalRooms: z.number().int().min(1).max(50),
+  
+  // LGD Hierarchical Address
+  district: z.string().min(2, "District is required"),
+  tehsil: z.string().min(2, "Tehsil is required"),
+  block: z.string().optional().or(z.literal('')), // Required for GP, handled in form validation
+  gramPanchayat: z.string().optional().or(z.literal('')), // Required for GP, handled in form validation
+  urbanBody: z.string().optional().or(z.literal('')), // Required for MC/TCP, handled in form validation
+  ward: z.string().optional().or(z.literal('')), // Required for MC/TCP, handled in form validation
+  
   address: z.string().min(10, "Address must be at least 10 characters"),
-  district: z.string().min(2),
   pincode: z.string().regex(/^[1-9]\d{5}$/, "Invalid pincode"),
   telephone: z.string().optional(),
   fax: z.string().optional(),
@@ -225,8 +246,16 @@ export const draftHomestayApplicationSchema = createInsertSchema(homestayApplica
   category: z.enum(['diamond', 'gold', 'silver']).optional(),
   locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
   totalRooms: z.number().int().min(0).optional(),
-  address: z.string().optional().or(z.literal('')),
+  
+  // LGD Hierarchical Address - All optional for drafts
   district: z.string().optional().or(z.literal('')),
+  tehsil: z.string().optional().or(z.literal('')),
+  block: z.string().optional().or(z.literal('')),
+  gramPanchayat: z.string().optional().or(z.literal('')),
+  urbanBody: z.string().optional().or(z.literal('')),
+  ward: z.string().optional().or(z.literal('')),
+  
+  address: z.string().optional().or(z.literal('')),
   pincode: z.string().optional().or(z.literal('')),
   telephone: z.string().optional().or(z.literal('')),
   fax: z.string().optional().or(z.literal('')),
