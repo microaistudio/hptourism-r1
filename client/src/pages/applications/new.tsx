@@ -1506,92 +1506,6 @@ export default function NewApplication() {
                     </div>
                   )}
 
-                  {/* Per-Room-Type Rates (2025 Rules Compliant) */}
-                  <div className="space-y-4">
-                    <div className="bg-muted/30 border border-muted rounded-lg p-4">
-                      <h4 className="font-medium text-sm mb-2">Room Rates (Per Night)</h4>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Enter the proposed rate for each room type. Category will be determined by weighted average rate.
-                      </p>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {singleBedRooms > 0 && (
-                          <FormField
-                            control={form.control}
-                            name="singleBedRoomRate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Single Bed Room Rate</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    placeholder="Rate per night" 
-                                    data-testid="input-single-bed-rate" 
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormDescription className="text-xs">
-                                  For {singleBedRooms} single bed {singleBedRooms === 1 ? 'room' : 'rooms'}
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-
-                        {doubleBedRooms > 0 && (
-                          <FormField
-                            control={form.control}
-                            name="doubleBedRoomRate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Double Bed Room Rate</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    placeholder="Rate per night" 
-                                    data-testid="input-double-bed-rate" 
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormDescription className="text-xs">
-                                  For {doubleBedRooms} double bed {doubleBedRooms === 1 ? 'room' : 'rooms'}
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-
-                        {familySuites > 0 && (
-                          <FormField
-                            control={form.control}
-                            name="familySuiteRate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Family Suite Rate</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    placeholder="Rate per night" 
-                                    data-testid="input-family-suite-rate" 
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormDescription className="text-xs">
-                                  For {familySuites} family {familySuites === 1 ? 'suite' : 'suites'}
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -1640,7 +1554,8 @@ export default function NewApplication() {
                   <div className="space-y-4 border-t pt-4">
                     <h4 className="font-medium">Room Configuration</h4>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Single Bed Rooms Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name="singleBedRooms"
@@ -1654,6 +1569,26 @@ export default function NewApplication() {
                                 data-testid="input-single-bed-rooms" 
                                 {...field}
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="singleBedRoomRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Single Room Rate (₹/night)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Rate per night" 
+                                data-testid="input-single-bed-rate" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1682,7 +1617,8 @@ export default function NewApplication() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Double Bed Rooms Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name="doubleBedRooms"
@@ -1696,6 +1632,26 @@ export default function NewApplication() {
                                 data-testid="input-double-bed-rooms" 
                                 {...field}
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="doubleBedRoomRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Double Room Rate (₹/night)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Rate per night" 
+                                data-testid="input-double-bed-rate" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1724,7 +1680,8 @@ export default function NewApplication() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Family Suites Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name="familySuites"
@@ -1738,6 +1695,26 @@ export default function NewApplication() {
                                 data-testid="input-family-suites" 
                                 {...field}
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="familySuiteRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Family Suite Rate (₹/night)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Rate per night" 
+                                data-testid="input-family-suite-rate" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                               />
                             </FormControl>
                             <FormMessage />
