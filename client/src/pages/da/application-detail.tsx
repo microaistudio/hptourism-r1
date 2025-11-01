@@ -491,13 +491,18 @@ export default function DAApplicationDetail() {
                     </div>
 
                     {/* Document Viewer */}
-                    <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
+                    <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900 min-h-[400px] flex items-center justify-center">
                       {selectedDocument.mimeType.startsWith('image/') ? (
                         <img
                           src={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`}
                           alt={selectedDocument.fileName}
-                          className="w-full h-auto"
+                          className="w-full h-auto max-h-[600px] object-contain"
                           data-testid="img-document-preview"
+                          onError={(e) => {
+                            console.error('Image failed to load:', selectedDocument.filePath);
+                            e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" fill="gray">Image failed to load</text></svg>';
+                          }}
+                          onLoad={() => console.log('Image loaded successfully:', selectedDocument.fileName)}
                         />
                       ) : selectedDocument.mimeType === 'application/pdf' ? (
                         <iframe
