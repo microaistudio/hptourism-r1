@@ -76,6 +76,7 @@ export default function DAApplicationDetail() {
   // All state hooks MUST come before any conditional returns
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [sendBackDialogOpen, setSendBackDialogOpen] = useState(false);
+  const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [reason, setReason] = useState("");
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -282,13 +283,29 @@ export default function DAApplicationDetail() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'verified':
-        return <Badge className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1" />Verified</Badge>;
+        return (
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-700">
+            <CheckCircle className="w-3 h-3 mr-1" />Verified
+          </Badge>
+        );
       case 'rejected':
-        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Rejected</Badge>;
+        return (
+          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-700">
+            <XCircle className="w-3 h-3 mr-1" />Rejected
+          </Badge>
+        );
       case 'needs_correction':
-        return <Badge variant="secondary"><AlertCircle className="w-3 h-3 mr-1" />Needs Correction</Badge>;
+        return (
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+            <AlertCircle className="w-3 h-3 mr-1" />Needs Correction
+          </Badge>
+        );
       default:
-        return <Badge variant="outline">Pending Review</Badge>;
+        return (
+          <Badge variant="outline" className="text-muted-foreground">
+            Pending Review
+          </Badge>
+        );
     }
   };
 
@@ -503,8 +520,42 @@ export default function DAApplicationDetail() {
             {/* Right Side - Document Checklist & Verification */}
             <Card className="h-[calc(100vh-320px)]">
               <CardHeader>
-                <CardTitle>Document Checklist</CardTitle>
-                <CardDescription>Review and verify each document</CardDescription>
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <CardTitle>Document Checklist</CardTitle>
+                    <CardDescription>Review and verify each document</CardDescription>
+                  </div>
+                  {documents.length > 0 && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          documents.forEach(doc => {
+                            updateVerification(doc.id, { status: 'verified' });
+                          });
+                          toast({
+                            title: "All Verified",
+                            description: `${documents.length} documents marked as verified`,
+                          });
+                        }}
+                        data-testid="button-verify-all"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Verify All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setClearAllDialogOpen(true)}
+                        data-testid="button-clear-all"
+                      >
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Clear All
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="h-[calc(100%-100px)] overflow-auto">
                 {documents.length === 0 ? (
@@ -791,6 +842,40 @@ export default function DAApplicationDetail() {
             >
               {sendBackMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Send Back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={clearAllDialogOpen} onOpenChange={setClearAllDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear All Verifications?</DialogTitle>
+            <DialogDescription>
+              This will reset all {documents.length} documents to pending status and clear all notes. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearAllDialogOpen(false)} data-testid="button-cancel-clear-all">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                documents.forEach(doc => {
+                  updateVerification(doc.id, { status: 'pending', notes: '' });
+                });
+                setClearAllDialogOpen(false);
+                toast({
+                  title: "All Cleared",
+                  description: `${documents.length} documents reset to pending`,
+                });
+              }}
+              data-testid="button-confirm-clear-all"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Clear All
             </Button>
           </DialogFooter>
         </DialogContent>
