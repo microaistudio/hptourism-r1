@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info } from "lucide-react";
-import type { User, HomestayApplication } from "@shared/schema";
+import type { User, HomestayApplication, UserProfile } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, type CategoryType, type LocationType } from "@shared/fee-calculator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -285,6 +285,13 @@ export default function NewApplication() {
     queryKey: ["/api/auth/me"],
   });
 
+  // Fetch user profile for auto-population
+  const { data: userProfile } = useQuery<UserProfile>({
+    queryKey: ["/api/profile"],
+    enabled: !!userData?.user,
+    retry: false,
+  });
+
   // Load draft application if resuming
   const { data: draftData } = useQuery<{ application: HomestayApplication }>({
     queryKey: ["/api/applications", draftIdFromUrl],
@@ -482,6 +489,63 @@ export default function NewApplication() {
       });
     }
   }, [draftData]);
+
+  // Auto-populate owner details from user profile (only for new applications, not drafts)
+  useEffect(() => {
+    // Only populate if NOT loading a draft and profile exists
+    if (!draftIdFromUrl && userProfile && !form.formState.isDirty) {
+      form.reset({
+        // Keep existing property-related defaults
+        propertyName: "",
+        locationType: "gp",
+        category: "silver",
+        proposedRoomRate: 2000,
+        singleBedRoomRate: 0,
+        doubleBedRoomRate: 2000,
+        familySuiteRate: 0,
+        projectType: "new_project",
+        propertyArea: 0,
+        singleBedRooms: 0,
+        singleBedRoomSize: undefined,
+        doubleBedRooms: 1,
+        doubleBedRoomSize: undefined,
+        familySuites: 0,
+        familySuiteSize: undefined,
+        attachedWashrooms: 1,
+        gstin: "",
+        distanceAirport: undefined,
+        distanceRailway: undefined,
+        distanceCityCenter: undefined,
+        distanceShopping: undefined,
+        distanceBusStand: undefined,
+        lobbyArea: undefined,
+        diningArea: undefined,
+        parkingArea: "",
+        ecoFriendlyFacilities: "",
+        differentlyAbledFacilities: "",
+        fireEquipmentDetails: "",
+        certificateValidityYears: "1",
+        nearestHospital: "",
+        
+        // Auto-populate from profile
+        ownerName: userProfile.fullName,
+        ownerGender: userProfile.gender as "male" | "female" | "other",
+        ownerMobile: userProfile.mobile,
+        ownerEmail: userProfile.email || "",
+        ownerAadhaar: userProfile.aadhaarNumber || "",
+        district: userProfile.district || "",
+        tehsil: userProfile.tehsil || "",
+        block: userProfile.block || "",
+        gramPanchayat: userProfile.gramPanchayat || "",
+        urbanBody: userProfile.urbanBody || "",
+        ward: userProfile.ward || "",
+        address: userProfile.address || "",
+        pincode: userProfile.pincode || "",
+        telephone: userProfile.telephone || "",
+        fax: userProfile.fax || "",
+      });
+    }
+  }, [userProfile, draftIdFromUrl, form]);
 
   // Auto-populate distances when district changes (user can override)
   useEffect(() => {

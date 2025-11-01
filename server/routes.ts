@@ -323,6 +323,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerEmail: z.string().optional(),
         ownerAadhaar: z.string().optional(),
         proposedRoomRate: z.coerce.number().optional(),
+        singleBedRoomRate: z.coerce.number().optional(),
+        doubleBedRoomRate: z.coerce.number().optional(),
+        familySuiteRate: z.coerce.number().optional(),
         projectType: z.enum(['new_rooms', 'new_project']).optional(),
         propertyArea: z.coerce.number().optional(),
         singleBedRooms: z.coerce.number().optional(),
@@ -431,6 +434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerEmail: z.string().optional(),
         ownerAadhaar: z.string().optional(),
         proposedRoomRate: z.coerce.number().optional(),
+        singleBedRoomRate: z.coerce.number().optional(),
+        doubleBedRoomRate: z.coerce.number().optional(),
+        familySuiteRate: z.coerce.number().optional(),
         projectType: z.enum(['new_rooms', 'new_project']).optional(),
         propertyArea: z.coerce.number().optional(),
         singleBedRooms: z.coerce.number().optional(),
@@ -531,6 +537,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Room & category details
         proposedRoomRate: z.coerce.number(),
+        singleBedRoomRate: z.coerce.number().optional(),
+        doubleBedRoomRate: z.coerce.number().optional(),
+        familySuiteRate: z.coerce.number().optional(),
         projectType: z.enum(['new_rooms', 'new_project']),
         propertyArea: z.coerce.number(),
         singleBedRooms: z.coerce.number().optional(),
@@ -603,6 +612,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         (validatedData.doubleBedRooms || 0) + 
                         (validatedData.familySuites || 0);
 
+      // 2025 Compliance: Validate per-room-type rates (HP Homestay Rules 2025 - Form-A Certificate Requirement)
+      // For FINAL SUBMISSION, per-room-type rates are MANDATORY for all room types with count > 0
+      // This enforces ANNEXURE-I compliance for new 2025 applications
+      if ((validatedData.singleBedRooms || 0) > 0 && !validatedData.singleBedRoomRate) {
+        return res.status(400).json({ 
+          message: "Per-room-type rates are mandatory. Single bed room rate is required (HP Homestay Rules 2025 - ANNEXURE-I Form-A Certificate Requirement)" 
+        });
+      }
+      if ((validatedData.doubleBedRooms || 0) > 0 && !validatedData.doubleBedRoomRate) {
+        return res.status(400).json({ 
+          message: "Per-room-type rates are mandatory. Double bed room rate is required (HP Homestay Rules 2025 - ANNEXURE-I Form-A Certificate Requirement)" 
+        });
+      }
+      if ((validatedData.familySuites || 0) > 0 && !validatedData.familySuiteRate) {
+        return res.status(400).json({ 
+          message: "Per-room-type rates are mandatory. Family suite rate is required (HP Homestay Rules 2025 - ANNEXURE-I Form-A Certificate Requirement)" 
+        });
+      }
+
       // Build payload with ONLY allowed fields (ANNEXURE-I compliant)
       // Pass trusted flag to allow server-controlled status override
       const application = await storage.createApplication({
@@ -625,6 +653,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Room & category details
         proposedRoomRate: validatedData.proposedRoomRate,
+        singleBedRoomRate: validatedData.singleBedRoomRate,
+        doubleBedRoomRate: validatedData.doubleBedRoomRate,
+        familySuiteRate: validatedData.familySuiteRate,
         projectType: validatedData.projectType,
         propertyArea: validatedData.propertyArea,
         singleBedRooms: validatedData.singleBedRooms,

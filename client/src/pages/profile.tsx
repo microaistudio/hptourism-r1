@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
 import { insertUserProfileSchema, type UserProfile } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,44 +56,65 @@ export default function ProfilePage() {
   const form = useForm({
     resolver: zodResolver(insertUserProfileSchema),
     defaultValues: {
-      fullName: profile?.fullName || user?.fullName || "",
-      gender: profile?.gender || "male",
-      aadhaarNumber: profile?.aadhaarNumber || user?.aadhaarNumber || "",
-      mobile: profile?.mobile || user?.mobile || "",
-      email: profile?.email || user?.email || "",
-      district: profile?.district || user?.district || "",
-      tehsil: profile?.tehsil || "",
-      block: profile?.block || "",
-      gramPanchayat: profile?.gramPanchayat || "",
-      urbanBody: profile?.urbanBody || "",
-      ward: profile?.ward || "",
-      address: profile?.address || "",
-      pincode: profile?.pincode || "",
-      telephone: profile?.telephone || "",
-      fax: profile?.fax || "",
+      fullName: "",
+      gender: "male",
+      aadhaarNumber: "",
+      mobile: "",
+      email: "",
+      district: "",
+      tehsil: "",
+      block: "",
+      gramPanchayat: "",
+      urbanBody: "",
+      ward: "",
+      address: "",
+      pincode: "",
+      telephone: "",
+      fax: "",
     },
   });
 
   // Reset form when profile data is loaded
-  if (profile && !form.formState.isDirty) {
-    form.reset({
-      fullName: profile.fullName,
-      gender: profile.gender as "male" | "female" | "other",
-      aadhaarNumber: profile.aadhaarNumber || "",
-      mobile: profile.mobile,
-      email: profile.email || "",
-      district: profile.district || "",
-      tehsil: profile.tehsil || "",
-      block: profile.block || "",
-      gramPanchayat: profile.gramPanchayat || "",
-      urbanBody: profile.urbanBody || "",
-      ward: profile.ward || "",
-      address: profile.address || "",
-      pincode: profile.pincode || "",
-      telephone: profile.telephone || "",
-      fax: profile.fax || "",
-    });
-  }
+  useEffect(() => {
+    if (profile) {
+      form.reset({
+        fullName: profile.fullName,
+        gender: profile.gender as "male" | "female" | "other",
+        aadhaarNumber: profile.aadhaarNumber || "",
+        mobile: profile.mobile,
+        email: profile.email || "",
+        district: profile.district || "",
+        tehsil: profile.tehsil || "",
+        block: profile.block || "",
+        gramPanchayat: profile.gramPanchayat || "",
+        urbanBody: profile.urbanBody || "",
+        ward: profile.ward || "",
+        address: profile.address || "",
+        pincode: profile.pincode || "",
+        telephone: profile.telephone || "",
+        fax: profile.fax || "",
+      });
+    } else if (user) {
+      // If no profile, pre-fill from user data
+      form.reset({
+        fullName: user.fullName || "",
+        gender: "male",
+        aadhaarNumber: user.aadhaarNumber || "",
+        mobile: user.mobile || "",
+        email: user.email || "",
+        district: user.district || "",
+        tehsil: "",
+        block: "",
+        gramPanchayat: "",
+        urbanBody: "",
+        ward: "",
+        address: "",
+        pincode: "",
+        telephone: "",
+        fax: "",
+      });
+    }
+  }, [profile, user, form]);
 
   // Save/Update profile mutation
   const saveProfileMutation = useMutation({
