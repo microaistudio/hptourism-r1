@@ -26,6 +26,13 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, Save, User } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+import { 
+  getDistricts, 
+  getTehsilsForDistrict, 
+  getBlocksForTehsil, 
+  getUrbanBodiesForDistrict, 
+  getWardsForUrbanBody 
+} from "@shared/lgd-data";
 
 export default function ProfilePage() {
   const { toast } = useToast();
@@ -268,13 +275,32 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>District</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="e.g., Shimla"
-                          data-testid="input-profile-district"
-                        />
-                      </FormControl>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Reset dependent fields when district changes
+                          form.setValue('tehsil', '');
+                          form.setValue('block', '');
+                          form.setValue('gramPanchayat', '');
+                          form.setValue('urbanBody', '');
+                          form.setValue('ward', '');
+                        }} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-profile-district">
+                            <SelectValue placeholder="Select district" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {getDistricts().map((district) => (
+                            <SelectItem key={district} value={district}>
+                              {district}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Select your district first</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -286,13 +312,30 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tehsil / Sub-Division</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="e.g., Shimla"
-                          data-testid="input-profile-tehsil"
-                        />
-                      </FormControl>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Reset block/GP when tehsil changes
+                          form.setValue('block', '');
+                          form.setValue('gramPanchayat', '');
+                        }} 
+                        value={field.value}
+                        disabled={!form.watch('district')}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-profile-tehsil">
+                            <SelectValue placeholder="Select tehsil" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {getTehsilsForDistrict(form.watch('district')).map((tehsil) => (
+                            <SelectItem key={tehsil} value={tehsil}>
+                              {tehsil}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Select tehsil after district</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -306,13 +349,25 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Block (for rural areas)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="Enter block name"
-                          data-testid="input-profile-block"
-                        />
-                      </FormControl>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                        disabled={!form.watch('tehsil')}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-profile-block">
+                            <SelectValue placeholder="Select block" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {getBlocksForTehsil(form.watch('district'), form.watch('tehsil')).map((block) => (
+                            <SelectItem key={block} value={block}>
+                              {block}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Rural development block</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -323,14 +378,16 @@ export default function ProfilePage() {
                   name="gramPanchayat"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gram Panchayat (for rural areas)</FormLabel>
+                      <FormLabel>Gram Panchayat / Village (for rural areas)</FormLabel>
                       <FormControl>
                         <Input 
                           {...field} 
-                          placeholder="Enter GP name"
+                          placeholder="Enter Gram Panchayat name"
                           data-testid="input-profile-gp"
+                          disabled={!form.watch('block')}
                         />
                       </FormControl>
+                      <FormDescription>Enter the specific GP/village name</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -344,13 +401,29 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Urban Body / MC / TCP (for urban areas)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="e.g., Shimla Municipal Corporation"
-                          data-testid="input-profile-urban-body"
-                        />
-                      </FormControl>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Reset ward when urban body changes
+                          form.setValue('ward', '');
+                        }} 
+                        value={field.value}
+                        disabled={!form.watch('district')}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-profile-urban-body">
+                            <SelectValue placeholder="Select urban body" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {getUrbanBodiesForDistrict(form.watch('district')).map((ub) => (
+                            <SelectItem key={ub.name} value={ub.name}>
+                              {ub.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Municipal Corporation or Town & Country Planning</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -362,13 +435,25 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Ward / Zone (for urban areas)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="e.g., Ward 12"
-                          data-testid="input-profile-ward"
-                        />
-                      </FormControl>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                        disabled={!form.watch('urbanBody')}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-profile-ward">
+                            <SelectValue placeholder="Select ward" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {getWardsForUrbanBody(form.watch('district'), form.watch('urbanBody')).map((ward) => (
+                            <SelectItem key={ward} value={ward}>
+                              {ward}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Ward number in the selected urban body</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
