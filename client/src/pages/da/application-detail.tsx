@@ -323,7 +323,7 @@ export default function DAApplicationDetail() {
               <Separator orientation="vertical" className="h-4" />
               <span>{owner?.fullName} • {owner?.mobile}</span>
               <Separator orientation="vertical" className="h-4" />
-              <Badge variant="outline">{application.category.toUpperCase()}</Badge>
+              <Badge variant="outline">{application.category?.toUpperCase() ?? 'SILVER'}</Badge>
               {applicationQueue.length > 0 && (
                 <>
                   <Separator orientation="vertical" className="h-4" />
