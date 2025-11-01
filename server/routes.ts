@@ -1371,6 +1371,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // DTDO (District Tourism Development Officer) ROUTES
+  // ========================================
+
+  // Get applications for DTDO (district-specific)
+  app.get("/api/dtdo/applications", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.district) {
+        return res.status(400).json({ message: "DTDO must be assigned to a district" });
+      }
+
+      // Get all applications from this DTDO's district with relevant statuses
+      const allApplications = await db
+        .select()
+        .from(homestayApplications)
+        .where(eq(homestayApplications.district, user.district));
+
+      // Filter for DTDO-relevant statuses
+      const dtdoRelevantStatuses = [
+        'forwarded_to_dtdo',
+        'dtdo_review',
+        'inspection_scheduled',
+        'inspection_completed'
+      ];
+      const relevantApplications = allApplications.filter(app => 
+        dtdoRelevantStatuses.includes(app.status)
+      );
+
+      // Enrich with owner and DA information
+      const applicationsWithDetails = await Promise.all(
+        relevantApplications.map(async (app) => {
+          const owner = await storage.getUser(app.userId);
+          
+          // Get DA name if the application was forwarded by DA
+          let daName = undefined;
+          if (app.daRemarks || app.daId) {
+            const da = app.daId ? await storage.getUser(app.daId) : null;
+            daName = da?.fullName || 'Unknown DA';
+          }
+
+          return {
+            ...app,
+            ownerName: owner?.fullName || 'Unknown',
+            ownerMobile: owner?.mobile || 'N/A',
+            daName,
+          };
+        })
+      );
+
+      res.json(applicationsWithDetails);
+    } catch (error) {
+      console.error("[dtdo] Failed to fetch applications:", error);
+      res.status(500).json({ message: "Failed to fetch applications" });
+    }
+  });
+
+  // Get single application details for DTDO
+  app.get("/api/dtdo/applications/:id", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only access applications from your district" });
+      }
+
+      // Get owner information
+      const owner = await storage.getUser(application.userId);
+      
+      // Get documents
+      const documents = await storage.getDocumentsByApplication(req.params.id);
+
+      // Get DA information if available
+      let daInfo = null;
+      if (application.daId) {
+        const da = await storage.getUser(application.daId);
+        daInfo = da ? { fullName: da.fullName, mobile: da.mobile } : null;
+      }
+
+      res.json({
+        application,
+        owner: owner ? {
+          fullName: owner.fullName,
+          mobile: owner.mobile,
+          email: owner.email,
+        } : null,
+        documents,
+        daInfo,
+      });
+    } catch (error) {
+      console.error("[dtdo] Failed to fetch application details:", error);
+      res.status(500).json({ message: "Failed to fetch application details" });
+    }
+  });
+
   // ====================================================================
   // DA INSPECTION ROUTES
   // ====================================================================

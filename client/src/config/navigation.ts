@@ -154,7 +154,10 @@ export function getNavigationForRole(role: string): NavSection[] {
   if (role === 'dealing_assistant') {
     return daNavigation;
   }
-  if (role === 'district_officer' || role === 'state_officer' || role === 'district_tourism_officer') {
+  if (role === 'district_tourism_officer' || role === 'district_officer') {
+    return officerNavigation; // DTDO uses officer navigation
+  }
+  if (role === 'state_officer') {
     return officerNavigation;
   }
   return ownerNavigation;
@@ -171,6 +174,9 @@ export function getDefaultRouteForRole(role: string): string {
   if (role === 'dealing_assistant') {
     return '/da/dashboard';
   }
-  // All roles now land on /dashboard with role-specific content
+  if (role === 'district_tourism_officer' || role === 'district_officer') {
+    return '/dtdo/dashboard';
+  }
+  // All other roles now land on /dashboard with role-specific content
   return '/dashboard';
 }

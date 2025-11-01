@@ -36,6 +36,7 @@ import DAApplicationDetail from "@/pages/da/application-detail";
 import DAInspections from "@/pages/da/inspections";
 import DAInspectionReport from "@/pages/da/inspection-report";
 import DAProfile from "@/pages/da/profile";
+import DTDODashboard from "@/pages/dtdo/dashboard";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -172,6 +173,11 @@ function Router() {
       </Route>
       <Route path="/da/inspections/:id">
         {() => <ProtectedRoute component={DAInspectionReport} allowedRoles={['dealing_assistant']} />}
+      </Route>
+
+      {/* DTDO (District Tourism Development Officer) Routes */}
+      <Route path="/dtdo/dashboard">
+        {() => <ProtectedRoute component={DTDODashboard} allowedRoles={['district_tourism_officer', 'district_officer']} />}
       </Route>
       
       <Route component={NotFound} />
