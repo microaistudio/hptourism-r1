@@ -13,6 +13,9 @@ import {
   payments, 
   productionStats, 
   users,
+  userProfiles,
+  insertUserProfileSchema,
+  type UserProfile,
   inspectionOrders,
   inspectionReports,
   objections,
@@ -185,6 +188,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const { password, ...userWithoutPassword } = user;
     res.json({ user: userWithoutPassword });
+  });
+
+  // User Profile Routes
+  
+  // Get user profile
+  app.get("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      
+      const [profile] = await db
+        .select()
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId))
+        .limit(1);
+      
+      if (!profile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      console.error('[profile] Error fetching profile:', error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+  
+  // Create or update user profile
+  app.post("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      
+      // Validate profile data
+      const profileData = insertUserProfileSchema.parse(req.body);
+      
+      // Check if profile already exists
+      const [existingProfile] = await db
+        .select()
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId))
+        .limit(1);
+      
+      let profile;
+      
+      if (existingProfile) {
+        // Update existing profile
+        [profile] = await db
+          .update(userProfiles)
+          .set({
+            ...profileData,
+            updatedAt: new Date(),
+          })
+          .where(eq(userProfiles.userId, userId))
+          .returning();
+      } else {
+        // Create new profile
+        [profile] = await db
+          .insert(userProfiles)
+          .values({
+            ...profileData,
+            userId,
+          })
+          .returning();
+      }
+      
+      res.json({ 
+        profile, 
+        message: existingProfile ? "Profile updated successfully" : "Profile created successfully" 
+      });
+    } catch (error) {
+      console.error('[profile] Error saving profile:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: error.errors[0].message, 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to save profile" });
+    }
   });
 
   // Homestay Application Routes
