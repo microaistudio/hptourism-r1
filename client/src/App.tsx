@@ -12,6 +12,7 @@ import HomePage from "@/pages/home";
 import Login from "@/pages/auth/login";
 import Register from "@/pages/auth/register";
 import Dashboard from "@/pages/dashboard";
+import ProfilePage from "@/pages/profile";
 import NewApplication from "@/pages/applications/new";
 import ApplicationDetail from "@/pages/applications/detail";
 import UpdateApplication from "@/pages/applications/update";
@@ -96,6 +97,9 @@ function Router() {
       {/* Property Owner Routes */}
       <Route path="/dashboard">
         {() => <ProtectedRoute component={Dashboard} />}
+      </Route>
+      <Route path="/profile">
+        {() => <ProtectedRoute component={ProfilePage} allowedRoles={['property_owner']} />}
       </Route>
       <Route path="/applications/new">
         {() => <ProtectedRoute component={NewApplication} allowedRoles={['property_owner']} />}

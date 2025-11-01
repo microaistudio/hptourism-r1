@@ -1,4 +1,4 @@
-import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings, Database, ClipboardCheck } from "lucide-react";
+import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings, Database, ClipboardCheck, User } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -22,6 +22,11 @@ export const ownerNavigation: NavSection[] = [
         title: "Dashboard",
         url: "/dashboard",
         icon: Home,
+      },
+      {
+        title: "My Profile",
+        url: "/profile",
+        icon: User,
       },
       {
         title: "New Application",
