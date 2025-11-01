@@ -30,6 +30,8 @@ import AdminUsers from "@/pages/admin/users";
 import AdminConsole from "@/pages/admin/console";
 import SuperAdminConsole from "@/pages/admin/super-admin-console";
 import SuperAdminDashboard from "@/pages/admin/super-admin-dashboard";
+import DADashboard from "@/pages/da/dashboard";
+import DAApplicationDetail from "@/pages/da/application-detail";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -146,6 +148,14 @@ function Router() {
       </Route>
       <Route path="/admin/super-console">
         {() => <ProtectedRoute component={SuperAdminConsole} allowedRoles={['super_admin']} />}
+      </Route>
+
+      {/* Dealing Assistant Routes */}
+      <Route path="/da/dashboard">
+        {() => <ProtectedRoute component={DADashboard} allowedRoles={['dealing_assistant']} />}
+      </Route>
+      <Route path="/da/applications/:id">
+        {() => <ProtectedRoute component={DAApplicationDetail} allowedRoles={['dealing_assistant']} />}
       </Route>
       
       <Route component={NotFound} />

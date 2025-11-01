@@ -119,13 +119,57 @@ async function seed() {
       console.log('   ⚠️  Change this password immediately after first login!');
     }
 
+    // Create test Dealing Assistant account for Shimla district
+    console.log('🔍 Creating test Dealing Assistant account...');
+    
+    const existingDA = await db.select()
+      .from(users)
+      .where(eq(users.mobile, '9876543210'))
+      .limit(1);
+
+    if (existingDA.length > 0) {
+      console.log('✅ Dealing Assistant user already exists (mobile: 9876543210)');
+      
+      // Update to ensure role and district are correct
+      await db.update(users)
+        .set({ 
+          role: 'dealing_assistant', 
+          district: 'Shimla',
+          isActive: true 
+        })
+        .where(eq(users.mobile, '9876543210'));
+      
+      console.log('✅ Dealing Assistant role and district verified');
+    } else {
+      // Create test DA user for Shimla
+      const hashedDAPassword = await bcrypt.hash('da123', 10);
+      
+      await db.insert(users).values({
+        mobile: '9876543210',
+        email: 'da.shimla@himachaltourism.gov.in',
+        password: hashedDAPassword,
+        fullName: 'Priya Sharma (DA Shimla)',
+        role: 'dealing_assistant',
+        district: 'Shimla',
+        isActive: true,
+      });
+      
+      console.log('✅ Dealing Assistant user created successfully');
+      console.log('   Mobile: 9876543210');
+      console.log('   Email: da.shimla@himachaltourism.gov.in');
+      console.log('   Password: da123');
+      console.log('   District: Shimla');
+      console.log('   ⚠️  For testing only - change password in production!');
+    }
+
     console.log('\n📋 Summary of Default Accounts:');
-    console.log('┌─────────────────┬──────────────┬──────────────────┬──────────────────────┐');
-    console.log('│ Role            │ Mobile       │ Password         │ Access Level         │');
-    console.log('├─────────────────┼──────────────┼──────────────────┼──────────────────────┤');
-    console.log('│ Admin           │ 9999999999   │ admin123         │ User Management      │');
-    console.log('│ Super Admin     │ 9999999998   │ SuperAdmin@2025  │ Full System + Reset  │');
-    console.log('└─────────────────┴──────────────┴──────────────────┴──────────────────────┘');
+    console.log('┌────────────────────┬──────────────┬──────────────────┬──────────────────────┐');
+    console.log('│ Role               │ Mobile       │ Password         │ Access Level         │');
+    console.log('├────────────────────┼──────────────┼──────────────────┼──────────────────────┤');
+    console.log('│ Admin              │ 9999999999   │ admin123         │ User Management      │');
+    console.log('│ Super Admin        │ 9999999998   │ SuperAdmin@2025  │ Full System + Reset  │');
+    console.log('│ Dealing Assistant  │ 9876543210   │ da123            │ Shimla District      │');
+    console.log('└────────────────────┴──────────────┴──────────────────┴──────────────────────┘');
 
     console.log('\n🎉 Database seed completed successfully!');
     console.log('   Run this script anytime to ensure default accounts and DDO codes exist.');

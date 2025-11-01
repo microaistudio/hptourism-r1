@@ -114,6 +114,25 @@ export const superAdminNavigation: NavSection[] = [
   },
 ];
 
+// Dealing Assistant Navigation Menu
+export const daNavigation: NavSection[] = [
+  {
+    title: "Main",
+    items: [
+      {
+        title: "Dashboard",
+        url: "/da/dashboard",
+        icon: Home,
+      },
+      {
+        title: "Application Queue",
+        url: "/da/dashboard",
+        icon: FileText,
+      },
+    ],
+  },
+];
+
 // Get navigation based on user role
 export function getNavigationForRole(role: string): NavSection[] {
   if (role === 'super_admin') {
@@ -122,7 +141,10 @@ export function getNavigationForRole(role: string): NavSection[] {
   if (role === 'admin') {
     return adminNavigation;
   }
-  if (role === 'district_officer' || role === 'state_officer') {
+  if (role === 'dealing_assistant') {
+    return daNavigation;
+  }
+  if (role === 'district_officer' || role === 'state_officer' || role === 'district_tourism_officer') {
     return officerNavigation;
   }
   return ownerNavigation;
@@ -135,6 +157,9 @@ export function getDefaultRouteForRole(role: string): string {
   }
   if (role === 'admin') {
     return '/admin/users';
+  }
+  if (role === 'dealing_assistant') {
+    return '/da/dashboard';
   }
   // All roles now land on /dashboard with role-specific content
   return '/dashboard';

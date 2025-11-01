@@ -954,6 +954,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   }
   // });
 
+  // ========================================
+  // DEALING ASSISTANT (DA) ROUTES
+  // ========================================
+
+  // Get applications for DA (district-specific)
+  app.get("/api/da/applications", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.district) {
+        return res.status(400).json({ message: "DA must be assigned to a district" });
+      }
+
+      // Get all applications from this DA's district with relevant statuses
+      const allApplications = await db
+        .select()
+        .from(homestayApplications)
+        .where(eq(homestayApplications.district, user.district));
+
+      // Filter for DA-relevant statuses: submitted, under_scrutiny, forwarded_to_dtdo, reverted_to_applicant
+      const daRelevantStatuses = ['submitted', 'under_scrutiny', 'forwarded_to_dtdo', 'reverted_to_applicant'];
+      const relevantApplications = allApplications.filter(app => 
+        daRelevantStatuses.includes(app.status)
+      );
+
+      // Enrich with owner information
+      const applicationsWithOwner = await Promise.all(
+        relevantApplications.map(async (app) => {
+          const owner = await storage.getUser(app.userId);
+          return {
+            ...app,
+            ownerName: owner?.fullName || 'Unknown',
+            ownerMobile: owner?.mobile || 'N/A',
+          };
+        })
+      );
+
+      res.json(applicationsWithOwner);
+    } catch (error) {
+      console.error("[da] Failed to fetch applications:", error);
+      res.status(500).json({ message: "Failed to fetch applications" });
+    }
+  });
+
+  // Get single application details for DA
+  app.get("/api/da/applications/:id", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DA's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only access applications from your district" });
+      }
+
+      // Get owner information
+      const owner = await storage.getUser(application.userId);
+      
+      // Get documents
+      const documents = await storage.getDocumentsByApplication(req.params.id);
+
+      res.json({
+        application,
+        owner: owner ? {
+          fullName: owner.fullName,
+          mobile: owner.mobile,
+          email: owner.email,
+        } : null,
+        documents,
+      });
+    } catch (error) {
+      console.error("[da] Failed to fetch application details:", error);
+      res.status(500).json({ message: "Failed to fetch application details" });
+    }
+  });
+
+  // Start scrutiny (change status to under_scrutiny)
+  app.post("/api/da/applications/:id/start-scrutiny", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      if (application.status !== 'submitted') {
+        return res.status(400).json({ message: "Only submitted applications can be put under scrutiny" });
+      }
+
+      await storage.updateApplicationStatus(req.params.id, 'under_scrutiny');
+      
+      res.json({ message: "Application is now under scrutiny" });
+    } catch (error) {
+      console.error("[da] Failed to start scrutiny:", error);
+      res.status(500).json({ message: "Failed to start scrutiny" });
+    }
+  });
+
+  // Forward to DTDO
+  app.post("/api/da/applications/:id/forward-to-dtdo", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const { remarks } = req.body;
+      const application = await storage.getApplication(req.params.id);
+      
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      if (application.status !== 'under_scrutiny') {
+        return res.status(400).json({ message: "Only applications under scrutiny can be forwarded" });
+      }
+
+      await storage.updateApplicationStatus(req.params.id, 'forwarded_to_dtdo');
+      
+      // TODO: Add timeline entry with remarks when timeline system is implemented
+      
+      res.json({ message: "Application forwarded to DTDO successfully" });
+    } catch (error) {
+      console.error("[da] Failed to forward to DTDO:", error);
+      res.status(500).json({ message: "Failed to forward application" });
+    }
+  });
+
+  // Send back to applicant
+  app.post("/api/da/applications/:id/send-back", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const { reason } = req.body;
+      
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Reason for sending back is required" });
+      }
+
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      if (application.status !== 'under_scrutiny') {
+        return res.status(400).json({ message: "Only applications under scrutiny can be sent back" });
+      }
+
+      await storage.updateApplicationStatus(req.params.id, 'reverted_to_applicant');
+      
+      // TODO: Add timeline entry with reason when timeline system is implemented
+      // TODO: Send notification to applicant
+      
+      res.json({ message: "Application sent back to applicant successfully" });
+    } catch (error) {
+      console.error("[da] Failed to send back application:", error);
+      res.status(500).json({ message: "Failed to send back application" });
+    }
+  });
+
   // Document Routes
   
   // Get documents for application
