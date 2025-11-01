@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ArrowLeft, Save, Send, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, User, FileText, Shield, Star } from "lucide-react";
+import { ArrowLeft, Save, Send, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, User, FileText, Shield, Star, CheckSquare, SquareX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -299,6 +299,39 @@ export default function DAInspectionReport() {
     ? Math.round((desirableValues.filter(Boolean).length / desirableValues.length) * 100)
     : 0;
 
+  // Select/Clear All handlers
+  const handleSelectAllMandatory = () => {
+    const allChecked = MANDATORY_CHECKPOINTS.reduce((acc, checkpoint) => {
+      acc[checkpoint.key] = true;
+      return acc;
+    }, {} as any);
+    form.setValue('mandatoryChecklist', allChecked);
+  };
+
+  const handleClearAllMandatory = () => {
+    const allUnchecked = MANDATORY_CHECKPOINTS.reduce((acc, checkpoint) => {
+      acc[checkpoint.key] = false;
+      return acc;
+    }, {} as any);
+    form.setValue('mandatoryChecklist', allUnchecked);
+  };
+
+  const handleSelectAllDesirable = () => {
+    const allChecked = DESIRABLE_CHECKPOINTS.reduce((acc, checkpoint) => {
+      acc[checkpoint.key] = true;
+      return acc;
+    }, {} as any);
+    form.setValue('desirableChecklist', allChecked);
+  };
+
+  const handleClearAllDesirable = () => {
+    const allUnchecked = DESIRABLE_CHECKPOINTS.reduce((acc, checkpoint) => {
+      acc[checkpoint.key] = false;
+      return acc;
+    }, {} as any);
+    form.setValue('desirableChecklist', allUnchecked);
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -539,6 +572,30 @@ export default function DAInspectionReport() {
                     </p>
                   </div>
 
+                  {/* Select/Clear All Buttons */}
+                  <div className="flex gap-2 justify-end mb-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectAllMandatory}
+                      data-testid="button-select-all-mandatory"
+                    >
+                      <CheckSquare className="w-4 h-4 mr-2" />
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAllMandatory}
+                      data-testid="button-clear-all-mandatory"
+                    >
+                      <SquareX className="w-4 h-4 mr-2" />
+                      Clear All
+                    </Button>
+                  </div>
+
                   <div className="grid grid-cols-1 gap-3">
                     {MANDATORY_CHECKPOINTS.map((checkpoint, index) => (
                       <FormField
@@ -597,6 +654,30 @@ export default function DAInspectionReport() {
                       <Star className="w-4 h-4 inline mr-2" />
                       Desirable requirements enhance guest experience and property rating
                     </p>
+                  </div>
+
+                  {/* Select/Clear All Buttons */}
+                  <div className="flex gap-2 justify-end mb-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectAllDesirable}
+                      data-testid="button-select-all-desirable"
+                    >
+                      <CheckSquare className="w-4 h-4 mr-2" />
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAllDesirable}
+                      data-testid="button-clear-all-desirable"
+                    >
+                      <SquareX className="w-4 h-4 mr-2" />
+                      Clear All
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
