@@ -30,6 +30,13 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
 - **Multiple Payment Gateways**: Integrated payment system with HimKosh (HP CTP), Razorpay, CCAvenue, PayU, and UPI QR Code options.
 - **Production-Level Role-Based Access Control (RBAC)**: Comprehensive RBAC with distinct roles: Property Owner, District Officer, State Officer, and Admin, including a `super_admin` role for system-wide control.
 - **Dealing Assistant (DA) Workflow**: Includes a DA Dashboard with district-specific application queues, an enhanced document scrutiny interface with split-screen view, verification checklists, and secure, role-based backend API routes for managing application review and forwarding processes. This also encompasses inspection order management, allowing DAs to view assigned inspections and submit detailed reports.
+- **District Tourism Development Officer (DTDO) Workflow**: Complete workflow implementation including:
+  - **DTDO Dashboard**: Shows applications forwarded by DA with status-based tabs (Forwarded, Under Review, Inspection Scheduled, Reports Received)
+  - **Application Review Interface**: View application details and DA remarks, with three decision options: Accept (schedule inspection), Reject (with reasons), or Revert to applicant
+  - **Inspection Scheduling System**: After accepting, DTDO can schedule inspections by selecting date/time, assigning to a DA from the same district, and adding special instructions
+  - **DTDO Profile Page**: View/edit profile and change password
+  - **Critical Workflow Fix**: Status transitions use intermediate `dtdo_review` state after acceptance, only moving to `inspection_scheduled` after successful inspection order creation, preventing orphaned records and workflow breakage
+  - **District-Based Filtering**: All DTDO endpoints enforce district-level access control, ensuring officers only see applications from their assigned district
 
 ### System Design Choices
 
