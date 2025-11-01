@@ -23,6 +23,7 @@ import {
   certificates
 } from "@shared/schema";
 import { z } from "zod";
+import bcrypt from "bcrypt";
 import { eq, desc, ne } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
