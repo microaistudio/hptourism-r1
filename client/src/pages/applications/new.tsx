@@ -15,10 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
-import { calculateHomestayFee, formatFee, type CategoryType, type LocationType } from "@shared/fee-calculator";
+import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, type CategoryType, type LocationType } from "@shared/fee-calculator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ApplicationStepper } from "@/components/application-stepper";
@@ -187,17 +187,17 @@ type ApplicationForm = z.infer<typeof applicationSchema>;
 type DraftForm = z.infer<typeof draftSchema>;
 
 const AMENITIES = [
-  { id: "ac", label: "Air Conditioning", icon: "❄️" },
-  { id: "wifi", label: "WiFi", icon: "📶" },
-  { id: "parking", label: "Parking", icon: "🅿️" },
-  { id: "restaurant", label: "Restaurant", icon: "🍽️" },
-  { id: "hotWater", label: "Hot Water 24/7", icon: "🚿" },
-  { id: "tv", label: "Television", icon: "📺" },
-  { id: "laundry", label: "Laundry Service", icon: "👕" },
-  { id: "roomService", label: "Room Service", icon: "🛎️" },
-  { id: "garden", label: "Garden", icon: "🌳" },
-  { id: "mountainView", label: "Mountain View", icon: "🏔️" },
-  { id: "petFriendly", label: "Pet Friendly", icon: "🐕" },
+  { id: "ac", label: "Air Conditioning" },
+  { id: "wifi", label: "WiFi" },
+  { id: "parking", label: "Parking" },
+  { id: "restaurant", label: "Restaurant" },
+  { id: "hotWater", label: "Hot Water 24/7" },
+  { id: "tv", label: "Television" },
+  { id: "laundry", label: "Laundry Service" },
+  { id: "roomService", label: "Room Service" },
+  { id: "garden", label: "Garden" },
+  { id: "mountainView", label: "Mountain View" },
+  { id: "petFriendly", label: "Pet Friendly" },
 ];
 
 // Fee structure as per ANNEXURE-I (location-based)
@@ -334,7 +334,18 @@ export default function NewApplication() {
   const singleBedRooms = form.watch("singleBedRooms") || 0;
   const doubleBedRooms = form.watch("doubleBedRooms") || 0;
   const familySuites = form.watch("familySuites") || 0;
+  const proposedRoomRate = form.watch("proposedRoomRate") || 0;
   const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
+
+  // Smart category suggestion based on room count + room rate
+  const suggestedCategoryValue = totalRooms > 0 && proposedRoomRate > 0 
+    ? suggestCategory(totalRooms, proposedRoomRate) 
+    : null;
+
+  // Validate selected category against room specs
+  const categoryValidation = category && totalRooms > 0 && proposedRoomRate > 0
+    ? validateCategorySelection(category as CategoryType, totalRooms, proposedRoomRate)
+    : null;
 
   // Load draft data into form when resuming
   useEffect(() => {
@@ -1211,6 +1222,24 @@ export default function NewApplication() {
                       )}
                     />
                   </div>
+
+                  {/* Discount Preview for Female Owners */}
+                  {ownerGender === "female" && (
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mt-4" data-testid="alert-female-discount">
+                      <div className="flex items-start gap-2">
+                        <Sparkles className="w-5 h-5 text-green-600 dark:text-green-500 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm text-green-600 dark:text-green-500">Special Discount Eligible!</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            As a female property owner, you qualify for an additional <strong>5% discount</strong> on registration fees.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            This discount will be automatically applied to your final fee calculation.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -1229,6 +1258,45 @@ export default function NewApplication() {
                     <p className="text-sm font-medium mb-2">Total Rooms: {totalRooms}</p>
                     <p className="text-xs text-muted-foreground">Maximum 12 beds across all rooms</p>
                   </div>
+
+                  {/* Smart Category Suggestion */}
+                  {suggestedCategoryValue && totalRooms > 0 && proposedRoomRate > 0 && (
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4" data-testid="alert-category-suggestion">
+                      <div className="flex items-start gap-3">
+                        <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">Recommended Category</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with ₹{proposedRoomRate.toLocaleString('en-IN')}/night rate
+                          </p>
+                          <div className="mt-3 flex items-center gap-3">
+                            <Badge variant={getCategoryBadge(suggestedCategoryValue).variant} className="text-base px-3 py-1">
+                              {getCategoryBadge(suggestedCategoryValue).label}
+                            </Badge>
+                            {category !== suggestedCategoryValue && (
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm"
+                                data-testid="button-apply-suggested-category"
+                                onClick={() => form.setValue("category", suggestedCategoryValue)}
+                              >
+                                Use this category
+                              </Button>
+                            )}
+                          </div>
+                          <div className="mt-3 text-xs text-muted-foreground">
+                            <p className="font-medium mb-1">Category Requirements:</p>
+                            <ul className="space-y-0.5">
+                              <li>• Diamond: 5+ rooms, ₹10,000+ per night</li>
+                              <li>• Gold: 3+ rooms, ₹3,000-₹10,000 per night</li>
+                              <li>• Silver: 1+ rooms, below ₹3,000 per night</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <FormField
                     control={form.control}
@@ -1273,6 +1341,55 @@ export default function NewApplication() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Category Validation Warnings */}
+                  {categoryValidation && !categoryValidation.isValid && (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4" data-testid="alert-category-validation">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm text-destructive">Category Requirements Not Met</p>
+                          <ul className="mt-2 space-y-1 text-sm text-destructive/90">
+                            {categoryValidation.errors.map((error, idx) => (
+                              <li key={idx}>• {error}</li>
+                            ))}
+                          </ul>
+                          {categoryValidation.suggestedCategory && (
+                            <div className="mt-3 pt-3 border-t border-destructive/20">
+                              <p className="text-sm text-muted-foreground">Suggested: 
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="ml-2"
+                                  data-testid="button-use-suggested-category"
+                                  onClick={() => form.setValue("category", categoryValidation.suggestedCategory!)}
+                                >
+                                  Switch to {categoryValidation.suggestedCategory.charAt(0).toUpperCase() + categoryValidation.suggestedCategory.slice(1)}
+                                </Button>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {categoryValidation && categoryValidation.warnings.length > 0 && categoryValidation.isValid && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4" data-testid="alert-category-warnings">
+                      <div className="flex items-start gap-2">
+                        <Lightbulb className="w-5 h-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm text-yellow-600 dark:text-yellow-500">Category Recommendations</p>
+                          <ul className="mt-2 space-y-1 text-sm text-yellow-600/90 dark:text-yellow-500/90">
+                            {categoryValidation.warnings.map((warning, idx) => (
+                              <li key={idx}>• {warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -1865,7 +1982,6 @@ export default function NewApplication() {
                             className="flex-1 cursor-pointer"
                             onClick={() => setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }))}
                           >
-                            <span className="mr-2">{amenity.icon}</span>
                             <span className="text-sm font-medium">{amenity.label}</span>
                           </label>
                         </div>
