@@ -38,6 +38,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -540,8 +541,14 @@ export default function DAApplicationDetail() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2 mb-1">
                                   <div className="flex-1">
-                                    <h4 className="font-medium text-sm mb-1">{doc.documentType}</h4>
-                                    <p className="text-xs text-muted-foreground truncate">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="text-xs font-normal">
+                                        {index + 1} of {documents.length}
+                                      </Badge>
+                                      {getStatusBadge(verifications[doc.id]?.status || 'pending')}
+                                      <h4 className="font-medium text-sm">{doc.documentType}</h4>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate mt-1">
                                       {doc.fileName}
                                     </p>
                                   </div>
@@ -556,7 +563,7 @@ export default function DAApplicationDetail() {
                                 </div>
 
                                 {/* Status Selection */}
-                                <div className="flex gap-2 mt-3">
+                                <div className="flex flex-wrap gap-2 mt-3">
                                   <Button
                                     size="sm"
                                     variant={verifications[doc.id]?.status === 'verified' ? 'default' : 'outline'}
@@ -584,6 +591,16 @@ export default function DAApplicationDetail() {
                                   >
                                     <XCircle className="w-3 h-3 mr-1" />
                                     Reject
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => updateVerification(doc.id, { status: 'pending' })}
+                                    disabled={verifications[doc.id]?.status === 'pending'}
+                                    data-testid={`button-clear-status-${doc.id}`}
+                                  >
+                                    <RotateCcw className="w-3 h-3 mr-1" />
+                                    Clear
                                   </Button>
                                 </div>
                               </div>
