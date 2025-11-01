@@ -130,16 +130,21 @@ async function seed() {
     if (existingDA.length > 0) {
       console.log('✅ Dealing Assistant user already exists (mobile: 9876543210)');
       
-      // Update to ensure role and district are correct
+      // Update role, district, AND password to ensure correct credentials
+      const hashedDAPassword = await bcrypt.hash('da123', 10);
+      
       await db.update(users)
         .set({ 
           role: 'dealing_assistant', 
           district: 'Shimla',
+          password: hashedDAPassword,
+          fullName: 'Priya Sharma (DA Shimla)',
           isActive: true 
         })
         .where(eq(users.mobile, '9876543210'));
       
-      console.log('✅ Dealing Assistant role and district verified');
+      console.log('✅ Dealing Assistant role, district, and password updated');
+      console.log('   Password reset to: da123');
     } else {
       // Create test DA user for Shimla
       const hashedDAPassword = await bcrypt.hash('da123', 10);
