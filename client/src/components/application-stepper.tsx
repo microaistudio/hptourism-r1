@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StepConfig {
@@ -6,6 +6,7 @@ interface StepConfig {
   label: string;
   shortLabel: string;
   requiredFields: string[];
+  icon?: LucideIcon;
 }
 
 interface ApplicationStepperProps {
@@ -71,7 +72,13 @@ export function ApplicationStepper({
                         !isActive && !isPast && "bg-muted text-muted-foreground"
                       )}
                     >
-                      {isPast ? <Check className="w-4 h-4" /> : step.id}
+                      {isPast ? (
+                        <Check className="w-4 h-4" />
+                      ) : step.icon ? (
+                        <step.icon className="w-4 h-4" />
+                      ) : (
+                        step.id
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p

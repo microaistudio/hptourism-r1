@@ -121,6 +121,7 @@ export const homestayApplications = pgTable("homestay_applications", {
   ownerMobile: varchar("owner_mobile", { length: 15 }).notNull(),
   ownerEmail: varchar("owner_email", { length: 255 }),
   ownerAadhaar: varchar("owner_aadhaar", { length: 12 }).notNull(),
+  propertyOwnership: varchar("property_ownership", { length: 10 }).$type<'owned' | 'leased'>().notNull().default('owned'),
   
   // Room & Category Details (ANNEXURE-I)
   proposedRoomRate: decimal("proposed_room_rate", { precision: 10, scale: 2 }), // DEPRECATED: Use per-room-type rates below

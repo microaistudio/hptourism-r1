@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info, MapPin } from "lucide-react";
 import type { User, HomestayApplication, UserProfile } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, type CategoryType, type LocationType } from "@shared/fee-calculator";
@@ -90,6 +90,7 @@ const applicationSchema = z.object({
   ownerName: z.string().min(3, "Owner name is required"),
   ownerGender: z.enum(["male", "female", "other"]),
   ownerAadhaar: z.string().min(1, "Aadhaar is required").regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
+  propertyOwnership: z.enum(["owned", "leased"]),
   
   // Category & room rate
   category: z.enum(["diamond", "gold", "silver"]),
@@ -228,36 +229,42 @@ const STEP_CONFIG = [
     id: 1,
     label: "Property Details",
     shortLabel: "Property",
+    icon: Home,
     requiredFields: ["propertyName", "address", "district", "pincode", "locationType"],
   },
   {
     id: 2,
     label: "Owner Information",
     shortLabel: "Owner Info",
+    icon: UserIcon,
     requiredFields: ["ownerName", "ownerMobile", "ownerEmail", "ownerAadhaar"],
   },
   {
     id: 3,
     label: "Rooms & Category",
     shortLabel: "Rooms",
+    icon: Bed,
     requiredFields: ["category", "proposedRoomRate", "projectType", "propertyArea", "attachedWashrooms"],
   },
   {
     id: 4,
     label: "Distances & Areas",
     shortLabel: "Distances",
+    icon: MapPin,
     requiredFields: ["distanceAirport", "distanceRailway", "distanceCityCenter", "distanceShopping", "distanceBusStand"],
   },
   {
     id: 5,
     label: "Documents Upload",
     shortLabel: "Documents",
+    icon: FileText,
     requiredFields: [], // Handled separately with document arrays
   },
   {
     id: 6,
     label: "Amenities & Review",
     shortLabel: "Review",
+    icon: Eye,
     requiredFields: [], // Final review page
   },
 ];
@@ -1319,6 +1326,41 @@ export default function NewApplication() {
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="propertyOwnership"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property Ownership</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex gap-4"
+                            data-testid="radio-property-ownership"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="owned" id="owned" data-testid="radio-ownership-owned" />
+                              <label htmlFor="owned" className="text-sm font-medium cursor-pointer">
+                                Owned
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="leased" id="leased" data-testid="radio-ownership-leased" />
+                              <label htmlFor="leased" className="text-sm font-medium cursor-pointer">
+                                Leased
+                              </label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormDescription>
+                          Specify whether you own the property or have it on lease
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   {/* Discount Preview for Female Owners */}
                   {ownerGender === "female" && (
