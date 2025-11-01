@@ -284,27 +284,27 @@ export default function DAApplicationDetail() {
     switch (status) {
       case 'verified':
         return (
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-700">
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border border-green-300 dark:border-green-700">
             <CheckCircle className="w-3 h-3 mr-1" />Verified
-          </Badge>
+          </span>
         );
       case 'rejected':
         return (
-          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-700">
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border border-red-300 dark:border-red-700">
             <XCircle className="w-3 h-3 mr-1" />Rejected
-          </Badge>
+          </span>
         );
       case 'needs_correction':
         return (
-          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
             <AlertCircle className="w-3 h-3 mr-1" />Needs Correction
-          </Badge>
+          </span>
         );
       default:
         return (
-          <Badge variant="outline" className="text-muted-foreground">
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
             Pending Review
-          </Badge>
+          </span>
         );
     }
   };
@@ -519,7 +519,7 @@ export default function DAApplicationDetail() {
 
             {/* Right Side - Document Checklist & Verification */}
             <Card className="h-[calc(100vh-320px)]">
-              <CardHeader>
+              <CardHeader className="space-y-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
                     <CardTitle>Document Checklist</CardTitle>
@@ -556,6 +556,40 @@ export default function DAApplicationDetail() {
                     </div>
                   )}
                 </div>
+                
+                {/* Progress Meter */}
+                {documents.length > 0 && (
+                  <div className="space-y-2" data-testid="progress-meter">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Overall Progress</span>
+                      <span 
+                        className={`font-semibold ${
+                          progress === 100 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : progress >= 50 
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}
+                        data-testid="text-progress-percentage"
+                      >
+                        {completedDocs} of {totalDocs} ({progress}%)
+                      </span>
+                    </div>
+                    <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden" data-testid="progress-bar-container">
+                      <div 
+                        className={`absolute top-0 left-0 h-full transition-all duration-300 ${
+                          progress === 100 
+                            ? 'bg-green-500' 
+                            : progress >= 50 
+                            ? 'bg-amber-500'
+                            : 'bg-red-500'
+                        }`}
+                        style={{ width: `${progress}%` }}
+                        data-testid="progress-bar-fill"
+                      />
+                    </div>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="h-[calc(100%-100px)] overflow-auto">
                 {documents.length === 0 ? (
