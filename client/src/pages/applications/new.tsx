@@ -779,67 +779,6 @@ export default function NewApplication() {
 
                   <FormField
                     control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Complete Address</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Enter full address with landmarks" 
-                            className="min-h-20"
-                            data-testid="input-address"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="district"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>District</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-district">
-                                <SelectValue placeholder="Select district" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {HP_DISTRICTS.map((district) => (
-                                <SelectItem key={district} value={district}>
-                                  {district}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>Auto-fills typical distances for your district</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="pincode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>PIN Code</FormLabel>
-                          <FormControl>
-                            <Input placeholder="6-digit PIN code" data-testid="input-pincode" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
                     name="locationType"
                     render={({ field }) => (
                       <FormItem>
@@ -858,7 +797,238 @@ export default function NewApplication() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormDescription>Required for calculating registration fees as per 2025 Rules</FormDescription>
+                        <FormDescription>Rural (GP) or Urban (MC/TCP) - Required for fee calculation</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* LGD Hierarchical Address - Step 1: District & Tehsil */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="district"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>District</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              // Reset dependent fields when district changes
+                              form.setValue('tehsil', '');
+                              form.setValue('block', '');
+                              form.setValue('gramPanchayat', '');
+                              form.setValue('urbanBody', '');
+                              form.setValue('ward', '');
+                            }} 
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-district">
+                                <SelectValue placeholder="Select district" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {HP_DISTRICTS.map((district) => (
+                                <SelectItem key={district} value={district}>
+                                  {district}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>Select your district first</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tehsil"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tehsil / Sub-Division</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              // Reset block/GP when tehsil changes
+                              form.setValue('block', '');
+                              form.setValue('gramPanchayat', '');
+                            }} 
+                            value={field.value}
+                            disabled={!form.watch('district')}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-tehsil">
+                                <SelectValue placeholder="Select tehsil" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {getTehsilsForDistrict(form.watch('district')).map((tehsil) => (
+                                <SelectItem key={tehsil} value={tehsil}>
+                                  {tehsil}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>Select tehsil after district</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Conditional: Rural Address (Gram Panchayat) */}
+                  {form.watch('locationType') === 'gp' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="block"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Block / Development Block</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value}
+                              disabled={!form.watch('tehsil')}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-block">
+                                  <SelectValue placeholder="Select block" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {getBlocksForTehsil(form.watch('district'), form.watch('tehsil')).map((block) => (
+                                  <SelectItem key={block} value={block}>
+                                    {block}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>Rural development block</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="gramPanchayat"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Gram Panchayat / Village</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter Gram Panchayat name" 
+                                data-testid="input-gram-panchayat" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>Your village/gram panchayat name</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+
+                  {/* Conditional: Urban Address (MC/TCP) */}
+                  {(form.watch('locationType') === 'mc' || form.watch('locationType') === 'tcp') && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="urbanBody"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Municipal Corporation / Nagar Panchayat</FormLabel>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                form.setValue('ward', '');
+                              }} 
+                              value={field.value}
+                              disabled={!form.watch('district')}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-urban-body">
+                                  <SelectValue placeholder="Select urban body" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {getUrbanBodiesForDistrict(form.watch('district')).map((ub) => (
+                                  <SelectItem key={ub.name} value={ub.name}>
+                                    {ub.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>MC/TCP/Nagar Panchayat</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="ward"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Ward Number</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value}
+                              disabled={!form.watch('urbanBody')}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-ward">
+                                  <SelectValue placeholder="Select ward" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {getWardsForUrbanBody(form.watch('district'), form.watch('urbanBody') || '').map((ward) => (
+                                  <SelectItem key={ward} value={ward}>
+                                    {ward}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>Your ward number</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>House/Building Number, Street & Locality</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="e.g., House No. 123, Main Road, Near Post Office" 
+                            className="min-h-20"
+                            data-testid="input-address"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormDescription>Specific address details with landmarks</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="pincode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>PIN Code</FormLabel>
+                        <FormControl>
+                          <Input placeholder="6-digit PIN code" data-testid="input-pincode" {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -907,16 +1077,42 @@ export default function NewApplication() {
                   <CardDescription>Details of the property owner</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="ownerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Owner Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Full name" data-testid="input-owner-name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="ownerName"
+                      name="ownerGender"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Owner Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Full name" data-testid="input-owner-name" {...field} />
-                          </FormControl>
+                          <FormLabel>Gender (affects registration fee)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-owner-gender">
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {GENDER_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>Female applicants receive 10% fee discount for 3 years</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
