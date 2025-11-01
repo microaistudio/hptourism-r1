@@ -257,55 +257,167 @@ if (locationType === "mc") {
 
 ### 5.1 Official Category Definitions (Rule 2e)
 
-| Category | Room Rate (per room per day) | GSTIN Required? |
-|----------|------------------------------|-----------------|
+| Category | Average Room Rate (per room per night) | GSTIN Required? |
+|----------|----------------------------------------|-----------------|
 | **Diamond** | **Higher than** ₹10,000 | ✅ Mandatory (ANNEXURE-I, Section 12) |
 | **Gold** | ₹3,000 to ₹10,000 (inclusive) | ✅ Mandatory (ANNEXURE-I, Section 12) |
 | **Silver** | **Less than** ₹3,000 | ❌ Exempt (ANNEXURE-I, Section 12) |
 
-### 5.2 Room Rate Definition
+### 5.2 Category Determination Logic
 
-**CRITICAL:** The rules specify **"Room rates"** - this refers to the **proposed room rent per night** that the homestay will charge guests.
+**CRITICAL CLARIFICATION:** Categories are based on **AVERAGE room rate** calculated from total revenue across all rooms, not individual room rates.
 
-**NOT** the registration fee, but the daily rate charged to tourists.
+**Average Rate Formula:**
+```
+Average Rate = Total Revenue per Night / Total Number of Rooms
+```
 
-### 5.3 Category Selection Process
+**Diamond Category Qualification:**
+- **Minimum 5 rooms** (Rule 2e specifies "Diamond" category requires substantial capacity)
+- **Average rate >₹10,000/night** per room
+- **Total revenue >₹50,000/night** (5 rooms × ₹10,000)
+
+**Example Calculations:**
+
+**Example 1: Diamond Category (VALID)**
+```
+Property has:
+- 3 single bed rooms @ ₹8,000/night = ₹24,000
+- 2 double bed rooms @ ₹15,000/night = ₹30,000
+
+Total: 5 rooms, ₹54,000/night total revenue
+Average: ₹54,000 ÷ 5 = ₹10,800/room
+Category: DIAMOND ✓ (5+ rooms AND average >₹10,000)
+```
+
+**Example 2: Gold Category**
+```
+Property has:
+- 2 single bed rooms @ ₹5,000/night = ₹10,000
+- 2 double bed rooms @ ₹7,000/night = ₹14,000
+
+Total: 4 rooms, ₹24,000/night total revenue
+Average: ₹24,000 ÷ 4 = ₹6,000/room
+Category: GOLD ✓ (average between ₹3,000-₹10,000)
+```
+
+**Example 3: Diamond Category (INVALID - Insufficient Rooms)**
+```
+Property has:
+- 2 double bed rooms @ ₹12,000/night = ₹24,000
+
+Total: 2 rooms, ₹24,000/night total revenue
+Average: ₹24,000 ÷ 2 = ₹12,000/room
+Category: GOLD (Not Diamond - less than 5 rooms)
+Note: Even though average rate >₹10,000, Diamond requires minimum 5 rooms
+```
+
+**Example 4: Silver Category**
+```
+Property has:
+- 3 single bed rooms @ ₹2,500/night = ₹7,500
+
+Total: 3 rooms, ₹7,500/night total revenue
+Average: ₹7,500 ÷ 3 = ₹2,500/room
+Category: SILVER ✓ (average <₹3,000)
+```
+
+### 5.3 Room Rate Collection
+
+**Per Room Type Rates (Required for Certificate Form-A):**
+
+The application MUST collect proposed room rent for each room type:
+- **Single bed room rate** (per night)
+- **Double bed room rate** (per night)
+- **Family suite rate** (per night)
+
+These individual rates appear on the official registration certificate (Form-A).
+
+**Total Revenue Calculation:**
+```typescript
+const totalRevenue = 
+  (singleBedRooms × singleBedRoomRate) +
+  (doubleBedRooms × doubleBedRoomRate) +
+  (familySuites × familySuiteRate);
+
+const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
+const averageRate = totalRevenue / totalRooms;
+```
+
+### 5.4 Category Selection & Validation Process
 
 **User-Selected Category:**
 - Applicant chooses Diamond/Gold/Silver during application
-- Must align with proposed room rates
+- System validates based on average rate and room count
 - Government verifies during inspection
 
 **Validation Rules:**
 ```typescript
 // Category thresholds
 const THRESHOLDS = {
-  diamond: { min: 10000 }, // >₹10,000
-  gold: { min: 3000, max: 10000 }, // ₹3,000 - ₹10,000
-  silver: { max: 3000 } // <₹3,000
+  diamond: { 
+    minRooms: 5, 
+    minAverageRate: 10000 
+  },
+  gold: { 
+    minRooms: 1, 
+    minAverageRate: 3000, 
+    maxAverageRate: 10000 
+  },
+  silver: { 
+    minRooms: 1, 
+    maxAverageRate: 3000 
+  }
 };
 
 // Validation logic
-function validateCategory(category, proposedRate) {
-  if (category === "diamond" && proposedRate <= 10000) {
-    return {
-      valid: false,
-      message: "Diamond category requires room rate >₹10,000/night"
-    };
+function validateCategory(category, totalRooms, averageRate) {
+  if (category === "diamond") {
+    if (totalRooms < 5) {
+      return {
+        valid: false,
+        message: "Diamond category requires minimum 5 rooms"
+      };
+    }
+    if (averageRate <= 10000) {
+      return {
+        valid: false,
+        message: "Diamond category requires average rate >₹10,000/night per room"
+      };
+    }
   }
-  if (category === "gold" && (proposedRate < 3000 || proposedRate > 10000)) {
-    return {
-      valid: false,
-      message: "Gold category requires room rate ₹3,000-₹10,000/night"
-    };
+  
+  if (category === "gold") {
+    if (averageRate < 3000 || averageRate > 10000) {
+      return {
+        valid: false,
+        message: "Gold category requires average rate ₹3,000-₹10,000/night per room"
+      };
+    }
   }
-  if (category === "silver" && proposedRate >= 3000) {
-    return {
-      valid: false,
-      message: "Silver category requires room rate <₹3,000/night"
-    };
+  
+  if (category === "silver") {
+    if (averageRate >= 3000) {
+      return {
+        valid: false,
+        message: "Silver category requires average rate <₹3,000/night per room"
+      };
+    }
   }
+  
   return { valid: true };
+}
+
+// Smart category suggestion
+function suggestCategory(totalRooms, averageRate) {
+  if (totalRooms >= 5 && averageRate > 10000) {
+    return "diamond";
+  } else if (averageRate >= 3000 && averageRate <= 10000) {
+    return "gold";
+  } else if (averageRate < 3000) {
+    return "silver";
+  }
+  return "silver"; // Default
 }
 ```
 

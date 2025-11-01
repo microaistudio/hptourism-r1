@@ -72,15 +72,23 @@ export const homestayApplications = pgTable("homestay_applications", {
   ownerAadhaar: varchar("owner_aadhaar", { length: 12 }).notNull(),
   
   // Room & Category Details (ANNEXURE-I)
-  proposedRoomRate: decimal("proposed_room_rate", { precision: 10, scale: 2 }).notNull(),
+  proposedRoomRate: decimal("proposed_room_rate", { precision: 10, scale: 2 }), // DEPRECATED: Use per-room-type rates below
   projectType: varchar("project_type", { length: 20 }).notNull(), // 'new_rooms', 'new_project'
   propertyArea: decimal("property_area", { precision: 10, scale: 2 }).notNull(), // in sq meters
+  
+  // 2025 Rules - Per Room Type Rates (Required for Form-A certificate)
   singleBedRooms: integer("single_bed_rooms").default(0),
   singleBedRoomSize: decimal("single_bed_room_size", { precision: 10, scale: 2 }), // in sq ft
+  singleBedRoomRate: decimal("single_bed_room_rate", { precision: 10, scale: 2 }), // per night rate for single bed rooms
+  
   doubleBedRooms: integer("double_bed_rooms").default(0),
   doubleBedRoomSize: decimal("double_bed_room_size", { precision: 10, scale: 2 }), // in sq ft
+  doubleBedRoomRate: decimal("double_bed_room_rate", { precision: 10, scale: 2 }), // per night rate for double bed rooms
+  
   familySuites: integer("family_suites").default(0),
   familySuiteSize: decimal("family_suite_size", { precision: 10, scale: 2 }), // in sq ft
+  familySuiteRate: decimal("family_suite_rate", { precision: 10, scale: 2 }), // per night rate for family suites
+  
   attachedWashrooms: integer("attached_washrooms").notNull(),
   gstin: varchar("gstin", { length: 15 }), // Mandatory for Diamond/Gold, optional for Silver
   
@@ -234,15 +242,23 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   ownerMobile: z.string().regex(/^[6-9]\d{9}$/),
   ownerEmail: z.string().email().optional().or(z.literal('')),
   ownerAadhaar: z.string().regex(/^\d{12}$/),
-  proposedRoomRate: z.number().min(100, "Room rate must be at least ₹100"),
+  proposedRoomRate: z.number().min(100, "Room rate must be at least ₹100").optional(), // DEPRECATED: Use per-room-type rates
   projectType: z.enum(['new_rooms', 'new_project']),
   propertyArea: z.number().min(1, "Property area required"),
+  
+  // 2025 Rules - Per Room Type Rates
   singleBedRooms: z.number().int().min(0).default(0),
   singleBedRoomSize: z.number().min(0).optional(),
+  singleBedRoomRate: z.number().min(100, "Single bed room rate must be at least ₹100").optional(),
+  
   doubleBedRooms: z.number().int().min(0).default(0),
   doubleBedRoomSize: z.number().min(0).optional(),
+  doubleBedRoomRate: z.number().min(100, "Double bed room rate must be at least ₹100").optional(),
+  
   familySuites: z.number().int().min(0).max(3).default(0),
   familySuiteSize: z.number().min(0).optional(),
+  familySuiteRate: z.number().min(100, "Family suite rate must be at least ₹100").optional(),
+  
   attachedWashrooms: z.number().int().min(0),
   gstin: z.string().optional().or(z.literal('')),
   
@@ -292,15 +308,23 @@ export const draftHomestayApplicationSchema = createInsertSchema(homestayApplica
   ownerMobile: z.string().optional().or(z.literal('')),
   ownerEmail: z.string().optional().or(z.literal('')),
   ownerAadhaar: z.string().optional().or(z.literal('')),
-  proposedRoomRate: z.number().optional(),
+  proposedRoomRate: z.number().optional(), // DEPRECATED: Use per-room-type rates
   projectType: z.enum(['new_rooms', 'new_project']).optional(),
   propertyArea: z.number().optional(),
+  
+  // 2025 Rules - Per Room Type Rates (optional for drafts)
   singleBedRooms: z.number().int().min(0).optional(),
   singleBedRoomSize: z.number().optional(),
+  singleBedRoomRate: z.number().optional(),
+  
   doubleBedRooms: z.number().int().min(0).optional(),
   doubleBedRoomSize: z.number().optional(),
+  doubleBedRoomRate: z.number().optional(),
+  
   familySuites: z.number().int().optional(),
   familySuiteSize: z.number().optional(),
+  familySuiteRate: z.number().optional(),
+  
   attachedWashrooms: z.number().int().optional(),
   gstin: z.string().optional().or(z.literal('')),
   
