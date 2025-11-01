@@ -1752,12 +1752,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only process applications from your district" });
       }
 
+      // Verify application is in inspection_under_review status
+      if (application.status !== 'inspection_under_review') {
+        return res.status(400).json({ 
+          message: `Cannot approve inspection report. Application must be in inspection_under_review status (current: ${application.status})` 
+        });
+      }
+
       // Update application status to verified_for_payment
       await storage.updateApplication(applicationId, {
         status: 'verified_for_payment',
-        dtdoRemarks: remarks || 'Inspection report approved. Property meets all requirements.',
-        dtdoId: userId,
-        dtdoReviewDate: new Date(),
+        districtNotes: remarks || 'Inspection report approved. Property meets all requirements.',
+        districtOfficerId: userId,
+        districtReviewDate: new Date(),
       });
 
       res.json({ message: "Inspection report approved successfully" });
@@ -1790,13 +1797,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only process applications from your district" });
       }
 
+      // Verify application is in inspection_under_review status
+      if (application.status !== 'inspection_under_review') {
+        return res.status(400).json({ 
+          message: `Cannot reject application. Application must be in inspection_under_review status (current: ${application.status})` 
+        });
+      }
+
       // Update application status to rejected
       await storage.updateApplication(applicationId, {
         status: 'rejected',
         rejectionReason: remarks,
-        dtdoRemarks: remarks,
-        dtdoId: userId,
-        dtdoReviewDate: new Date(),
+        districtNotes: remarks,
+        districtOfficerId: userId,
+        districtReviewDate: new Date(),
       });
 
       res.json({ message: "Application rejected successfully" });
@@ -1829,13 +1843,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only process applications from your district" });
       }
 
+      // Verify application is in inspection_under_review status
+      if (application.status !== 'inspection_under_review') {
+        return res.status(400).json({ 
+          message: `Cannot raise objections. Application must be in inspection_under_review status (current: ${application.status})` 
+        });
+      }
+
       // Update application status to objection_raised
       await storage.updateApplication(applicationId, {
         status: 'objection_raised',
         clarificationRequested: remarks,
-        dtdoRemarks: remarks,
-        dtdoId: userId,
-        dtdoReviewDate: new Date(),
+        districtNotes: remarks,
+        districtOfficerId: userId,
+        districtReviewDate: new Date(),
       });
 
       res.json({ message: "Objections raised successfully. Application will require re-inspection." });
