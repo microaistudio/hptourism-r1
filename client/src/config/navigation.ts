@@ -125,11 +125,6 @@ export const daNavigation: NavSection[] = [
         icon: Home,
       },
       {
-        title: "Application Queue",
-        url: "/da/dashboard",
-        icon: FileText,
-      },
-      {
         title: "Inspections",
         url: "/da/inspections",
         icon: ClipboardCheck,
