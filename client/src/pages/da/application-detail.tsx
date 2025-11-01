@@ -462,15 +462,17 @@ export default function DAApplicationDetail() {
                     <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
                       {selectedDocument.mimeType.startsWith('image/') ? (
                         <img
-                          src={selectedDocument.filePath}
+                          src={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`}
                           alt={selectedDocument.fileName}
                           className="w-full h-auto"
+                          data-testid="img-document-preview"
                         />
                       ) : selectedDocument.mimeType === 'application/pdf' ? (
                         <iframe
-                          src={selectedDocument.filePath}
+                          src={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`}
                           className="w-full h-[600px]"
                           title={selectedDocument.fileName}
+                          data-testid="iframe-document-preview"
                         />
                       ) : (
                         <div className="p-8 text-center">
@@ -478,8 +480,8 @@ export default function DAApplicationDetail() {
                           <p className="text-sm text-muted-foreground mb-4">
                             Preview not available for this file type
                           </p>
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={selectedDocument.filePath} download>
+                          <Button variant="outline" size="sm" asChild data-testid="button-download-document">
+                            <a href={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`} download>
                               <Download className="w-4 h-4 mr-2" />
                               Download File
                             </a>
