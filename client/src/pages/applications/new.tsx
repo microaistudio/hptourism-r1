@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, type CategoryType, type LocationType } from "@shared/fee-calculator";
@@ -93,7 +93,12 @@ const applicationSchema = z.object({
   
   // Category & room rate
   category: z.enum(["diamond", "gold", "silver"]),
-  proposedRoomRate: z.number().min(100, "Room rate must be positive"),
+  proposedRoomRate: z.number().optional(), // Legacy field for backward compatibility
+  
+  // Per-room-type rates (2025 Rules - Form-A Certificate Requirement)
+  singleBedRoomRate: z.number().min(0).optional(),
+  doubleBedRoomRate: z.number().min(0).optional(),
+  familySuiteRate: z.number().min(0).optional(),
   
   // Distance from key locations (in km)
   distanceAirport: z.number().min(0).optional(),
@@ -158,6 +163,9 @@ const draftSchema = z.object({
   ownerAadhaar: z.string().optional(),
   category: z.enum(["diamond", "gold", "silver"]).optional(),
   proposedRoomRate: z.number().optional(),
+  singleBedRoomRate: z.number().optional(),
+  doubleBedRoomRate: z.number().optional(),
+  familySuiteRate: z.number().optional(),
   distanceAirport: z.number().optional(),
   distanceRailway: z.number().optional(),
   distanceCityCenter: z.number().optional(),
@@ -299,6 +307,9 @@ export default function NewApplication() {
       ownerAadhaar: userData?.user?.aadhaarNumber || "",
       category: "silver",
       proposedRoomRate: 2000,
+      singleBedRoomRate: 0,
+      doubleBedRoomRate: 2000,
+      familySuiteRate: 0,
       projectType: "new_project",
       propertyArea: 0,
       singleBedRooms: 0,
@@ -335,16 +346,35 @@ export default function NewApplication() {
   const doubleBedRooms = form.watch("doubleBedRooms") || 0;
   const familySuites = form.watch("familySuites") || 0;
   const proposedRoomRate = form.watch("proposedRoomRate") || 0;
+  const singleBedRoomRate = form.watch("singleBedRoomRate") || 0;
+  const doubleBedRoomRate = form.watch("doubleBedRoomRate") || 0;
+  const familySuiteRate = form.watch("familySuiteRate") || 0;
   const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
 
-  // Smart category suggestion based on room count + room rate
-  const suggestedCategoryValue = totalRooms > 0 && proposedRoomRate > 0 
-    ? suggestCategory(totalRooms, proposedRoomRate) 
+  // Calculate weighted average rate (2025 Rules - based on total revenue)
+  const calculateWeightedAverageRate = (): number => {
+    if (totalRooms === 0) return 0;
+    
+    const totalRevenue = 
+      (singleBedRooms * singleBedRoomRate) +
+      (doubleBedRooms * doubleBedRoomRate) +
+      (familySuites * familySuiteRate);
+    
+    return Math.round(totalRevenue / totalRooms);
+  };
+
+  // Use weighted average if per-room-type rates are set, otherwise fall back to proposedRoomRate (legacy)
+  const hasPerRoomTypeRates = singleBedRoomRate > 0 || doubleBedRoomRate > 0 || familySuiteRate > 0;
+  const effectiveRate = hasPerRoomTypeRates ? calculateWeightedAverageRate() : proposedRoomRate;
+
+  // Smart category suggestion based on room count + weighted average rate
+  const suggestedCategoryValue = totalRooms > 0 && effectiveRate > 0 
+    ? suggestCategory(totalRooms, effectiveRate) 
     : null;
 
   // Validate selected category against room specs
-  const categoryValidation = category && totalRooms > 0 && proposedRoomRate > 0
-    ? validateCategorySelection(category as CategoryType, totalRooms, proposedRoomRate)
+  const categoryValidation = category && totalRooms > 0 && effectiveRate > 0
+    ? validateCategorySelection(category as CategoryType, totalRooms, effectiveRate)
     : null;
 
   // Load draft data into form when resuming
@@ -370,6 +400,9 @@ export default function NewApplication() {
         ownerAadhaar: draft.ownerAadhaar || "",
         category: (draft.category as "diamond" | "gold" | "silver") || "silver",
         proposedRoomRate: draft.proposedRoomRate ? parseFloat(draft.proposedRoomRate.toString()) : 2000,
+        singleBedRoomRate: draft.singleBedRoomRate ? parseFloat(draft.singleBedRoomRate.toString()) : 0,
+        doubleBedRoomRate: draft.doubleBedRoomRate ? parseFloat(draft.doubleBedRoomRate.toString()) : 2000,
+        familySuiteRate: draft.familySuiteRate ? parseFloat(draft.familySuiteRate.toString()) : 0,
         projectType: (draft.projectType as "new_rooms" | "new_project") || "new_project",
         propertyArea: draft.propertyArea ? parseFloat(draft.propertyArea.toString()) : 0,
         singleBedRooms: draft.singleBedRooms ? parseInt(draft.singleBedRooms.toString()) : 0,
@@ -1259,15 +1292,33 @@ export default function NewApplication() {
                     <p className="text-xs text-muted-foreground">Maximum 12 beds across all rooms</p>
                   </div>
 
+                  {/* Weighted Average Rate Display */}
+                  {hasPerRoomTypeRates && totalRooms > 0 && effectiveRate > 0 && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <div>
+                          <p className="font-medium text-sm">Weighted Average Rate</p>
+                          <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1">
+                            ₹{effectiveRate.toLocaleString('en-IN')}/night
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with different rates
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Smart Category Suggestion */}
-                  {suggestedCategoryValue && totalRooms > 0 && proposedRoomRate > 0 && (
+                  {suggestedCategoryValue && totalRooms > 0 && effectiveRate > 0 && (
                     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4" data-testid="alert-category-suggestion">
                       <div className="flex items-start gap-3">
                         <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
                         <div className="flex-1">
                           <p className="font-medium text-sm">Recommended Category</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with ₹{proposedRoomRate.toLocaleString('en-IN')}/night rate
+                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with ₹{effectiveRate.toLocaleString('en-IN')}/night {hasPerRoomTypeRates ? 'average' : ''} rate
                           </p>
                           <div className="mt-3 flex items-center gap-3">
                             <Badge variant={getCategoryBadge(suggestedCategoryValue).variant} className="text-base px-3 py-1">
@@ -1391,28 +1442,94 @@ export default function NewApplication() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="proposedRoomRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Proposed Room Rate (per day)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="Enter rate" 
-                              data-testid="input-room-rate" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormDescription>Suggested category will appear based on rate</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  {/* Per-Room-Type Rates (2025 Rules Compliant) */}
+                  <div className="space-y-4">
+                    <div className="bg-muted/30 border border-muted rounded-lg p-4">
+                      <h4 className="font-medium text-sm mb-2">Room Rates (Per Night)</h4>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Enter the proposed rate for each room type. Category will be determined by weighted average rate.
+                      </p>
 
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {singleBedRooms > 0 && (
+                          <FormField
+                            control={form.control}
+                            name="singleBedRoomRate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Single Bed Room Rate</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="Rate per night" 
+                                    data-testid="input-single-bed-rate" 
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-xs">
+                                  For {singleBedRooms} single bed {singleBedRooms === 1 ? 'room' : 'rooms'}
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {doubleBedRooms > 0 && (
+                          <FormField
+                            control={form.control}
+                            name="doubleBedRoomRate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Double Bed Room Rate</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="Rate per night" 
+                                    data-testid="input-double-bed-rate" 
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-xs">
+                                  For {doubleBedRooms} double bed {doubleBedRooms === 1 ? 'room' : 'rooms'}
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {familySuites > 0 && (
+                          <FormField
+                            control={form.control}
+                            name="familySuiteRate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Family Suite Rate</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="Rate per night" 
+                                    data-testid="input-family-suite-rate" 
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormDescription className="text-xs">
+                                  For {familySuites} family {familySuites === 1 ? 'suite' : 'suites'}
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="projectType"
