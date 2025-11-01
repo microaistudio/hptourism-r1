@@ -1475,6 +1475,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DTDO accept application (schedule inspection)
+  app.post("/api/dtdo/applications/:id/accept", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { remarks } = req.body;
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only process applications from your district" });
+      }
+
+      // Verify application status
+      if (application.status !== 'forwarded_to_dtdo' && application.status !== 'dtdo_review') {
+        return res.status(400).json({ message: "Application is not in the correct status for DTDO review" });
+      }
+
+      // Update application status to dtdo_review (intermediate state)
+      // Will only move to inspection_scheduled after successful inspection scheduling
+      await storage.updateApplication(req.params.id, {
+        status: 'dtdo_review',
+        dtdoRemarks: remarks || null,
+        dtdoId: userId,
+        dtdoReviewDate: new Date(),
+      });
+
+      res.json({ message: "Application accepted. Proceed to schedule inspection.", applicationId: req.params.id });
+    } catch (error) {
+      console.error("[dtdo] Failed to accept application:", error);
+      res.status(500).json({ message: "Failed to accept application" });
+    }
+  });
+
+  // DTDO reject application
+  app.post("/api/dtdo/applications/:id/reject", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { remarks } = req.body;
+      
+      if (!remarks || remarks.trim().length === 0) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only process applications from your district" });
+      }
+
+      // Update application status to rejected
+      await storage.updateApplication(req.params.id, {
+        status: 'rejected',
+        dtdoRemarks: remarks,
+        dtdoId: userId,
+        dtdoReviewDate: new Date(),
+        rejectionReason: remarks,
+      });
+
+      res.json({ message: "Application rejected successfully" });
+    } catch (error) {
+      console.error("[dtdo] Failed to reject application:", error);
+      res.status(500).json({ message: "Failed to reject application" });
+    }
+  });
+
+  // DTDO revert application to applicant
+  app.post("/api/dtdo/applications/:id/revert", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { remarks } = req.body;
+      
+      if (!remarks || remarks.trim().length === 0) {
+        return res.status(400).json({ message: "Please specify what corrections are needed" });
+      }
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+
+      const application = await storage.getApplication(req.params.id);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application is from DTDO's district
+      if (user?.district && application.district !== user.district) {
+        return res.status(403).json({ message: "You can only process applications from your district" });
+      }
+
+      // Update application status to reverted_by_dtdo
+      await storage.updateApplication(req.params.id, {
+        status: 'reverted_by_dtdo',
+        dtdoRemarks: remarks,
+        dtdoId: userId,
+        dtdoReviewDate: new Date(),
+      });
+
+      res.json({ message: "Application reverted to applicant successfully" });
+    } catch (error) {
+      console.error("[dtdo] Failed to revert application:", error);
+      res.status(500).json({ message: "Failed to revert application" });
+    }
+  });
+
+  // Get available DAs for DTDO's district
+  app.get("/api/dtdo/available-das", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.district) {
+        return res.status(400).json({ message: "DTDO must be assigned to a district" });
+      }
+
+      // Get all DAs from the same district
+      const allUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.district, user.district));
+
+      const das = allUsers
+        .filter(u => u.role === 'dealing_assistant')
+        .map(da => ({
+          id: da.id,
+          fullName: da.fullName,
+          mobile: da.mobile,
+        }));
+
+      res.json({ das });
+    } catch (error) {
+      console.error("[dtdo] Failed to fetch DAs:", error);
+      res.status(500).json({ message: "Failed to fetch available DAs" });
+    }
+  });
+
+  // Schedule inspection (create inspection order)
+  app.post("/api/dtdo/schedule-inspection", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+    try {
+      const { applicationId, inspectionDate, assignedTo, specialInstructions } = req.body;
+      const userId = req.session.userId!;
+
+      if (!applicationId || !inspectionDate || !assignedTo) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const application = await storage.getApplication(applicationId);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Verify application status - should be in dtdo_review after acceptance
+      if (application.status !== 'dtdo_review') {
+        return res.status(400).json({ message: "Application must be accepted by DTDO before scheduling inspection" });
+      }
+
+      // Create inspection order
+      const newInspectionOrder = await db
+        .insert(inspectionOrders)
+        .values({
+          applicationId,
+          scheduledBy: userId,
+          scheduledDate: new Date(),
+          assignedTo,
+          assignedDate: new Date(),
+          inspectionDate: new Date(inspectionDate),
+          inspectionAddress: application.address,
+          specialInstructions: specialInstructions || null,
+          status: 'scheduled',
+        })
+        .returning();
+
+      // Only NOW update the application status to inspection_scheduled
+      await storage.updateApplication(applicationId, {
+        status: 'inspection_scheduled',
+      });
+
+      res.json({ message: "Inspection scheduled successfully", inspectionOrder: newInspectionOrder[0] });
+    } catch (error) {
+      console.error("[dtdo] Failed to schedule inspection:", error);
+      res.status(500).json({ message: "Failed to schedule inspection" });
+    }
+  });
+
   // ====================================================================
   // DA INSPECTION ROUTES
   // ====================================================================

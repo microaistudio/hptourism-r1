@@ -37,6 +37,9 @@ import DAInspections from "@/pages/da/inspections";
 import DAInspectionReport from "@/pages/da/inspection-report";
 import DAProfile from "@/pages/da/profile";
 import DTDODashboard from "@/pages/dtdo/dashboard";
+import DTDOApplicationReview from "@/pages/dtdo/application-review";
+import DTDOScheduleInspection from "@/pages/dtdo/schedule-inspection";
+import DTDOProfile from "@/pages/dtdo/profile";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -178,6 +181,15 @@ function Router() {
       {/* DTDO (District Tourism Development Officer) Routes */}
       <Route path="/dtdo/dashboard">
         {() => <ProtectedRoute component={DTDODashboard} allowedRoles={['district_tourism_officer', 'district_officer']} />}
+      </Route>
+      <Route path="/dtdo/applications/:id">
+        {() => <ProtectedRoute component={DTDOApplicationReview} allowedRoles={['district_tourism_officer', 'district_officer']} />}
+      </Route>
+      <Route path="/dtdo/schedule-inspection/:id">
+        {() => <ProtectedRoute component={DTDOScheduleInspection} allowedRoles={['district_tourism_officer', 'district_officer']} />}
+      </Route>
+      <Route path="/dtdo/profile">
+        {() => <ProtectedRoute component={DTDOProfile} allowedRoles={['district_tourism_officer', 'district_officer']} />}
       </Route>
       
       <Route component={NotFound} />

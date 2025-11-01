@@ -1,4 +1,4 @@
-import { Home, FileText, Bell, BarChart3, Users, ClipboardList, Settings, Database, ClipboardCheck, User } from "lucide-react";
+import { Home, FileText, Bell, BarChart3, BarChart, Users, ClipboardList, Settings, Database, ClipboardCheck, User, Activity } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -143,6 +143,35 @@ export const daNavigation: NavSection[] = [
   },
 ];
 
+// DTDO Navigation Menu
+export const dtdoNavigation: NavSection[] = [
+  {
+    title: "Main",
+    items: [
+      {
+        title: "Dashboard",
+        url: "/dtdo/dashboard",
+        icon: Home,
+      },
+      {
+        title: "Analytics",
+        url: "/analytics",
+        icon: BarChart,
+      },
+      {
+        title: "Workflow Monitor",
+        url: "/workflow-monitoring",
+        icon: Activity,
+      },
+      {
+        title: "My Profile",
+        url: "/dtdo/profile",
+        icon: User,
+      },
+    ],
+  },
+];
+
 // Get navigation based on user role
 export function getNavigationForRole(role: string): NavSection[] {
   if (role === 'super_admin') {
@@ -155,7 +184,7 @@ export function getNavigationForRole(role: string): NavSection[] {
     return daNavigation;
   }
   if (role === 'district_tourism_officer' || role === 'district_officer') {
-    return officerNavigation; // DTDO uses officer navigation
+    return dtdoNavigation; // DTDO has dedicated navigation
   }
   if (role === 'state_officer') {
     return officerNavigation;
