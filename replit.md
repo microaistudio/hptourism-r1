@@ -41,6 +41,12 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
   - **DTDO Dashboard**: Shows applications forwarded by DA with status-based tabs (Forwarded, Under Review, Inspection Scheduled, Reports Received)
   - **Application Review Interface**: View application details and DA remarks, with three decision options: Accept (schedule inspection), Reject (with reasons), or Revert to applicant
   - **Inspection Scheduling System**: After accepting, DTDO can schedule inspections by selecting date/time, assigning to a DA from the same district, and adding special instructions
+  - **Post-Inspection Report Review**: Complete DTDO inspection report review workflow implementing PRD_2.0.md state machine:
+    - **Status Flow**: DA submits report → `inspection_under_review` → DTDO reviews → `verified_for_payment`/`rejected`/`objection_raised`
+    - **Inspection Review Page**: Comprehensive review interface displaying ANNEXURE-III compliance data, DA findings, property details, and owner information
+    - **Three Decision Actions**: Approve (verified_for_payment), Reject (rejected), Raise Objections (objection_raised for re-inspection)
+    - **Status Guards**: All DTDO decision endpoints enforce status validation to prevent out-of-order state transitions
+    - **Data Persistence**: DTDO decisions stored in `districtOfficerId`, `districtNotes`, `districtReviewDate` fields with proper audit trail
   - **DTDO Profile Page**: View/edit profile and change password
   - **Critical Workflow Fix**: Status transitions use intermediate `dtdo_review` state after acceptance, only moving to `inspection_scheduled` after successful inspection order creation, preventing orphaned records and workflow breakage
   - **District-Based Filtering**: All DTDO endpoints enforce district-level access control, ensuring officers only see applications from their assigned district
