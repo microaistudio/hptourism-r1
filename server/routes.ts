@@ -1048,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only submitted applications can be put under scrutiny" });
       }
 
-      await storage.updateApplicationStatus(req.params.id, 'under_scrutiny');
+      await storage.updateApplication(req.params.id, { status: 'under_scrutiny' });
       
       res.json({ message: "Application is now under scrutiny" });
     } catch (error) {
@@ -1101,7 +1101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only applications under scrutiny can be forwarded" });
       }
 
-      await storage.updateApplicationStatus(req.params.id, 'forwarded_to_dtdo');
+      await storage.updateApplication(req.params.id, { status: 'forwarded_to_dtdo' });
       
       // TODO: Add timeline entry with remarks when timeline system is implemented
       
@@ -1130,7 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only applications under scrutiny can be sent back" });
       }
 
-      await storage.updateApplicationStatus(req.params.id, 'reverted_to_applicant');
+      await storage.updateApplication(req.params.id, { status: 'reverted_to_applicant' });
       
       // TODO: Add timeline entry with reason when timeline system is implemented
       // TODO: Send notification to applicant

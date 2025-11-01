@@ -62,11 +62,7 @@ export default function DAApplicationDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  if (!id) {
-    setLocation("/da/dashboard");
-    return null;
-  }
-  
+  // All state hooks MUST come before any conditional returns
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [sendBackDialogOpen, setSendBackDialogOpen] = useState(false);
   const [remarks, setRemarks] = useState("");
@@ -79,6 +75,7 @@ export default function DAApplicationDetail() {
 
   const { data, isLoading } = useQuery<ApplicationData>({
     queryKey: ["/api/da/applications", id],
+    enabled: !!id, // Only run query if id exists
   });
 
   // Start Scrutiny Mutation
@@ -173,6 +170,29 @@ export default function DAApplicationDetail() {
     },
   });
 
+  // Initialize verification states for documents (in useEffect to avoid render-time state updates)
+  // Re-hydrate whenever documents change to ensure synchronization
+  // MUST be before any conditional returns to satisfy Rules of Hooks
+  useEffect(() => {
+    if (data?.documents && data.documents.length > 0) {
+      const initialVerifications: Record<string, DocumentVerification> = {};
+      data.documents.forEach(doc => {
+        initialVerifications[doc.id] = {
+          documentId: doc.id,
+          status: doc.verificationStatus as any || 'pending',
+          notes: doc.verificationNotes || '',
+        };
+      });
+      setVerifications(initialVerifications);
+    }
+  }, [data?.documents]);
+
+  // Check for missing id AFTER all hooks are called
+  if (!id) {
+    setLocation("/da/dashboard");
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
@@ -194,22 +214,6 @@ export default function DAApplicationDetail() {
   }
 
   const { application, owner, documents } = data;
-
-  // Initialize verification states for documents (in useEffect to avoid render-time state updates)
-  // Re-hydrate whenever documents change to ensure synchronization
-  useEffect(() => {
-    if (documents.length > 0) {
-      const initialVerifications: Record<string, DocumentVerification> = {};
-      documents.forEach(doc => {
-        initialVerifications[doc.id] = {
-          documentId: doc.id,
-          status: doc.verificationStatus as any || 'pending',
-          notes: doc.verificationNotes || '',
-        };
-      });
-      setVerifications(initialVerifications);
-    }
-  }, [documents]);
 
   // Calculate verification progress - count any non-pending status as complete (verified, rejected, needs_correction)
   const totalDocs = documents.length;
@@ -327,7 +331,7 @@ export default function DAApplicationDetail() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <Label>Document Verification Progress</Label>
-              <span className="text-sm font-medium">{verifiedDocs} / {totalDocs} documents verified</span>
+              <span className="text-sm font-medium">{completedDocs} / {totalDocs} documents reviewed</span>
             </div>
             <Progress value={progress} className="h-2" />
           </CardContent>
@@ -562,8 +566,8 @@ export default function DAApplicationDetail() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <DetailRow label="Property Name" value={application.propertyName} />
-                <DetailRow label="Category" value={application.category.toUpperCase()} />
-                <DetailRow label="Location Type" value={application.locationType.toUpperCase()} />
+                <DetailRow label="Category" value={application.category?.toUpperCase() || "N/A"} />
+                <DetailRow label="Location Type" value={application.locationType?.toUpperCase() || "N/A"} />
                 <DetailRow label="Address" value={application.address} />
                 <DetailRow label="District" value={application.district} />
                 <DetailRow label="Pincode" value={application.pincode} />
