@@ -32,6 +32,57 @@ export const selectUserSchema = createSelectSchema(users);
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// User Profiles Table - Stores default owner information for auto-populating applications
+export const userProfiles = pgTable("user_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Personal Details
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  gender: varchar("gender", { length: 10 }).notNull(), // 'male', 'female', 'other'
+  aadhaarNumber: varchar("aadhaar_number", { length: 12 }),
+  mobile: varchar("mobile", { length: 15 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  
+  // Address Details (LGD Hierarchical)
+  district: varchar("district", { length: 100 }),
+  tehsil: varchar("tehsil", { length: 100 }),
+  block: varchar("block", { length: 100 }), // For rural (GP) areas
+  gramPanchayat: varchar("gram_panchayat", { length: 100 }), // For rural (GP) areas
+  urbanBody: varchar("urban_body", { length: 200 }), // For urban (MC/TCP) areas
+  ward: varchar("ward", { length: 50 }), // For urban (MC/TCP) areas
+  address: text("address"),
+  pincode: varchar("pincode", { length: 10 }),
+  telephone: varchar("telephone", { length: 20 }),
+  fax: varchar("fax", { length: 20 }),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserProfileSchema = createInsertSchema(userProfiles, {
+  fullName: z.string().min(3, "Name must be at least 3 characters"),
+  gender: z.enum(['male', 'female', 'other']),
+  aadhaarNumber: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional().or(z.literal('')),
+  mobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid mobile number"),
+  email: z.string().email().optional().or(z.literal('')),
+  district: z.string().optional().or(z.literal('')),
+  tehsil: z.string().optional().or(z.literal('')),
+  block: z.string().optional().or(z.literal('')),
+  gramPanchayat: z.string().optional().or(z.literal('')),
+  urbanBody: z.string().optional().or(z.literal('')),
+  ward: z.string().optional().or(z.literal('')),
+  address: z.string().optional().or(z.literal('')),
+  pincode: z.string().regex(/^[1-9]\d{5}$/, "Invalid pincode").optional().or(z.literal('')),
+  telephone: z.string().optional().or(z.literal('')),
+  fax: z.string().optional().or(z.literal('')),
+}).omit({ id: true, userId: true, createdAt: true, updatedAt: true });
+
+export const selectUserProfileSchema = createSelectSchema(userProfiles);
+export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
+export type UserProfile = typeof userProfiles.$inferSelect;
+
 // Homestay Applications Table
 export const homestayApplications = pgTable("homestay_applications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
