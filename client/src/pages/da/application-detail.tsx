@@ -233,6 +233,20 @@ export default function DAApplicationDetail() {
         };
       });
       setVerifications(initialVerifications);
+      
+      // Auto-select first document if no document currently selected
+      // OR if the selected document's ID doesn't exist in new documents (stale after navigation)
+      setSelectedDocument(prevSelected => {
+        const documentIds = data.documents.map(d => d.id);
+        if (!prevSelected || !documentIds.includes(prevSelected.id)) {
+          return data.documents[0];
+        }
+        return prevSelected;
+      });
+    } else if (data?.documents && data.documents.length === 0) {
+      // Clear state when navigating to application with no documents
+      setVerifications({});
+      setSelectedDocument(null);
     }
   }, [data?.documents]);
 
@@ -625,15 +639,17 @@ export default function DAApplicationDetail() {
                               {/* Document Info */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2 mb-1">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <Badge variant="outline" className="text-xs font-normal">
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs font-normal shrink-0">
                                         {index + 1} of {documents.length}
                                       </Badge>
-                                      {getStatusBadge(verifications[doc.id]?.status || 'pending')}
-                                      <h4 className="font-medium text-sm">{doc.documentType}</h4>
+                                      <h4 className="font-medium text-sm truncate">{doc.documentType}</h4>
                                     </div>
-                                    <p className="text-xs text-muted-foreground truncate mt-1">
+                                    <div className="flex items-center gap-2">
+                                      {getStatusBadge(verifications[doc.id]?.status || 'pending')}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate">
                                       {doc.fileName}
                                     </p>
                                   </div>
