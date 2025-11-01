@@ -36,6 +36,8 @@ import {
   Save,
   Eye,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -62,6 +64,14 @@ export default function DAApplicationDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
+  // Parse queue from URL query params
+  const searchParams = new URLSearchParams(window.location.search);
+  const queueParam = searchParams.get('queue');
+  const applicationQueue = queueParam ? queueParam.split(',') : [];
+  const currentIndex = applicationQueue.indexOf(id || '');
+  const hasPrevious = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < applicationQueue.length - 1;
+  
   // All state hooks MUST come before any conditional returns
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [sendBackDialogOpen, setSendBackDialogOpen] = useState(false);
@@ -72,6 +82,43 @@ export default function DAApplicationDetail() {
   // Document verification state
   const [verifications, setVerifications] = useState<Record<string, DocumentVerification>>({});
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+  
+  // Navigation functions
+  const navigateToApplication = (targetId: string) => {
+    const queue = applicationQueue.join(',');
+    setLocation(`/da/applications/${targetId}?queue=${encodeURIComponent(queue)}`);
+  };
+  
+  const goToPrevious = () => {
+    if (hasPrevious) {
+      navigateToApplication(applicationQueue[currentIndex - 1]);
+    }
+  };
+  
+  const goToNext = () => {
+    if (hasNext) {
+      navigateToApplication(applicationQueue[currentIndex + 1]);
+    }
+  };
+  
+  // Keyboard shortcuts for navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if not typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      if (e.key === 'ArrowLeft' && hasPrevious) {
+        goToPrevious();
+      } else if (e.key === 'ArrowRight' && hasNext) {
+        goToNext();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [hasPrevious, hasNext, currentIndex]);
 
   const { data, isLoading } = useQuery<ApplicationData>({
     queryKey: ["/api/da/applications", id],
@@ -268,20 +315,56 @@ export default function DAApplicationDetail() {
           Back to Dashboard
         </Button>
 
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-bold mb-2">{application.propertyName}</h1>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
               <span>Application #{application.applicationNumber}</span>
               <Separator orientation="vertical" className="h-4" />
               <span>{owner?.fullName} • {owner?.mobile}</span>
               <Separator orientation="vertical" className="h-4" />
               <Badge variant="outline">{application.category.toUpperCase()}</Badge>
+              {applicationQueue.length > 0 && (
+                <>
+                  <Separator orientation="vertical" className="h-4" />
+                  <span className="text-xs font-medium">
+                    {currentIndex + 1} of {applicationQueue.length}
+                  </span>
+                </>
+              )}
             </div>
           </div>
+          
+          {/* Navigation Controls */}
+          {applicationQueue.length > 1 && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPrevious}
+                disabled={!hasPrevious}
+                data-testid="button-previous"
+                title="Previous application (←)"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNext}
+                disabled={!hasNext}
+                data-testid="button-next"
+                title="Next application (→)"
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             {application.status === 'submitted' && (
               <Button
                 onClick={() => startScrutinyMutation.mutate()}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,8 @@ interface ApplicationWithOwner extends HomestayApplication {
 }
 
 export default function DADashboard() {
+  const [activeTab, setActiveTab] = useState("new");
+  
   const { data: applications, isLoading } = useQuery<ApplicationWithOwner[]>({
     queryKey: ["/api/da/applications"],
   });
@@ -55,6 +58,7 @@ export default function DADashboard() {
       icon: FileText,
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-50 dark:bg-blue-950/20",
+      tabValue: "new",
     },
     {
       title: "Under Scrutiny",
@@ -63,6 +67,7 @@ export default function DADashboard() {
       icon: Search,
       color: "text-orange-600 dark:text-orange-400",
       bgColor: "bg-orange-50 dark:bg-orange-950/20",
+      tabValue: "scrutiny",
     },
     {
       title: "Forwarded to DTDO",
@@ -71,6 +76,7 @@ export default function DADashboard() {
       icon: CheckCircle,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-50 dark:bg-green-950/20",
+      tabValue: "forwarded",
     },
     {
       title: "Sent Back",
@@ -79,6 +85,7 @@ export default function DADashboard() {
       icon: AlertCircle,
       color: "text-red-600 dark:text-red-400",
       bgColor: "bg-red-50 dark:bg-red-950/20",
+      tabValue: "reverted",
     },
   ];
 
@@ -97,7 +104,12 @@ export default function DADashboard() {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title}>
+            <Card 
+              key={stat.title}
+              className="cursor-pointer transition-all hover-elevate active-elevate-2"
+              onClick={() => setActiveTab(stat.tabValue)}
+              data-testid={`card-${stat.tabValue}`}
+            >
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
                 <div className={`p-2 rounded-lg ${stat.bgColor}`}>
@@ -114,7 +126,7 @@ export default function DADashboard() {
       </div>
 
       {/* Application Queue Tabs */}
-      <Tabs defaultValue="new" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="new" data-testid="tab-new">
             New ({newApplications.length})
@@ -148,7 +160,12 @@ export default function DADashboard() {
               ) : (
                 <div className="space-y-3">
                   {newApplications.map((app) => (
-                    <ApplicationRow key={app.id} application={app} actionLabel="Start Scrutiny" />
+                    <ApplicationRow 
+                      key={app.id} 
+                      application={app} 
+                      actionLabel="Start Scrutiny"
+                      applicationIds={newApplications.map(a => a.id)}
+                    />
                   ))}
                 </div>
               )}
@@ -174,7 +191,12 @@ export default function DADashboard() {
               ) : (
                 <div className="space-y-3">
                   {underScrutiny.map((app) => (
-                    <ApplicationRow key={app.id} application={app} actionLabel="Continue Review" />
+                    <ApplicationRow 
+                      key={app.id} 
+                      application={app} 
+                      actionLabel="Continue Review"
+                      applicationIds={underScrutiny.map(a => a.id)}
+                    />
                   ))}
                 </div>
               )}
@@ -200,7 +222,12 @@ export default function DADashboard() {
               ) : (
                 <div className="space-y-3">
                   {forwarded.map((app) => (
-                    <ApplicationRow key={app.id} application={app} actionLabel="View Details" />
+                    <ApplicationRow 
+                      key={app.id} 
+                      application={app} 
+                      actionLabel="View Details"
+                      applicationIds={forwarded.map(a => a.id)}
+                    />
                   ))}
                 </div>
               )}
@@ -226,7 +253,12 @@ export default function DADashboard() {
               ) : (
                 <div className="space-y-3">
                   {reverted.map((app) => (
-                    <ApplicationRow key={app.id} application={app} actionLabel="View Details" />
+                    <ApplicationRow 
+                      key={app.id} 
+                      application={app} 
+                      actionLabel="View Details"
+                      applicationIds={reverted.map(a => a.id)}
+                    />
                   ))}
                 </div>
               )}
@@ -241,9 +273,10 @@ export default function DADashboard() {
 interface ApplicationRowProps {
   application: ApplicationWithOwner;
   actionLabel: string;
+  applicationIds: string[];
 }
 
-function ApplicationRow({ application, actionLabel }: ApplicationRowProps) {
+function ApplicationRow({ application, actionLabel, applicationIds }: ApplicationRowProps) {
   const getCategoryBadge = (category: string) => {
     const variants: Record<string, { color: string; bg: string }> = {
       diamond: { color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/20" },
@@ -271,7 +304,7 @@ function ApplicationRow({ application, actionLabel }: ApplicationRowProps) {
         <div className="flex items-center gap-3 mb-2">
           <h3 className="font-semibold truncate">{application.propertyName}</h3>
           {getCategoryBadge(application.category || 'silver')}
-          {getStatusBadge(application.status)}
+          {getStatusBadge(application.status || 'submitted')}
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
           <div>
@@ -290,7 +323,9 @@ function ApplicationRow({ application, actionLabel }: ApplicationRowProps) {
         </div>
       </div>
       <div className="ml-4">
-        <Link href={`/da/applications/${application.id}`}>
+        <Link 
+          href={`/da/applications/${application.id}?queue=${encodeURIComponent(applicationIds.join(','))}`}
+        >
           <Button data-testid={`button-review-${application.id}`}>
             {actionLabel}
             <ArrowRight className="w-4 h-4 ml-2" />
