@@ -10,6 +10,31 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (Last Updated: Nov 01, 2025)
 
+### Document Scrutiny UI Enhancements (COMPLETED)
+
+**Status**: ✅ Completed, Architect Approved & User Verified
+
+**Implemented Features**:
+1. **Auto-Document Selection** - First document automatically selected on page load and during navigation between applications
+2. **Status Badge Visibility** - Dedicated line layout for status badges with clear color coding:
+   - 🟢 Verified (green with checkmark icon)
+   - 🔴 Rejected (red with X icon)  
+   - 🟡 Needs Correction (amber with alert icon)
+   - ⚪ Pending Review (gray)
+3. **Smart State Management** - Verification progress preserved when switching between documents within same application
+4. **Zero-Document Handling** - Graceful empty state when navigating to applications without uploaded documents
+5. **Image Preview Error Handling** - Fallback display for corrupted/missing image files with console debugging
+
+**Technical Implementation**:
+- useEffect with `[data?.documents]` dependency to hydrate verification states only on navigation
+- Functional setState pattern to check for stale document selection without causing re-renders
+- Separate line in flex layout for status badges (no longer hidden by text overflow)
+- Error boundary on image elements with onError/onLoad handlers for debugging
+
+**UX Impact**: DAs can immediately see document preview and verification status without manual selection, improving review workflow efficiency.
+
+---
+
 ### Navigation Enhancements for DA Workflow (COMPLETED)
 
 **Status**: ✅ Completed, Architect Approved & Tested
