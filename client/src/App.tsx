@@ -39,6 +39,7 @@ import DAProfile from "@/pages/da/profile";
 import DTDODashboard from "@/pages/dtdo/dashboard";
 import DTDOApplicationReview from "@/pages/dtdo/application-review";
 import DTDOScheduleInspection from "@/pages/dtdo/schedule-inspection";
+import DTDOInspectionReview from "@/pages/dtdo/inspection-review";
 import DTDOProfile from "@/pages/dtdo/profile";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
@@ -187,6 +188,9 @@ function Router() {
       </Route>
       <Route path="/dtdo/schedule-inspection/:id">
         {() => <ProtectedRoute component={DTDOScheduleInspection} allowedRoles={['district_tourism_officer', 'district_officer']} />}
+      </Route>
+      <Route path="/dtdo/inspection-review/:id">
+        {() => <ProtectedRoute component={DTDOInspectionReview} allowedRoles={['district_tourism_officer', 'district_officer']} />}
       </Route>
       <Route path="/dtdo/profile">
         {() => <ProtectedRoute component={DTDOProfile} allowedRoles={['district_tourism_officer', 'district_officer']} />}

@@ -1396,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'forwarded_to_dtdo',
         'dtdo_review',
         'inspection_scheduled',
-        'inspection_completed'
+        'inspection_under_review'
       ];
       const relevantApplications = allApplications.filter(app => 
         dtdoRelevantStatuses.includes(app.status)

@@ -39,7 +39,7 @@ export default function DTDODashboard() {
   const forwardedByDA = applications?.filter(app => app.status === 'forwarded_to_dtdo') || [];
   const underReview = applications?.filter(app => app.status === 'dtdo_review') || [];
   const inspectionPending = applications?.filter(app => app.status === 'inspection_scheduled') || [];
-  const inspectionCompleted = applications?.filter(app => app.status === 'inspection_completed') || [];
+  const inspectionCompleted = applications?.filter(app => app.status === 'inspection_under_review') || [];
 
   if (isLoading) {
     return (
@@ -104,8 +104,8 @@ export default function DTDODashboard() {
         label: "Inspection Scheduled",
         className: "bg-purple-50 text-purple-700 dark:bg-purple-950/20",
       },
-      inspection_completed: {
-        label: "Report Submitted",
+      inspection_under_review: {
+        label: "Report Awaiting Review",
         className: "bg-green-50 text-green-700 dark:bg-green-950/20",
       },
     };
@@ -174,7 +174,11 @@ export default function DTDODashboard() {
                     {app.submittedAt ? format(new Date(app.submittedAt), "MMM dd, yyyy") : "N/A"}
                   </td>
                   <td className="p-4 text-right">
-                    <Link href={`/dtdo/applications/${app.id}`}>
+                    <Link href={
+                      app.status === 'inspection_under_review' 
+                        ? `/dtdo/inspection-review/${app.id}` 
+                        : `/dtdo/applications/${app.id}`
+                    }>
                       <Button size="sm" variant="ghost" data-testid={`button-review-${app.id}`}>
                         Review <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
