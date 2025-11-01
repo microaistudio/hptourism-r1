@@ -88,7 +88,7 @@ export default function DADashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Dealing Assistant Dashboard</h1>
         <p className="text-muted-foreground">
-          {user?.user?.assignedDistrict || 'District'} - Application Scrutiny & Verification
+          {user?.user?.district || 'District'} - Application Scrutiny & Verification
         </p>
       </div>
 
