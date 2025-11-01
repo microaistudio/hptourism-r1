@@ -732,8 +732,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ application });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", error.errors);
         return res.status(400).json({ message: error.errors[0].message });
       }
+      console.error("Application creation error:", error);
       res.status(500).json({ message: "Failed to create application" });
     }
   });
