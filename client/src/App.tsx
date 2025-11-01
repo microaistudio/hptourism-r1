@@ -35,6 +35,7 @@ import DADashboard from "@/pages/da/dashboard";
 import DAApplicationDetail from "@/pages/da/application-detail";
 import DAInspections from "@/pages/da/inspections";
 import DAInspectionReport from "@/pages/da/inspection-report";
+import DAProfile from "@/pages/da/profile";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -159,6 +160,9 @@ function Router() {
       {/* Dealing Assistant Routes */}
       <Route path="/da/dashboard">
         {() => <ProtectedRoute component={DADashboard} allowedRoles={['dealing_assistant']} />}
+      </Route>
+      <Route path="/da/profile">
+        {() => <ProtectedRoute component={DAProfile} allowedRoles={['dealing_assistant']} />}
       </Route>
       <Route path="/da/applications/:id">
         {() => <ProtectedRoute component={DAApplicationDetail} allowedRoles={['dealing_assistant']} />}

@@ -134,6 +134,11 @@ export const daNavigation: NavSection[] = [
         url: "/da/inspections",
         icon: ClipboardCheck,
       },
+      {
+        title: "My Profile",
+        url: "/da/profile",
+        icon: User,
+      },
     ],
   },
 ];

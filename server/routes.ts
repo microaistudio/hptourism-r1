@@ -1118,6 +1118,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DEALING ASSISTANT (DA) ROUTES
   // ========================================
 
+  // Update DA profile
+  app.patch("/api/da/profile", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { fullName, email, mobile } = req.body;
+
+      // Validate input
+      if (!fullName || fullName.trim().length < 3) {
+        return res.status(400).json({ message: "Full name must be at least 3 characters" });
+      }
+
+      if (mobile && !/^[6-9]\d{9}$/.test(mobile)) {
+        return res.status(400).json({ message: "Invalid mobile number" });
+      }
+
+      // Update user
+      const updated = await storage.updateUser(userId, {
+        fullName: fullName.trim(),
+        email: email?.trim() || null,
+        mobile: mobile.trim(),
+      });
+
+      res.json({ user: updated, message: "Profile updated successfully" });
+    } catch (error) {
+      console.error("[da] Failed to update profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Change DA password
+  app.post("/api/da/change-password", requireRole('dealing_assistant'), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters" });
+      }
+
+      // Get user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      const isValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      await storage.updateUser(userId, { password: hashedPassword });
+
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("[da] Failed to change password:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
   // Get applications for DA (district-specific)
   app.get("/api/da/applications", requireRole('dealing_assistant'), async (req, res) => {
     try {
