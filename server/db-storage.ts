@@ -54,6 +54,22 @@ export class DbStorage implements IStorage {
       .orderBy(desc(homestayApplications.createdAt));
   }
 
+  async getUserActiveApplication(userId: string): Promise<HomestayApplication | undefined> {
+    // ONE-APPLICATION-PER-OWNER: Get active application (not in terminal states)
+    // Terminal states: rejected, approved, withdrawn
+    // Active states: draft, submitted, payment_pending, verified_for_payment, under_review, inspection_scheduled, etc.
+    const result = await db.select().from(homestayApplications)
+      .where(eq(homestayApplications.userId, userId))
+      .orderBy(desc(homestayApplications.createdAt))
+      .limit(20); // Get recent applications
+    
+    // Filter out terminal states (business rule: only one active application allowed)
+    const terminalStatuses = ['rejected', 'approved', 'withdrawn'];
+    const activeApp = result.find(app => !terminalStatuses.includes(app.status));
+    
+    return activeApp;
+  }
+
   async getApplicationsByDistrict(district: string): Promise<HomestayApplication[]> {
     return await db.select().from(homestayApplications)
       .where(
