@@ -3016,64 +3016,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preserveLgdData
       });
       
+      // Helper function to safely delete from a table (handles missing tables)
+      const safeDelete = async (table: any, tableName: string) => {
+        try {
+          await db.delete(table);
+          console.log(`[admin] ✓ Deleted all ${tableName}`);
+        } catch (error: any) {
+          if (error.code === '42P01') { // Table doesn't exist
+            console.log(`[admin] ⊙ Skipped ${tableName} (table doesn't exist yet)`);
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
+      };
+      
       // Delete in correct order to respect foreign key constraints
       // Child tables first, then parent tables
       
       // 1. Inspection Reports (references inspectionOrders, homestayApplications)
-      await db.delete(inspectionReports);
-      console.log(`[admin] ✓ Deleted all inspection reports`);
+      await safeDelete(inspectionReports, 'inspection reports');
       
       // 2. Inspection Orders (references homestayApplications, users)
-      await db.delete(inspectionOrders);
-      console.log(`[admin] ✓ Deleted all inspection orders`);
+      await safeDelete(inspectionOrders, 'inspection orders');
       
       // 3. Certificates (references homestayApplications)
-      await db.delete(certificates);
-      console.log(`[admin] ✓ Deleted all certificates`);
+      await safeDelete(certificates, 'certificates');
       
       // 4. Clarifications (references homestayApplications)
-      await db.delete(clarifications);
-      console.log(`[admin] ✓ Deleted all clarifications`);
+      await safeDelete(clarifications, 'clarifications');
       
       // 5. Objections (references homestayApplications)
-      await db.delete(objections);
-      console.log(`[admin] ✓ Deleted all objections`);
+      await safeDelete(objections, 'objections');
       
       // 6. Application Actions (references homestayApplications)
-      await db.delete(applicationActions);
-      console.log(`[admin] ✓ Deleted all application actions`);
+      await safeDelete(applicationActions, 'application actions');
       
       // 7. Reviews (references homestayApplications)
-      await db.delete(reviews);
-      console.log(`[admin] ✓ Deleted all reviews`);
+      await safeDelete(reviews, 'reviews');
       
       // 8. HimKosh Transactions (references payments)
-      await db.delete(himkoshTransactions);
-      console.log(`[admin] ✓ Deleted all HimKosh transactions`);
+      await safeDelete(himkoshTransactions, 'HimKosh transactions');
       
       // 9. Payments (references homestayApplications)
-      await db.delete(payments);
-      console.log(`[admin] ✓ Deleted all payments`);
+      await safeDelete(payments, 'payments');
       
       // 10. Documents (references homestayApplications)
-      await db.delete(documents);
-      console.log(`[admin] ✓ Deleted all documents`);
+      await safeDelete(documents, 'documents');
       
       // 11. Homestay Applications (references users)
-      await db.delete(homestayApplications);
-      console.log(`[admin] ✓ Deleted all homestay applications`);
+      await safeDelete(homestayApplications, 'homestay applications');
       
       // 12. Notifications (references users)
-      await db.delete(notifications);
-      console.log(`[admin] ✓ Deleted all notifications`);
+      await safeDelete(notifications, 'notifications');
       
       // 13. Audit Logs (references users)
-      await db.delete(auditLogs);
-      console.log(`[admin] ✓ Deleted all audit logs`);
+      await safeDelete(auditLogs, 'audit logs');
       
       // 14. Production Stats (no foreign keys)
-      await db.delete(productionStats);
-      console.log(`[admin] ✓ Deleted all production stats`);
+      await safeDelete(productionStats, 'production stats');
       
       // 15. DDO Codes (optional - configuration data, not test data)
       let ddoCodesStatus = "preserved (configuration data)";
