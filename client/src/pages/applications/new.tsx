@@ -258,7 +258,7 @@ const STEP_CONFIG = [
     label: "Documents Upload",
     shortLabel: "Documents",
     icon: FileText,
-    requiredFields: [], // Handled separately with document arrays
+    requiredFields: ["revenuePapers", "affidavitSection29", "undertakingFormC", "registerForVerification", "billBook", "propertyPhotos"],
   },
   {
     id: 6,
@@ -898,6 +898,17 @@ export default function NewApplication() {
     }
   };
 
+  // Combine form data with uploaded documents for progress tracking
+  const combinedFormData = {
+    ...form.getValues(),
+    revenuePapers: uploadedDocuments.revenuePapers,
+    affidavitSection29: uploadedDocuments.affidavitSection29,
+    undertakingFormC: uploadedDocuments.undertakingFormC,
+    registerForVerification: uploadedDocuments.registerForVerification,
+    billBook: uploadedDocuments.billBook,
+    propertyPhotos: propertyPhotos,
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-5xl mx-auto">
@@ -905,7 +916,7 @@ export default function NewApplication() {
           currentStep={step}
           maxStepReached={maxStepReached}
           totalSteps={totalSteps}
-          formData={form.getValues()}
+          formData={combinedFormData}
           onStepClick={handleStepClick}
           steps={STEP_CONFIG}
         />
