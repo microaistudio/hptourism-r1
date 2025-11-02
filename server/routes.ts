@@ -1060,15 +1060,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         perRoomFee: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
         gstAmount: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
         
-        // Documents (validated JSONB structure)
+        // Documents (validated JSONB structure) - all fields optional for partial updates
         documents: z.array(z.object({
-          id: z.string(),
-          name: z.string(),
-          type: z.string(),
-          url: z.string(),
+          id: z.string().optional(),
+          name: z.string().optional(),
+          type: z.string().optional(),
+          url: z.string().optional(),
           uploadedAt: z.string().optional(),
           required: z.boolean().optional(),
-        })).optional(),
+          fileName: z.string().optional(),
+          filePath: z.string().optional(),
+          fileSize: z.number().optional(),
+          mimeType: z.string().optional(),
+          documentType: z.string().optional(),
+        }).passthrough()).optional(),
         
         // Legacy document URLs (for backward compatibility)
         ownershipProofUrl: z.string().optional(),
