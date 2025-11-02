@@ -2917,7 +2917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/users/:id", requireRole('admin'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { role, isActive } = req.body;
+      const { role, isActive, fullName, email, district, password } = req.body;
       
       // Fetch target user first to check their role
       const targetUser = await storage.getUser(id);
@@ -2927,14 +2927,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Whitelist only safe fields for admin updates
       const updates: Partial<User> = {};
+      
+      // Profile fields that can always be updated
+      if (fullName !== undefined && fullName !== null && fullName.trim()) {
+        updates.fullName = fullName.trim();
+      }
+      if (email !== undefined && email !== null) {
+        updates.email = email.trim() || null;
+      }
+      if (district !== undefined && district !== null) {
+        updates.district = district.trim() || null;
+      }
+      
+      // Hash password if provided
+      if (password !== undefined && password !== null && password.trim()) {
+        const hashedPassword = await bcrypt.hash(password.trim(), 10);
+        updates.password = hashedPassword;
+      }
+      
+      // Role updates with validation
       if (role !== undefined) {
         // Validate role is one of the allowed values
-        const allowedRoles = ['property_owner', 'district_officer', 'state_officer', 'admin'];
+        const allowedRoles = ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer', 'admin'];
         if (!allowedRoles.includes(role)) {
           return res.status(400).json({ message: "Invalid role" });
         }
         updates.role = role;
       }
+      
+      // Active status updates
       if (isActive !== undefined) {
         updates.isActive = isActive;
       }
