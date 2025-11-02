@@ -33,7 +33,7 @@ router.post('/initiate', async (req, res) => {
     }
 
     // Verify application is ready for payment
-    if (application.status !== 'payment_pending') {
+    if (application.status !== 'payment_pending' && application.status !== 'verified_for_payment') {
       return res.status(400).json({ 
         error: 'Application is not ready for payment',
         currentStatus: application.status 

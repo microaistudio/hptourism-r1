@@ -106,15 +106,20 @@ export default function HimKoshPaymentPage() {
     );
   }
 
-  const baseFee = parseFloat(application.baseFee);
-  const perRoomFee = parseFloat(application.perRoomFee);
-  const totalRoomsFee = perRoomFee * application.totalRooms;
-  const subtotal = baseFee + totalRoomsFee;
-  const gstAmount = parseFloat(application.gstAmount);
-  const totalFee = parseFloat(application.totalFee);
+  // 2025 Fee Structure - All fees are pre-calculated and stored
+  const baseFee = parseFloat(application.baseFee || '0');
+  const totalBeforeDiscounts = parseFloat(application.totalBeforeDiscounts || '0');
+  const validityDiscount = parseFloat(application.validityDiscount || '0');
+  const femaleOwnerDiscount = parseFloat(application.femaleOwnerDiscount || '0');
+  const pangiDiscount = parseFloat(application.pangiDiscount || '0');
+  const totalDiscount = parseFloat(application.totalDiscount || '0');
+  const totalFee = parseFloat(application.totalFee || '0');
+  const certificateValidityYears = application.certificateValidityYears || 1;
+  
+  const hasDiscounts = totalDiscount > 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="mb-6">
         <Button variant="ghost" onClick={() => setLocation("/dashboard")} data-testid="button-back">
@@ -153,27 +158,56 @@ export default function HimKoshPaymentPage() {
                   <span className="text-sm text-muted-foreground">Total Rooms</span>
                   <span className="font-medium">{application.totalRooms}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Certificate Validity</span>
+                  <Badge variant="secondary">{certificateValidityYears} {certificateValidityYears === 1 ? 'Year' : 'Years'}</Badge>
+                </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Base Fee</span>
+                  <span className="text-sm">Base Fee (Annual)</span>
                   <span>₹{baseFee.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Per Room Fee ({application.totalRooms} × ₹{perRoomFee.toLocaleString('en-IN')})</span>
-                  <span>₹{totalRoomsFee.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Subtotal</span>
-                  <span>₹{subtotal.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">GST (18%)</span>
-                  <span>₹{gstAmount.toLocaleString('en-IN')}</span>
-                </div>
+                {certificateValidityYears > 1 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Total for {certificateValidityYears} Years</span>
+                    <span>₹{totalBeforeDiscounts.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                {hasDiscounts && (
+                  <>
+                    <Separator className="my-2" />
+                    <div className="text-xs font-medium text-muted-foreground">Discounts Applied:</div>
+                    {validityDiscount > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span className="text-sm">3-Year Lump Sum (10%)</span>
+                        <span>-₹{validityDiscount.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {femaleOwnerDiscount > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span className="text-sm">Female Owner (5%)</span>
+                        <span>-₹{femaleOwnerDiscount.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {pangiDiscount > 0 && (
+                      <div className="flex justify-between items-center text-green-600">
+                        <span className="text-sm">Pangi Sub-Division (50%)</span>
+                        <span>-₹{pangiDiscount.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center font-medium text-green-600">
+                      <span className="text-sm">Total Savings</span>
+                      <span>-₹{totalDiscount.toLocaleString('en-IN')}</span>
+                    </div>
+                  </>
+                )}
                 <Separator className="my-2" />
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-lg">Total Amount</span>
                   <span className="font-bold text-lg text-primary">₹{totalFee.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  * GST included in the fee (HP Homestay Rules 2025)
                 </div>
               </div>
             </CardContent>
