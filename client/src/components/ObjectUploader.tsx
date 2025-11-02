@@ -4,6 +4,7 @@ import { Upload, X, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export interface UploadedFileMetadata {
+  id?: string; // Optional ID for existing documents
   filePath: string;
   fileName: string;
   fileSize: number;
