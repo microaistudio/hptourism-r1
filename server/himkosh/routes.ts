@@ -117,11 +117,9 @@ router.post('/initiate', async (req, res) => {
     // Per NIC-HP: checksum calculated before appending Service_code/return_url
     const checksum = HimKoshCrypto.generateChecksum(coreString);
     
-    // Append checksum to FULL string (includes Service_code and return_url)
-    const requestStringWithChecksum = `${fullString}|checkSum=${checksum}`;
-    
-    // Encrypt the ENTIRE string including Service_code, return_url, and checksum
-    const encryptedData = await crypto.encrypt(requestStringWithChecksum);
+    // CRITICAL: Checksum is sent as SEPARATE field (NOT inside encrypted data)
+    // Encrypt only the full string WITHOUT checksum
+    const encryptedData = await crypto.encrypt(fullString);
 
     // Debug: Log values to identify which field is too long
     console.log('[himkosh] Transaction values:', {
@@ -139,10 +137,10 @@ router.post('/initiate', async (req, res) => {
 
     // Debug: Log encryption details
     console.log('[himkosh-encryption] CORE string (for checksum):', coreString);
-    console.log('[himkosh-encryption] FULL string (before checksum):', fullString);
+    console.log('[himkosh-encryption] FULL string (what we encrypt):', fullString);
     console.log('[himkosh-encryption] Checksum calculated on CORE:', checksum);
-    console.log('[himkosh-encryption] Full string WITH checksum (what we encrypt):', requestStringWithChecksum);
-    console.log('[himkosh-encryption] Full string length:', requestStringWithChecksum.length);
+    console.log('[himkosh-encryption] Checksum sent as SEPARATE field (NOT encrypted)');
+    console.log('[himkosh-encryption] Full string length:', fullString.length);
     console.log('[himkosh-encryption] Encrypted data:', encryptedData);
     console.log('[himkosh-encryption] Encrypted length:', encryptedData.length);
 
