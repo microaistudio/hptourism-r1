@@ -16,14 +16,15 @@ Preferred communication style: Simple, everyday language.
 - **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, update page guard, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
 - **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated, and resubmit correctly with status changing back to 'submitted'
 
-### Comprehensive Application Update Form
-- **Expanded from 8 to 70+ fields**: Property owners can now update all application sections when sent back for corrections, not just basic property/owner info
-- **Complete sections included**: Property Information, Room Configuration (with per-type rates), LGD Hierarchical Address, Distances to facilities, Public Areas, Amenities (11 checkboxes), Additional Facilities, Owner Information, GSTIN, Certificate Validity
-- **Document upload/replacement functionality**: Property owners can re-upload or replace ANNEXURE-II documents (Revenue Papers, Affidavit Section-29, Undertaking Form-C, Register for Verification, Bill Book) and Property Photos through integrated ObjectUploader components; existing documents are displayed for review and can be selectively replaced
-- **DTDO/DA workflow field additions**: Added missing schema fields (`dtdoId`, `dtdoRemarks`, `dtdoReviewDate`, `daId`, `daReviewDate`, `daForwardedDate`) to support full workflow tracking
-- **Data integrity protection**: Implemented submit-time sanitization that converts empty/zero optional numeric fields (distances, room sizes, rates, public areas) to `undefined` instead of overwriting existing data with 0
-- **Dual feedback display**: Update page shows both DA feedback (`clarificationRequested`) and DTDO feedback (`dtdoRemarks`) alerts when applications are reverted
-- **Future enhancement planned**: Hybrid Option 2 where only officer-marked sections are editable by default, with toggle to show all fields
+### View-First Application Update Interface
+- **Read-first UX design**: Property owners see their complete submitted application as a formatted summary before making any updates, eliminating blind data re-entry
+- **Application Summary Cards**: Clean, organized display of Property Information, Owner Information, Amenities & Facilities, and Fee Summary with read-only data presentation
+- **Visual Document Gallery**: Property photos displayed as thumbnail grid with hover previews; supporting documents shown as file cards with "View/Download" buttons for easy review
+- **Selective Document Updates**: "Update Documents" button expands ObjectUploader section only when needed; existing documents displayed prominently with options to view, keep, replace, or add more
+- **Smart Document ID Preservation**: Existing documents retain their IDs on resubmit (preventing duplicates), while new uploads get fresh UUIDs; documents loaded via useEffect to prevent infinite re-render loops
+- **Feedback Display**: DA and DTDO feedback alerts shown at top of page for clear visibility of required corrections
+- **Single-Click Resubmit**: "Resubmit Application" button updates only documents and status, preserving all other application data unchanged
+- **Future enhancement planned**: Expand sectional editing to allow updates to other fields (room rates, amenities, etc.) with similar view-first approach
 
 ## System Architecture
 
