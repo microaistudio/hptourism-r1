@@ -5,16 +5,19 @@ import { fileURLToPath } from 'url';
 
 /**
  * HimKosh Encryption/Decryption Utilities
- * Based on CTP Technical Specification
+ * Based on working Node.js sample implementation
  * 
- * Algorithm: AES-128 (Rijndael)
+ * Algorithm: AES-128-CBC (or AES-256-CBC based on key length)
  * Mode: CBC
- * Padding: PKCS7
- * Key Size: 128 bits (16 bytes)
+ * Padding: PKCS7 (default in Node.js)
+ * Key Size: 128/192/256 bits (16/24/32 bytes)
  * Block Size: 128 bits (16 bytes)
+ * 
+ * CRITICAL: echallan.key file format (from Treasury):
+ * Line 1: base64-encoded encryption key
+ * Line 2: base64-encoded IV
  */
 
-// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -22,68 +25,80 @@ export class HimKoshCrypto {
   private keyFilePath: string;
   private key: Buffer | null = null;
   private iv: Buffer | null = null;
+  private algorithm: string | null = null;
 
   constructor(keyFilePath?: string) {
-    // Default to echallan.key in server/himkosh directory
     this.keyFilePath = keyFilePath || path.join(__dirname, 'echallan.key');
   }
 
   /**
    * Load encryption key and IV from file
-   * CRITICAL FIX #3: DLL uses IV = key (first 16 bytes), NOT separate IV
-   * Key file format from CTP:
-   * - Must be exactly 16 bytes for the key
-   * - IV is set equal to the key (actual DLL behavior)
+   * File format: Two lines with base64-encoded key and IV
    */
-  private async loadKey(): Promise<{ key: Buffer; iv: Buffer }> {
-    if (this.key && this.iv) {
-      console.log('[himkosh-crypto] Using cached key/IV');
-      return { key: this.key, iv: this.iv };
+  private async loadKey(): Promise<{ key: Buffer; iv: Buffer; algorithm: string }> {
+    if (this.key && this.iv && this.algorithm) {
+      return { key: this.key, iv: this.iv, algorithm: this.algorithm };
     }
 
     try {
-      console.log('[himkosh-crypto] Loading key from:', this.keyFilePath);
-      const keyData = await fs.readFile(this.keyFilePath);
-      console.log('[himkosh-crypto] Key file size:', keyData.length, 'bytes');
+      const raw = await fs.readFile(this.keyFilePath, 'utf8');
+      const lines = raw.trim().split(/\r?\n/);
       
-      // Extract first 16 bytes as key (even if file is longer)
-      const keyBytes = Buffer.alloc(16);
-      keyData.copy(keyBytes, 0, 0, Math.min(16, keyData.length));
-      this.key = keyBytes;
-      console.log('[himkosh-crypto] Key loaded successfully (16 bytes)');
+      if (lines.length < 2) {
+        throw new Error('echallan.key must contain base64 key and IV on separate lines');
+      }
+
+      const keyLine = lines[0].trim();
+      const ivLine = lines[1].trim();
       
-      // CRITICAL FIX #3: Use key as IV (first 16 bytes of echallan.key)
-      // This matches actual DLL behavior (doc/dummy code was misleading)
-      this.iv = keyBytes; // IV = key (same buffer reference)
-      console.log('[himkosh-crypto] IV set equal to key (DLL behavior)');
+      this.key = Buffer.from(keyLine, 'base64');
+      this.iv = Buffer.from(ivLine, 'base64');
+
+      if (!this.key.length || !this.iv.length) {
+        throw new Error('Invalid key file format - key or IV is empty');
+      }
+
+      if (![16, 24, 32].includes(this.key.length)) {
+        throw new Error('Encryption key must be 16/24/32 bytes (AES-128/192/256)');
+      }
+
+      if (this.iv.length !== 16) {
+        throw new Error('Encryption IV must be 16 bytes (AES block size)');
+      }
+
+      // Determine algorithm based on key length
+      this.algorithm = 
+        this.key.length === 16 ? 'aes-128-cbc' : 
+        this.key.length === 24 ? 'aes-192-cbc' : 
+        'aes-256-cbc';
+
+      console.log(`[himkosh-crypto] Loaded ${this.algorithm.toUpperCase()} key (${this.key.length} bytes) and IV (${this.iv.length} bytes)`);
       
-      return { key: this.key, iv: this.iv };
+      return { key: this.key, iv: this.iv, algorithm: this.algorithm };
     } catch (error) {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error(`Key file not found at: ${this.keyFilePath}. Please obtain echallan.key from CTP team.`);
+      throw new Error(`Key file not found at: ${this.keyFilePath}`);
     }
   }
 
   /**
-   * Encrypt data string using AES-128-CBC
-   * .NET backend expects ASCII encoding (NOT UTF-8)
-   * @param textToEncrypt - Plain text string to encrypt
+   * Encrypt data string using AES-CBC
+   * @param textToEncrypt - Plain text string to encrypt (includes checksum)
    * @returns Base64 encoded encrypted string
    */
   async encrypt(textToEncrypt: string): Promise<string> {
     try {
-      const { key, iv } = await this.loadKey();
+      const { key, iv, algorithm } = await this.loadKey();
       
-      // Create cipher with separate key and IV
-      const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
+      const cipher = crypto.createCipheriv(algorithm, key, iv);
+      const encrypted = Buffer.concat([
+        cipher.update(textToEncrypt, 'utf8'),
+        cipher.final(),
+      ]);
       
-      // CRITICAL: Use 'ascii' encoding to match .NET's Encoding.ASCII (NOT UTF-8)
-      let encrypted = cipher.update(textToEncrypt, 'ascii', 'base64');
-      encrypted += cipher.final('base64');
-      
-      return encrypted;
+      return encrypted.toString('base64');
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Encryption failed: ${error.message}`);
@@ -93,23 +108,21 @@ export class HimKoshCrypto {
   }
 
   /**
-   * Decrypt data string using AES-128-CBC
-   * .NET backend uses ASCII encoding (NOT UTF-8)
+   * Decrypt data string using AES-CBC
    * @param textToDecrypt - Base64 encoded encrypted string
    * @returns Decrypted plain text string
    */
   async decrypt(textToDecrypt: string): Promise<string> {
     try {
-      const { key, iv } = await this.loadKey();
+      const { key, iv, algorithm } = await this.loadKey();
       
-      // Create decipher with separate key and IV
-      const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
+      const decipher = crypto.createDecipheriv(algorithm, key, iv);
+      const decrypted = Buffer.concat([
+        decipher.update(Buffer.from(textToDecrypt, 'base64')),
+        decipher.final(),
+      ]);
       
-      // CRITICAL: Use 'ascii' encoding to match .NET's Encoding.ASCII.GetString()
-      let decrypted = decipher.update(textToDecrypt, 'base64', 'ascii');
-      decrypted += decipher.final('ascii');
-      
-      return decrypted;
+      return decrypted.toString('utf8');
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Decryption failed: ${error.message}`);
@@ -120,36 +133,31 @@ export class HimKoshCrypto {
 
   /**
    * Generate MD5 checksum for data string
-   * CRITICAL FIX: DLL returns lowercase hex (not uppercase as doc implied)
    * @param dataString - String to generate checksum for
    * @returns MD5 checksum in lowercase hexadecimal
    */
   static generateChecksum(dataString: string): string {
-    const hash = crypto.createHash('md5');
-    // CRITICAL: Use ASCII encoding to match .NET's Encoding.ASCII
-    hash.update(dataString, 'ascii');
-    // CRITICAL FIX #1: DLL returns lowercase hex (doc was wrong about uppercase)
-    return hash.digest('hex').toLowerCase();
+    return crypto.createHash('md5').update(dataString, 'utf8').digest('hex');
   }
 
   /**
    * Verify checksum of received data
    * @param dataString - Data string without checksum
    * @param receivedChecksum - Checksum to verify against
-   * @returns true if checksums match (case-insensitive comparison)
+   * @returns true if checksums match
    */
   static verifyChecksum(dataString: string, receivedChecksum: string): boolean {
     const calculatedChecksum = this.generateChecksum(dataString);
-    return calculatedChecksum.toUpperCase() === receivedChecksum.toUpperCase();
+    return calculatedChecksum.toLowerCase() === receivedChecksum.toLowerCase();
   }
 }
 
 /**
- * Build pipe-delimited request string for HimKosh
+ * Build pipe-delimited request string for HimKosh (WITH checksum appended)
  * @param params - Request parameters
- * @returns Object with coreString (for checksum) and fullString (for encryption)
+ * @returns Complete pipe string with checksum (ready to encrypt)
  */
-export function buildRequestString(params: {
+export function buildPipeString(params: {
   deptId: string;
   deptRefNo: string;
   totalAmount: number;
@@ -157,74 +165,58 @@ export function buildRequestString(params: {
   appRefNo: string;
   head1: string;
   amount1: number;
-  ddo: string;
+  ddo?: string;
   periodFrom: string;
   periodTo: string;
   head2?: string;
   amount2?: number;
-  head3?: string;
-  amount3?: number;
-  head4?: string;
-  amount4?: number;
-  head10?: string;
-  amount10?: number;
   serviceCode?: string;
   returnUrl?: string;
-}): { coreString: string; fullString: string } {
-  // Build base string (mandatory fields)
-  // CRITICAL: Field ORDER must match government code EXACTLY!
-  // CRITICAL FIX #2: All amounts must be integers (no decimals)
-  let parts = [
+}): string {
+  // Ensure amounts are integers (no decimals)
+  const intAmount = Math.round(Number(params.totalAmount || 0));
+  const intAmount1 = Math.round(Number(params.amount1 || 0));
+  
+  // Build pipe string in exact order from working sample
+  const pieces = [
     `DeptID=${params.deptId}`,
     `DeptRefNo=${params.deptRefNo}`,
-    `TotalAmount=${Math.round(params.totalAmount)}`, // Ensure integer
+    `TotalAmount=${intAmount}`,
     `TenderBy=${params.tenderBy}`,
     `AppRefNo=${params.appRefNo}`,
     `Head1=${params.head1}`,
-    `Amount1=${Math.round(params.amount1)}`, // Ensure integer
+    `Amount1=${intAmount1}`,
+    `PeriodFrom=${params.periodFrom}`,
+    `PeriodTo=${params.periodTo}`,
+    `Service_code=${params.serviceCode || ''}`,
   ];
 
-  // Add Head2/Amount2 BEFORE Ddo (government code order)
-  // CRITICAL: Government code includes Head2/Amount2 ALWAYS (even if Amount2=0)
-  if (params.head2 !== undefined && params.amount2 !== undefined) {
-    parts.push(`Head2=${params.head2}`);
-    parts.push(`Amount2=${Math.round(params.amount2)}`); // Ensure integer
+  // Add DDO if provided
+  if (params.ddo) {
+    pieces.push(`Ddo=${params.ddo}`);
   }
 
-  // Add Ddo AFTER Head2/Amount2
-  parts.push(`Ddo=${params.ddo}`);
-  parts.push(`PeriodFrom=${params.periodFrom}`);
-  parts.push(`PeriodTo=${params.periodTo}`);
-  if (params.head3 && params.amount3 && params.amount3 > 0) {
-    parts.push(`Head3=${params.head3}`);
-    parts.push(`Amount3=${Math.round(params.amount3)}`); // Ensure integer
-  }
-  if (params.head4 && params.amount4 && params.amount4 > 0) {
-    parts.push(`Head4=${params.head4}`);
-    parts.push(`Amount4=${Math.round(params.amount4)}`); // Ensure integer
-  }
-  if (params.head10 && params.amount10 && params.amount10 > 0) {
-    parts.push(`Head10=${params.head10}`);
-    parts.push(`Amount10=${Math.round(params.amount10)}`); // Ensure integer
-  }
-
-  // CRITICAL FIX: Per NIC-HP feedback, checksum is calculated on CORE fields only
-  // Service_code and return_url are appended AFTER checksum calculation
-  // Core string ends at last Amount/Period field
-  const coreString = parts.join('|');
-  
-  // Append Service_code and return_url to the FULL string (but NOT in checksum)
-  if (params.serviceCode) {
-    parts.push(`Service_code=${params.serviceCode}`);
-  }
+  // Add return URL if provided
   if (params.returnUrl) {
-    parts.push(`return_url=${params.returnUrl}`);
+    pieces.push(`return_url=${params.returnUrl}`);
   }
+
+  // Add Head2/Amount2 if provided
+  if (params.head2 && params.amount2 !== undefined) {
+    const intAmount2 = Math.round(Number(params.amount2));
+    pieces.push(`Head2=${params.head2}`);
+    pieces.push(`Amount2=${intAmount2}`);
+  }
+
+  // Join into pipe string
+  const pipe = pieces.join('|');
   
-  const fullString = parts.join('|');
+  // Calculate checksum on the pipe string
+  const checksum = HimKoshCrypto.generateChecksum(pipe);
   
-  // Return object with both strings
-  return { coreString, fullString };
+  // CRITICAL: Append checksum to the pipe string
+  // This entire string (including checksum) gets encrypted
+  return `${pipe}|checkSum=${checksum}`;
 }
 
 /**
@@ -249,9 +241,9 @@ export function parseResponseString(responseString: string): {
   const data: Record<string, string> = {};
 
   for (const part of parts) {
-    const [key, value] = part.split('=');
-    if (key && value !== undefined) {
-      data[key] = value;
+    const [key, ...rest] = part.split('=');
+    if (key) {
+      data[key] = rest.join('=');
     }
   }
 
@@ -266,7 +258,7 @@ export function parseResponseString(responseString: string): {
     paymentDate: data.Payment_date || '',
     deptRefNo: data.DeptRefNo || '',
     bankName: data.BankName || '',
-    checksum: data.checksum || '',
+    checksum: data.checkSum || data.checksum || '',
   };
 }
 

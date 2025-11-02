@@ -20,7 +20,6 @@ export default function HimKoshPaymentPage() {
     paymentUrl: string;
     merchantCode: string;
     encdata: string;
-    checksum: string;
     appRefNo: string;
     totalAmount: number;
     isConfigured: boolean;
@@ -332,10 +331,9 @@ export default function HimKoshPaymentPage() {
                   action={paymentData.paymentUrl}
                   className="hidden"
                 >
-                  {/* HimKosh requires: encdata (encrypted), merchant_code, and checksum (separate) */}
+                  {/* HimKosh requires ONLY 2 fields: encdata (with checksum inside) and merchant_code */}
                   <input type="hidden" name="encdata" value={paymentData.encdata} />
                   <input type="hidden" name="merchant_code" value={paymentData.merchantCode} />
-                  <input type="hidden" name="checksum" value={paymentData.checksum} />
                 </form>
               )}
             </CardContent>

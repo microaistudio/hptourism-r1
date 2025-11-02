@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { himkoshTransactions, homestayApplications, ddoCodes, systemSettings } from '../../shared/schema';
-import { HimKoshCrypto, buildRequestString, parseResponseString, buildVerificationString } from './crypto';
+import { HimKoshCrypto, buildPipeString, parseResponseString, buildVerificationString } from './crypto';
 import { getHimKoshConfig } from './config';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
@@ -87,13 +87,15 @@ router.post('/initiate', async (req, res) => {
       console.log(`[himkosh] 🧪 TEST PAYMENT MODE ACTIVE - Sending ₹1 to gateway instead of ₹${actualAmount}`);
     }
 
-    // Get current date in DD-MM-YYYY format (as per HP Government code)
+    // Get period dates (first and last day of current month)
     const now = new Date();
-    const periodDate = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const formatDate = (date: Date) => 
+      `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
 
-    // Build request parameters
-    // CRITICAL: Government code ALWAYS includes Head2/Amount2 (even if 0)
-    const requestParams = {
+    // Build pipe string parameters (matches working Node.js sample)
+    const pipeParams = {
       deptId: config.deptId,
       deptRefNo: application.applicationNumber,
       totalAmount: gatewayAmount, // Use gateway amount (₹1 in test mode)
@@ -101,47 +103,24 @@ router.post('/initiate', async (req, res) => {
       appRefNo,
       head1: config.heads.registrationFee,
       amount1: gatewayAmount, // Use gateway amount (₹1 in test mode)
-      head2: config.heads.registrationFee, // Same head, amount 0 (required by HimKosh)
-      amount2: 0,
-      ddo: ddoCode,
-      periodFrom: periodDate,
-      periodTo: periodDate,
+      periodFrom: formatDate(firstDay),
+      periodTo: formatDate(lastDay),
       serviceCode: config.serviceCode,
+      ddo: ddoCode,
       returnUrl: config.returnUrl,
     };
 
-    // Build request strings (core for checksum, full for encryption)
-    const { coreString, fullString } = buildRequestString(requestParams);
+    // Build pipe string WITH checksum appended (ready to encrypt)
+    // This matches the working sample exactly
+    const pipeStringWithChecksum = buildPipeString(pipeParams);
     
-    // CRITICAL: Calculate checksum on the FULL string (same as what we encrypt)
-    // HimKosh decrypts the data and verifies checksum against the decrypted string
-    const checksum = HimKoshCrypto.generateChecksum(fullString);
-    
-    // CRITICAL: Checksum is sent as SEPARATE field (NOT inside encrypted data)
-    // Encrypt only the full string WITHOUT checksum
-    const encryptedData = await crypto.encrypt(fullString);
+    // Encrypt the ENTIRE pipe string (including checksum)
+    const encryptedData = await crypto.encrypt(pipeStringWithChecksum);
 
-    // Debug: Log values to identify which field is too long
-    console.log('[himkosh] Transaction values:', {
-      merchantCode: config.merchantCode,
-      merchantCodeLen: config.merchantCode?.length,
-      deptId: config.deptId,
-      deptIdLen: config.deptId?.length,
-      serviceCode: config.serviceCode,
-      serviceCodeLen: config.serviceCode?.length,
-      ddo: ddoCode,
-      ddoLen: ddoCode?.length,
-      head1: config.heads.registrationFee,
-      head1Len: config.heads.registrationFee?.length,
-    });
-
-    // Debug: Log encryption details
-    console.log('[himkosh-encryption] FULL string (what we encrypt AND checksum):', fullString);
-    console.log('[himkosh-encryption] Checksum calculated on FULL string:', checksum);
-    console.log('[himkosh-encryption] Checksum sent as SEPARATE field (NOT encrypted)');
-    console.log('[himkosh-encryption] Full string length:', fullString.length);
-    console.log('[himkosh-encryption] Encrypted data:', encryptedData);
-    console.log('[himkosh-encryption] Encrypted length:', encryptedData.length);
+    // Debug logging
+    console.log('[himkosh] Pipe string with checksum (before encryption):', pipeStringWithChecksum);
+    console.log('[himkosh] Encrypted data:', encryptedData);
+    console.log('[himkosh] POST fields: encdata + merchant_code ONLY (no separate checksum)');
 
     // Save transaction to database (store gateway amount that was actually sent)
     await db.insert(himkoshTransactions).values({
@@ -156,20 +135,20 @@ router.post('/initiate', async (req, res) => {
       ddo: ddoCode,
       head1: config.heads.registrationFee,
       amount1: gatewayAmount, // Store what was sent to gateway
-      periodFrom: periodDate,
-      periodTo: periodDate,
+      periodFrom: formatDate(firstDay),
+      periodTo: formatDate(lastDay),
       encryptedRequest: encryptedData,
-      requestChecksum: checksum,
+      requestChecksum: '', // Checksum is inside encrypted data (not separate)
       transactionStatus: 'initiated',
     });
 
-    // Return payment initiation data
+    // Return payment initiation data (ONLY 2 fields: encdata + merchant_code)
     const response = {
       success: true,
       paymentUrl: config.paymentUrl,
       merchantCode: config.merchantCode,
       encdata: encryptedData,
-      checksum: checksum, // CRITICAL: Send checksum separately (NOT encrypted)
+      // NO separate checksum field! Checksum is inside encrypted data
       appRefNo,
       totalAmount: gatewayAmount, // Gateway amount (₹1 in test mode)
       actualAmount, // Actual calculated fee (for display purposes)
@@ -182,8 +161,7 @@ router.post('/initiate', async (req, res) => {
           : 'Using test configuration - waiting for CTP credentials'),
     };
     
-    console.log('[himkosh] Response isConfigured:', config.isConfigured);
-    console.log('[himkosh] Response isTestMode:', isTestMode);
+    console.log('[himkosh] ✅ Using working sample format - checksum INSIDE encrypted data');
     res.json(response);
   } catch (error) {
     console.error('HimKosh initiation error:', error);
@@ -469,8 +447,6 @@ router.post('/test-callback-url', async (req, res) => {
       appRefNo: appRefNo,
       head1: config.heads.registrationFee,
       amount1: totalAmount,
-      head2: config.heads.registrationFee,
-      amount2: 0,
       ddo: ddoCode,
       periodFrom: periodDate,
       periodTo: periodDate,
@@ -478,33 +454,23 @@ router.post('/test-callback-url', async (req, res) => {
       returnUrl: callbackUrl, // Use the test callback URL
     };
 
-    // Build request strings (core for checksum, full for encryption)
-    const { coreString, fullString } = buildRequestString(requestParams);
+    // Build pipe string WITH checksum (matches working sample)
+    const pipeStringWithChecksum = buildPipeString(requestParams);
     
-    // CRITICAL FIX: Calculate checksum ONLY on core string (excludes Service_code and return_url)
-    const checksumCalc = HimKoshCrypto.generateChecksum(coreString);
-    
-    // Build full string WITH checksum
-    const fullStringWithChecksum = `${fullString}|checkSum=${checksumCalc}`;
-    
-    // Encrypt
-    const encrypted = await crypto.encrypt(fullStringWithChecksum);
+    // Encrypt the entire pipe string (including checksum)
+    const encrypted = await crypto.encrypt(pipeStringWithChecksum);
 
     console.log('[himkosh-test] Testing callback URL:', callbackUrl);
-    console.log('[himkosh-test] CORE string (for checksum):', coreString);
-    console.log('[himkosh-test] FULL string (before checksum):', fullString);
-    console.log('[himkosh-test] Checksum (on CORE only):', checksumCalc);
+    console.log('[himkosh-test] Pipe string with checksum:', pipeStringWithChecksum);
+    console.log('[himkosh-test] Encrypted:', encrypted);
 
     res.json({
       success: true,
       testUrl: callbackUrl,
-      checksum: checksumCalc,
-      coreString: coreString,
-      fullString: fullString,
-      fullStringWithChecksum: fullStringWithChecksum,
+      pipeStringWithChecksum: pipeStringWithChecksum,
       encrypted: encrypted,
       paymentUrl: `${config.paymentUrl}?encdata=${encodeURIComponent(encrypted)}&merchant_code=${config.merchantCode}`,
-      message: 'FIXED: Checksum now calculated on CORE string only (excluding Service_code/return_url)',
+      message: 'Using working Node.js sample format - checksum INSIDE encrypted data',
     });
 
   } catch (error) {
