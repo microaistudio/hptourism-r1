@@ -22,7 +22,7 @@ export default function PublicPropertyDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="bg-background">
         <div className="container mx-auto px-4 py-8">
           <Card>
             <CardHeader className="space-y-3">
@@ -42,7 +42,7 @@ export default function PublicPropertyDetail() {
 
   if (!property) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardContent className="p-12 text-center">
             <Mountain className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -80,7 +80,7 @@ export default function PublicPropertyDetail() {
     })) : [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <NavigationHeader 
         title={property.propertyName}
         backTo="/properties"

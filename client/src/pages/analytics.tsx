@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="bg-background p-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <div className="h-8 bg-muted rounded w-64 animate-pulse mb-2" />
@@ -88,7 +88,7 @@ export default function AnalyticsPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="p-12 text-center">
             <AlertCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />

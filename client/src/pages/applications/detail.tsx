@@ -204,7 +204,7 @@ export default function ApplicationDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading application...</p>
@@ -215,7 +215,7 @@ export default function ApplicationDetail() {
 
   if (!applicationData?.application) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Application Not Found</CardTitle>

@@ -94,7 +94,7 @@ export default function PublicProperties() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <NavigationHeader 
         title="Discover Himachal Pradesh"
         showBack={false}

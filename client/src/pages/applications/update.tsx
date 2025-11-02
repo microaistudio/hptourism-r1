@@ -102,7 +102,7 @@ export default function UpdateApplication() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="bg-background p-8">
         <div className="max-w-4xl mx-auto space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-96 w-full" />
@@ -113,7 +113,7 @@ export default function UpdateApplication() {
 
   if (error || !data?.application) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="bg-background p-8">
         <div className="max-w-4xl mx-auto">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -140,7 +140,7 @@ export default function UpdateApplication() {
 
   if (application.status !== 'sent_back_for_corrections') {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="bg-background p-8">
         <div className="max-w-4xl mx-auto">
           <Alert>
             <AlertCircle className="h-4 w-4" />
@@ -165,7 +165,7 @@ export default function UpdateApplication() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <header className="border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <Button

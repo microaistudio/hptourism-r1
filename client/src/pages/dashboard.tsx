@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   if (userLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center p-8">
         <Skeleton className="h-12 w-48" />
       </div>
     );
@@ -35,7 +35,7 @@ export default function Dashboard() {
   if (error || !userData?.user) {
     setTimeout(() => setLocation("/login"), 0);
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center p-8">
         <p>Redirecting to login...</p>
       </div>
     );
@@ -131,7 +131,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background p-6">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>

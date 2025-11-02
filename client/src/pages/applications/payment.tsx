@@ -105,7 +105,7 @@ export default function PaymentPage() {
 
   if (appLoading || paymentLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading payment details...</p>
@@ -116,7 +116,7 @@ export default function PaymentPage() {
 
   if (!application) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Application Not Found</CardTitle>
@@ -134,7 +134,7 @@ export default function PaymentPage() {
 
   if (application.status !== "payment_pending") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Payment Not Required</CardTitle>
