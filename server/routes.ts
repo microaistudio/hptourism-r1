@@ -20,11 +20,17 @@ import {
   inspectionReports,
   objections,
   clarifications,
-  certificates
+  certificates,
+  notifications,
+  applicationActions,
+  reviews,
+  auditLogs,
+  himkoshTransactions,
+  ddoCodes
 } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { eq, desc, ne } from "drizzle-orm";
+import { eq, desc, ne, notInArray, and } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
 import himkoshRoutes from "./himkosh/routes";
@@ -2990,44 +2996,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("[admin] Starting database reset...");
       
-      // Delete all applications
-      const deletedApplications = await db.delete(homestayApplications);
-      console.log(`[admin] Deleted all applications`);
+      // Delete in correct order to respect foreign key constraints
+      // Child tables first, then parent tables
       
-      // Delete all documents
-      const deletedDocuments = await db.delete(documents);
-      console.log(`[admin] Deleted all documents`);
+      // 1. Inspection Reports (references inspectionOrders, homestayApplications)
+      await db.delete(inspectionReports);
+      console.log(`[admin] ✓ Deleted all inspection reports`);
       
-      // Delete all payments  
-      const deletedPayments = await db.delete(payments);
-      console.log(`[admin] Deleted all payments`);
+      // 2. Inspection Orders (references homestayApplications, users)
+      await db.delete(inspectionOrders);
+      console.log(`[admin] ✓ Deleted all inspection orders`);
       
-      // Delete all production stats
-      const deletedStats = await db.delete(productionStats);
-      console.log(`[admin] Deleted all production stats`);
+      // 3. Certificates (references homestayApplications)
+      await db.delete(certificates);
+      console.log(`[admin] ✓ Deleted all certificates`);
       
-      // Delete all users EXCEPT admins
-      await db.delete(users).where(ne(users.role, 'admin'));
-      console.log(`[admin] Deleted all non-admin users`);
+      // 4. Clarifications (references homestayApplications)
+      await db.delete(clarifications);
+      console.log(`[admin] ✓ Deleted all clarifications`);
+      
+      // 5. Objections (references homestayApplications)
+      await db.delete(objections);
+      console.log(`[admin] ✓ Deleted all objections`);
+      
+      // 6. Application Actions (references homestayApplications)
+      await db.delete(applicationActions);
+      console.log(`[admin] ✓ Deleted all application actions`);
+      
+      // 7. Reviews (references homestayApplications)
+      await db.delete(reviews);
+      console.log(`[admin] ✓ Deleted all reviews`);
+      
+      // 8. HimKosh Transactions (references payments)
+      await db.delete(himkoshTransactions);
+      console.log(`[admin] ✓ Deleted all HimKosh transactions`);
+      
+      // 9. Payments (references homestayApplications)
+      await db.delete(payments);
+      console.log(`[admin] ✓ Deleted all payments`);
+      
+      // 10. Documents (references homestayApplications)
+      await db.delete(documents);
+      console.log(`[admin] ✓ Deleted all documents`);
+      
+      // 11. Homestay Applications (references users)
+      await db.delete(homestayApplications);
+      console.log(`[admin] ✓ Deleted all homestay applications`);
+      
+      // 12. Notifications (references users)
+      await db.delete(notifications);
+      console.log(`[admin] ✓ Deleted all notifications`);
+      
+      // 13. Audit Logs (references users)
+      await db.delete(auditLogs);
+      console.log(`[admin] ✓ Deleted all audit logs`);
+      
+      // 14. Production Stats (no foreign keys)
+      await db.delete(productionStats);
+      console.log(`[admin] ✓ Deleted all production stats`);
+      
+      // 15. DDO Codes (no foreign keys)
+      await db.delete(ddoCodes);
+      console.log(`[admin] ✓ Deleted all DDO codes`);
+      
+      // 16. Get admin user IDs to preserve their profiles
+      const adminUsers = await db.select({ id: users.id })
+        .from(users)
+        .where(
+          notInArray(users.role, ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer'])
+        );
+      
+      const adminUserIds = adminUsers.map(u => u.id);
+      
+      // Delete user profiles for non-admin users
+      if (adminUserIds.length > 0) {
+        await db.delete(userProfiles)
+          .where(notInArray(userProfiles.userId, adminUserIds));
+      } else {
+        await db.delete(userProfiles);
+      }
+      console.log(`[admin] ✓ Deleted all non-admin user profiles`);
+      
+      // 17. Users (keep admins and super_admins)
+      const deletedUsers = await db.delete(users)
+        .where(
+          notInArray(users.role, ['admin', 'super_admin'])
+        )
+        .returning();
+      
+      const preservedAdmins = await db.select().from(users);
+      console.log(`[admin] ✓ Deleted ${deletedUsers.length} non-admin users (preserved ${preservedAdmins.length} admin accounts)`);
       
       // TODO: Delete uploaded files from object storage
       // This would require listing and deleting files from GCS bucket
       // For now, we'll just clear database records
       
-      console.log("[admin] Database reset complete");
+      console.log("[admin] ✅ Database reset complete");
       
       res.json({ 
         message: "Database reset successful", 
         deleted: {
-          applications: "all",
-          documents: "all",
+          inspectionReports: "all",
+          inspectionOrders: "all",
+          certificates: "all",
+          clarifications: "all",
+          objections: "all",
+          applicationActions: "all",
+          reviews: "all",
+          himkoshTransactions: "all",
           payments: "all",
+          documents: "all",
+          applications: "all",
+          notifications: "all",
+          auditLogs: "all",
+          productionStats: "all",
+          ddoCodes: "all",
+          userProfiles: "non-admin only",
           users: "non-admin only"
+        },
+        preserved: {
+          adminAccounts: preservedAdmins.length
         }
       });
     } catch (error) {
-      console.error("[admin] Database reset failed:", error);
-      res.status(500).json({ message: "Failed to reset database" });
+      console.error("[admin] ❌ Database reset failed:", error);
+      res.status(500).json({ 
+        message: "Failed to reset database",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
