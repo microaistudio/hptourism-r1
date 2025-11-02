@@ -465,7 +465,7 @@ export default function AdminConsole() {
                       data-testid="checkbox-preserve-owners"
                     />
                     <Label htmlFor="preserve-owners" className="text-sm font-normal cursor-pointer">
-                      Preserve Property Owners
+                      Preserve Owners
                     </Label>
                   </div>
                   
@@ -477,7 +477,7 @@ export default function AdminConsole() {
                       data-testid="checkbox-preserve-district"
                     />
                     <Label htmlFor="preserve-district" className="text-sm font-normal cursor-pointer">
-                      Preserve District Officers (DA, DTDO)
+                      Preserve Staff (DA, DTDO, DO)
                     </Label>
                   </div>
                   
