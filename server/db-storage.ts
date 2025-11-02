@@ -57,17 +57,22 @@ export class DbStorage implements IStorage {
   async getUserActiveApplication(userId: string): Promise<HomestayApplication | undefined> {
     // ONE-APPLICATION-PER-OWNER: Get active application (not in terminal states)
     // Terminal states: rejected, approved, withdrawn
-    // Active states: draft, submitted, payment_pending, verified_for_payment, under_review, inspection_scheduled, etc.
-    const result = await db.select().from(homestayApplications)
-      .where(eq(homestayApplications.userId, userId))
-      .orderBy(desc(homestayApplications.createdAt))
-      .limit(20); // Get recent applications
+    // Query directly with WHERE clause (no limit) to catch all applications
+    const { sql: rawSql, inArray, and, not } = await import('drizzle-orm');
     
-    // Filter out terminal states (business rule: only one active application allowed)
     const terminalStatuses = ['rejected', 'approved', 'withdrawn'];
-    const activeApp = result.find(app => !terminalStatuses.includes(app.status));
     
-    return activeApp;
+    const result = await db.select().from(homestayApplications)
+      .where(
+        and(
+          eq(homestayApplications.userId, userId),
+          not(inArray(homestayApplications.status, terminalStatuses))
+        )
+      )
+      .orderBy(desc(homestayApplications.createdAt))
+      .limit(1);
+    
+    return result[0];
   }
 
   async getApplicationsByDistrict(district: string): Promise<HomestayApplication[]> {

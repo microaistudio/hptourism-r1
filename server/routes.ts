@@ -479,8 +479,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing.userId !== userId) {
         return res.status(403).json({ message: "Not authorized to update this application" });
       }
-      if (existing.status !== 'draft') {
-        return res.status(400).json({ message: "Can only update draft applications" });
+      
+      // ONE-APPLICATION-PER-OWNER: Allow updates for non-terminal applications
+      // Terminal states: rejected, approved, withdrawn
+      const terminalStatuses = ['rejected', 'approved', 'withdrawn'];
+      if (terminalStatuses.includes(existing.status)) {
+        return res.status(400).json({ message: "Cannot update applications in terminal state (rejected/approved/withdrawn)" });
       }
       
       // Same minimal validation as create draft
