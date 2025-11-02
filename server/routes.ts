@@ -3516,15 +3516,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Execute the query
       const result = await db.execute(sql.raw(sqlQuery));
       
+      // Extract rows from the result
+      // db.execute returns an object with rows property for Neon driver
+      const rows = Array.isArray(result) ? result : (result as any).rows || [];
+      
       // Format response
       const response = {
         success: true,
         type: isReadOnly ? 'read' : 'write',
-        rowCount: Array.isArray(result) ? result.length : 0,
-        data: result,
+        rowCount: rows.length,
+        data: rows,
         query: sqlQuery
       };
 
+      console.log(`[db-console] Query returned ${rows.length} row(s)`);
       res.json(response);
     } catch (error) {
       console.error("[db-console] Query execution failed:", error);
