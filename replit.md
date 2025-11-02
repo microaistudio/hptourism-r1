@@ -10,21 +10,22 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (November 2025)
 
-### Workflow Revert System Fix
-- **Fixed critical workflow visibility bug**: Applications reverted by DA (`reverted_to_applicant`) or DTDO (`reverted_by_dtdo`) now properly appear in owner's dashboard "Pending Review" and "Sent Back" sections with "Update Application" buttons
-- **Dual-revert status support**: Owner dashboard distinguishes between DA reverts (badge: "Reverted by DA", shows `clarificationRequested`) and DTDO reverts (badge: "Reverted by DTDO", shows `dtdoRemarks`)
-- **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, update page guard, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
-- **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated, and resubmit correctly with status changing back to 'submitted'
+### Single-Page View & Edit for Sent-Back Applications  
+- **Unified Interface**: Replaced separate update page (`/applications/:id/update`) with integrated edit mode on existing detail page (`/applications/:id`), providing seamless single-page experience for viewing and editing sent-back applications
+- **In-Place Edit Mode**: When application status is `reverted_to_applicant` or `reverted_by_dtdo`, an "Edit" button appears in the documents card header; clicking toggles to edit mode showing ObjectUploader components for all document types
+- **View-First UX**: Property owners see complete submitted application summary (property details, owner info, amenities, fee breakdown) before editing, eliminating blind re-entry of 70+ form fields
+- **Feedback Visibility**: DA (`clarificationRequested`) and DTDO (`dtdoRemarks`) feedback displayed as alerts at top of page for clear visibility of required corrections
+- **Selective Document Updates**: Edit mode shows file uploaders for Property Photos, Revenue Papers, Affidavit Section 29, Undertaking Form-C, Register for Verification, and Bill Book; existing documents preserved with IDs to prevent duplication
+- **Smart State Management**: React hooks (useEffect, useMutation) properly ordered before early returns to prevent rendering errors; documents hydrated in useEffect to avoid infinite loops; ObjectUploader components receive all required props (label, uploadedFiles, onFilesChange, bucketPath, allowedTypes, maxFiles)
+- **Cancel/Resubmit Actions**: Cancel button exits edit mode without changes; Resubmit button updates documents and changes status back to 'submitted', preserving all other application data
+- **Route Cleanup**: Removed obsolete `/applications/:id/update` route and update.tsx page; all update functionality consolidated into detail.tsx
+- **Verified via E2E testing**: Confirmed reverted applications display correctly, Edit button appears, edit mode toggles properly, and Cancel/Resubmit flows work as expected
 
-### View-First Application Update Interface
-- **Read-first UX design**: Property owners see their complete submitted application as a formatted summary before making any updates, eliminating blind data re-entry
-- **Application Summary Cards**: Clean, organized display of Property Information, Owner Information, Amenities & Facilities, and Fee Summary with read-only data presentation
-- **Visual Document Gallery**: Property photos displayed as thumbnail grid with hover previews; supporting documents shown as file cards with "View/Download" buttons for easy review
-- **Selective Document Updates**: "Update Documents" button expands ObjectUploader section only when needed; existing documents displayed prominently with options to view, keep, replace, or add more
-- **Smart Document ID Preservation**: Existing documents retain their IDs on resubmit (preventing duplicates), while new uploads get fresh UUIDs; documents loaded via useEffect to prevent infinite re-render loops
-- **Feedback Display**: DA and DTDO feedback alerts shown at top of page for clear visibility of required corrections
-- **Single-Click Resubmit**: "Resubmit Application" button updates only documents and status, preserving all other application data unchanged
-- **Future enhancement planned**: Expand sectional editing to allow updates to other fields (room rates, amenities, etc.) with similar view-first approach
+### Workflow Revert System Fix
+- **Fixed critical workflow visibility bug**: Applications reverted by DA (`reverted_to_applicant`) or DTDO (`reverted_by_dtdo`) now properly appear in owner's dashboard "Pending Review" and "Sent Back" sections
+- **Dual-revert status support**: Owner dashboard distinguishes between DA reverts (badge: "Reverted by DA", shows `clarificationRequested`) and DTDO reverts (badge: "Reverted by DTDO", shows `dtdoRemarks`)
+- **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
+- **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated via in-place editing, and resubmit correctly with status changing back to 'submitted'
 
 ## System Architecture
 

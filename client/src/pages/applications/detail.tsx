@@ -9,14 +9,17 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard, QrCode } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard, QrCode, Edit, Check } from "lucide-react";
 import type { HomestayApplication, User as UserType, Document } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { generateCertificatePDF } from "@/lib/certificateGenerator";
+import { ObjectUploader, UploadedFileMetadata } from "@/components/ObjectUploader";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function ApplicationDetail() {
   const [, params] = useRoute("/applications/:id");
@@ -45,6 +48,24 @@ export default function ApplicationDetail() {
   // Image gallery state
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
+
+  // Edit mode state for property owners
+  const [isEditingDocuments, setIsEditingDocuments] = useState(false);
+  const [documentsLoaded, setDocumentsLoaded] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState<{
+    revenuePapers: UploadedFileMetadata[];
+    affidavitSection29: UploadedFileMetadata[];
+    undertakingFormC: UploadedFileMetadata[];
+    registerForVerification: UploadedFileMetadata[];
+    billBook: UploadedFileMetadata[];
+  }>({
+    revenuePapers: [],
+    affidavitSection29: [],
+    undertakingFormC: [],
+    registerForVerification: [],
+    billBook: [],
+  });
+  const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
 
   const applicationId = params?.id;
 
@@ -202,6 +223,79 @@ export default function ApplicationDetail() {
     },
   });
 
+  // Resubmit mutation for property owners (must be before early returns)
+  const resubmitMutation = useMutation({
+    mutationFn: async () => {
+      if (!applicationId) throw new Error("No application ID");
+      const allDocuments = [
+        ...uploadedDocuments.revenuePapers.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'revenue_papers' })),
+        ...uploadedDocuments.affidavitSection29.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'affidavit_section_29' })),
+        ...uploadedDocuments.undertakingFormC.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'undertaking_form_c' })),
+        ...uploadedDocuments.registerForVerification.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'register_for_verification' })),
+        ...uploadedDocuments.billBook.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'bill_book' })),
+        ...propertyPhotos.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'property_photo' })),
+      ];
+      
+      const response = await fetch(`/api/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: 'submitted', documents: allDocuments }),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to update application");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+      toast({ title: "Application Resubmitted", description: "Your application has been resubmitted successfully." });
+      setIsEditingDocuments(false);
+      setLocation("/dashboard");
+    },
+    onError: () => {
+      toast({ title: "Update Failed", description: "Failed to resubmit application", variant: "destructive" });
+    },
+  });
+
+  // Load existing documents for editing (must be before early returns)
+  useEffect(() => {
+    const app = applicationData?.application;
+    if (app?.documents && !documentsLoaded) {
+      const docs = app.documents as any[];
+      const docsByType = {
+        revenuePapers: [] as UploadedFileMetadata[],
+        affidavitSection29: [] as UploadedFileMetadata[],
+        undertakingFormC: [] as UploadedFileMetadata[],
+        registerForVerification: [] as UploadedFileMetadata[],
+        billBook: [] as UploadedFileMetadata[],
+      };
+      const photos: UploadedFileMetadata[] = [];
+      
+      docs.forEach((doc: any) => {
+        const file: UploadedFileMetadata = {
+          id: doc.id,
+          filePath: doc.fileUrl || doc.filePath,
+          fileName: doc.fileName,
+          fileSize: doc.fileSize || 0,
+          mimeType: doc.mimeType || 'application/octet-stream',
+        };
+        
+        switch (doc.documentType) {
+          case 'revenue_papers': docsByType.revenuePapers.push(file); break;
+          case 'affidavit_section_29': docsByType.affidavitSection29.push(file); break;
+          case 'undertaking_form_c': docsByType.undertakingFormC.push(file); break;
+          case 'register_for_verification': docsByType.registerForVerification.push(file); break;
+          case 'bill_book': docsByType.billBook.push(file); break;
+          case 'property_photo': photos.push(file); break;
+        }
+      });
+      
+      setUploadedDocuments(docsByType);
+      setPropertyPhotos(photos);
+      setDocumentsLoaded(true);
+    }
+  }, [applicationData, documentsLoaded]);
+
   if (isLoading) {
     return (
       <div className="bg-background flex items-center justify-center">
@@ -235,6 +329,8 @@ export default function ApplicationDetail() {
   const user = userData?.user;
   const isDistrictOfficer = user?.role === "district_officer";
   const isStateOfficer = user?.role === "state_officer";
+  const isPropertyOwner = user?.role === "property_owner";
+  const canEdit = isPropertyOwner && ['reverted_to_applicant', 'reverted_by_dtdo'].includes(app.status);
   
   // District officers can review pending applications
   // State officers can review applications in state_review status
@@ -503,20 +599,53 @@ export default function ApplicationDetail() {
               </Card>
             )}
 
+            {/* Feedback Alerts for sent back applications */}
+            {canEdit && (app.clarificationRequested || app.dtdoRemarks) && (
+              <>
+                {app.clarificationRequested && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Feedback from Dealing Assistant</AlertTitle>
+                    <AlertDescription>{app.clarificationRequested}</AlertDescription>
+                  </Alert>
+                )}
+                {app.dtdoRemarks && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Feedback from DTDO</AlertTitle>
+                    <AlertDescription>{app.dtdoRemarks}</AlertDescription>
+                  </Alert>
+                )}
+              </>
+            )}
+
             {/* Uploaded Documents */}
             <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <FileImage className="w-5 h-5 text-primary" />
-                  <CardTitle>Uploaded Documents</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <FileImage className="w-5 h-5 text-primary" />
+                    <CardTitle>Uploaded Documents</CardTitle>
+                  </div>
+                  <CardDescription className="mt-2">
+                    {isLoadingDocuments 
+                      ? "Loading documents..."
+                      : documentsData?.documents && documentsData.documents.length > 0 
+                      ? `${documentsData.documents.length} document(s) uploaded`
+                      : "No documents uploaded yet"}
+                  </CardDescription>
                 </div>
-                <CardDescription>
-                  {isLoadingDocuments 
-                    ? "Loading documents..."
-                    : documentsData?.documents && documentsData.documents.length > 0 
-                    ? `${documentsData.documents.length} document(s) uploaded`
-                    : "No documents uploaded yet"}
-                </CardDescription>
+                {canEdit && !isEditingDocuments && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingDocuments(true)}
+                    data-testid="button-edit-documents"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 {isLoadingDocuments ? (
@@ -751,6 +880,115 @@ export default function ApplicationDetail() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Edit Mode Upload Components */}
+                {isEditingDocuments && (
+                  <div className="space-y-6 mt-6 pt-6 border-t">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Update Documents</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Replace or add documents as needed. Existing documents will be kept unless you remove them.
+                      </p>
+                      
+                      {/* Property Photos */}
+                      <div className="space-y-2">
+                        <Label>Property Photos</Label>
+                        <ObjectUploader
+                          label="Property Photos"
+                          uploadedFiles={propertyPhotos}
+                          onFilesChange={setPropertyPhotos}
+                          bucketPath="property-photos"
+                          allowedTypes={["image/*"]}
+                          maxFiles={10}
+                        />
+                      </div>
+
+                      {/* Revenue Papers */}
+                      <div className="space-y-2">
+                        <Label>Revenue Papers (Jamabandi / Mutation)</Label>
+                        <ObjectUploader
+                          label="Revenue Papers"
+                          uploadedFiles={uploadedDocuments.revenuePapers}
+                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: files }))}
+                          bucketPath="documents/revenue-papers"
+                          allowedTypes={["application/pdf", "image/*"]}
+                          maxFiles={5}
+                        />
+                      </div>
+
+                      {/* Affidavit Section 29 */}
+                      <div className="space-y-2">
+                        <Label>Affidavit Under Section 29</Label>
+                        <ObjectUploader
+                          label="Affidavit Section 29"
+                          uploadedFiles={uploadedDocuments.affidavitSection29}
+                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: files }))}
+                          bucketPath="documents/affidavit"
+                          allowedTypes={["application/pdf", "image/*"]}
+                          maxFiles={5}
+                        />
+                      </div>
+
+                      {/* Undertaking Form C */}
+                      <div className="space-y-2">
+                        <Label>Undertaking in Form-C</Label>
+                        <ObjectUploader
+                          label="Undertaking Form C"
+                          uploadedFiles={uploadedDocuments.undertakingFormC}
+                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: files }))}
+                          bucketPath="documents/undertaking"
+                          allowedTypes={["application/pdf", "image/*"]}
+                          maxFiles={5}
+                        />
+                      </div>
+
+                      {/* Register for Verification */}
+                      <div className="space-y-2">
+                        <Label>Register for Verification</Label>
+                        <ObjectUploader
+                          label="Register for Verification"
+                          uploadedFiles={uploadedDocuments.registerForVerification}
+                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: files }))}
+                          bucketPath="documents/register"
+                          allowedTypes={["application/pdf", "image/*"]}
+                          maxFiles={5}
+                        />
+                      </div>
+
+                      {/* Bill Book */}
+                      <div className="space-y-2">
+                        <Label>Bill Book</Label>
+                        <ObjectUploader
+                          label="Bill Book"
+                          uploadedFiles={uploadedDocuments.billBook}
+                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, billBook: files }))}
+                          bucketPath="documents/bill-book"
+                          allowedTypes={["application/pdf", "image/*"]}
+                          maxFiles={5}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditingDocuments(false)}
+                        data-testid="button-cancel-edit"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => resubmitMutation.mutate()}
+                        disabled={resubmitMutation.isPending}
+                        data-testid="button-resubmit-application"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        {resubmitMutation.isPending ? "Resubmitting..." : "Resubmit Application"}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
