@@ -1045,3 +1045,36 @@ export const insertCertificateSchema = createInsertSchema(certificates, {
 export const selectCertificateSchema = createSelectSchema(certificates);
 export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
 export type Certificate = typeof certificates.$inferSelect;
+
+// System Settings Table - Stores global configuration
+export const systemSettings = pgTable("system_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Setting Key (unique identifier for the setting)
+  settingKey: varchar("setting_key", { length: 100 }).notNull().unique(), // e.g., 'test_payment_mode'
+  
+  // Setting Value (stored as JSON for flexibility)
+  settingValue: jsonb("setting_value").notNull(), // e.g., { enabled: true }
+  
+  // Metadata
+  description: text("description"), // Human-readable description
+  category: varchar("category", { length: 50 }).default('general'), // e.g., 'payment', 'general', 'notification'
+  
+  // Audit fields
+  updatedBy: varchar("updated_by").references(() => users.id), // Admin who last updated
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings, {
+  settingKey: z.string().min(1, "Setting key is required"),
+  settingValue: z.any(), // Allow any JSON value
+  description: z.string().optional().or(z.literal('')),
+  category: z.enum(['general', 'payment', 'notification', 'security']).optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const selectSystemSettingSchema = createSelectSchema(systemSettings);
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;

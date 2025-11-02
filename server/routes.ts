@@ -26,7 +26,9 @@ import {
   reviews,
   auditLogs,
   himkoshTransactions,
-  ddoCodes
+  ddoCodes,
+  systemSettings,
+  type SystemSetting
 } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -2994,7 +2996,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // RESET DATABASE - Clear all test data (admin only)
   app.post("/api/admin/reset-db", requireRole('admin'), async (req, res) => {
     try {
-      console.log("[admin] Starting database reset...");
+      const { preserveDdoCodes = false } = req.body;
+      console.log("[admin] Starting database reset...", { preserveDdoCodes });
       
       // Delete in correct order to respect foreign key constraints
       // Child tables first, then parent tables
@@ -3055,9 +3058,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.delete(productionStats);
       console.log(`[admin] ✓ Deleted all production stats`);
       
-      // 15. DDO Codes (no foreign keys)
-      await db.delete(ddoCodes);
-      console.log(`[admin] ✓ Deleted all DDO codes`);
+      // 15. DDO Codes (optional - configuration data, not test data)
+      let ddoCodesStatus = "preserved (configuration data)";
+      if (!preserveDdoCodes) {
+        await db.delete(ddoCodes);
+        ddoCodesStatus = "deleted";
+        console.log(`[admin] ✓ Deleted all DDO codes`);
+      } else {
+        console.log(`[admin] ⊙ Preserved DDO codes (configuration data)`);
+      }
       
       // 16. Get admin user IDs to preserve their profiles
       const adminUsers = await db.select({ id: users.id })
@@ -3110,12 +3119,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notifications: "all",
           auditLogs: "all",
           productionStats: "all",
-          ddoCodes: "all",
+          ddoCodes: ddoCodesStatus,
           userProfiles: "non-admin only",
           users: "non-admin only"
         },
         preserved: {
-          adminAccounts: preservedAdmins.length
+          adminAccounts: preservedAdmins.length,
+          ddoCodes: preserveDdoCodes
         }
       });
     } catch (error) {
@@ -3255,6 +3265,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[admin] Failed to fetch stats:", error);
       res.status(500).json({ message: "Failed to fetch system statistics" });
+    }
+  });
+
+  // ========================================
+  // SYSTEM SETTINGS ROUTES (Admin/Super Admin)
+  // ========================================
+
+  // Get a specific system setting by key
+  app.get("/api/admin/settings/:key", requireRole('admin'), async (req, res) => {
+    try {
+      const { key } = req.params;
+      
+      const [setting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, key))
+        .limit(1);
+      
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      console.error("[admin] Failed to fetch setting:", error);
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+
+  // Update or create a system setting
+  app.put("/api/admin/settings/:key", requireRole('admin'), async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { settingValue, description } = req.body;
+      const userId = req.user?.id;
+      
+      if (!settingValue) {
+        return res.status(400).json({ message: "Setting value is required" });
+      }
+      
+      // Check if setting exists
+      const [existingSetting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, key))
+        .limit(1);
+      
+      if (existingSetting) {
+        // Update existing setting
+        const [updated] = await db
+          .update(systemSettings)
+          .set({
+            settingValue,
+            description: description || existingSetting.description,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          })
+          .where(eq(systemSettings.settingKey, key))
+          .returning();
+        
+        console.log(`[admin] Updated setting: ${key}`);
+        res.json(updated);
+      } else {
+        // Create new setting
+        const [created] = await db
+          .insert(systemSettings)
+          .values({
+            settingKey: key,
+            settingValue,
+            description: description || '',
+            category: key.startsWith('payment_') ? 'payment' : 'general',
+            updatedBy: userId,
+          })
+          .returning();
+        
+        console.log(`[admin] Created setting: ${key}`);
+        res.json(created);
+      }
+    } catch (error) {
+      console.error("[admin] Failed to update setting:", error);
+      res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
+  // Get test payment mode status (specific endpoint for convenience)
+  app.get("/api/admin/settings/payment/test-mode", requireRole('admin'), async (req, res) => {
+    try {
+      const [setting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, 'payment_test_mode'))
+        .limit(1);
+      
+      if (!setting) {
+        // Default: test mode disabled
+        res.json({ enabled: false, isDefault: true });
+      } else {
+        const value = setting.settingValue as { enabled: boolean };
+        res.json({ enabled: value.enabled, isDefault: false });
+      }
+    } catch (error) {
+      console.error("[admin] Failed to fetch test payment mode:", error);
+      res.status(500).json({ message: "Failed to fetch test payment mode" });
+    }
+  });
+
+  // Toggle test payment mode
+  app.post("/api/admin/settings/payment/test-mode/toggle", requireRole('admin'), async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      const userId = req.user?.id;
+      
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+      
+      // Check if setting exists
+      const [existingSetting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, 'payment_test_mode'))
+        .limit(1);
+      
+      if (existingSetting) {
+        // Update existing
+        const [updated] = await db
+          .update(systemSettings)
+          .set({
+            settingValue: { enabled },
+            updatedBy: userId,
+            updatedAt: new Date(),
+          })
+          .where(eq(systemSettings.settingKey, 'payment_test_mode'))
+          .returning();
+        
+        console.log(`[admin] Test payment mode ${enabled ? 'enabled' : 'disabled'}`);
+        res.json(updated);
+      } else {
+        // Create new
+        const [created] = await db
+          .insert(systemSettings)
+          .values({
+            settingKey: 'payment_test_mode',
+            settingValue: { enabled },
+            description: 'When enabled, payment requests send ₹1 to gateway instead of actual amount (for testing)',
+            category: 'payment',
+            updatedBy: userId,
+          })
+          .returning();
+        
+        console.log(`[admin] Test payment mode ${enabled ? 'enabled' : 'disabled'}`);
+        res.json(created);
+      }
+    } catch (error) {
+      console.error("[admin] Failed to toggle test payment mode:", error);
+      res.status(500).json({ message: "Failed to toggle test payment mode" });
     }
   });
 
