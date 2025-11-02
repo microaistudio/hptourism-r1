@@ -66,8 +66,6 @@ export default function AdminConsole() {
       return response.json();
     },
     onSuccess: (data: any) => {
-      console.log('[DB Console] Query result:', data);
-      console.log('[DB Console] Success:', data.success, 'Row count:', data.rowCount, 'Data length:', data.data?.length);
       setQueryResult(data);
       toast({
         title: "Query executed successfully",
@@ -75,7 +73,6 @@ export default function AdminConsole() {
       });
     },
     onError: (error: any) => {
-      console.error('[DB Console] Query error:', error);
       toast({
         title: "Query execution failed",
         description: error.message || "An error occurred while executing the query",
