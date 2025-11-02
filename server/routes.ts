@@ -353,6 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Save application as draft (partial data allowed)
+  // ENFORCE ONE-APPLICATION-PER-OWNER RULE: Check for existing application first
   app.post("/api/applications/draft", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
@@ -432,17 +433,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         (validatedData.doubleBedRooms || 0) + 
                         (validatedData.familySuites || 0);
 
-      // Create draft application
-      const application = await storage.createApplication({
-        ...validatedData,
-        userId,
-        totalRooms: totalRooms || 0,
-        status: 'draft', // Explicitly set as draft
-      } as any);
+      // ONE-APPLICATION-PER-OWNER RULE: Check if user already has an active application
+      const existingApp = await storage.getUserActiveApplication(userId);
+      
+      let application;
+      if (existingApp) {
+        // Update existing application instead of creating a new one
+        application = await storage.updateApplication(existingApp.id, {
+          ...validatedData,
+          totalRooms: totalRooms || existingApp.totalRooms,
+        } as any);
+      } else {
+        // Create new application only if none exists
+        application = await storage.createApplication({
+          ...validatedData,
+          userId,
+          totalRooms: totalRooms || 0,
+          status: 'draft', // Explicitly set as draft
+        } as any);
+      }
 
       res.json({ 
         application, 
-        message: "Draft saved successfully. You can continue editing anytime." 
+        message: existingApp 
+          ? "Draft updated successfully. You can continue editing anytime." 
+          : "Draft saved successfully. You can continue editing anytime."
       });
     } catch (error) {
       console.error("Draft save error:", error);
