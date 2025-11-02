@@ -81,7 +81,7 @@ export default function Dashboard() {
       case 'sent_back':
         return applications.filter(a => a.status === 'sent_back_for_corrections' || a.status === 'reverted_to_applicant' || a.status === 'reverted_by_dtdo');
       case 'payment_pending':
-        return applications.filter(a => a.status === 'payment_pending');
+        return applications.filter(a => a.status === 'payment_pending' || a.status === 'verified_for_payment');
       case 'all':
       default:
         return applications;
@@ -95,7 +95,7 @@ export default function Dashboard() {
     total: applications.length,
     draft: applications.filter(a => a.status === 'draft').length,
     sentBack: applications.filter(a => a.status === 'sent_back_for_corrections' || a.status === 'reverted_to_applicant' || a.status === 'reverted_by_dtdo').length,
-    paymentPending: applications.filter(a => a.status === 'payment_pending').length,
+    paymentPending: applications.filter(a => a.status === 'payment_pending' || a.status === 'verified_for_payment').length,
     pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review' || a.status === 'inspection_scheduled' || a.status === 'inspection_completed' || a.status === 'reverted_to_applicant' || a.status === 'reverted_by_dtdo').length,
     approved: applications.filter(a => a.status === 'approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
@@ -109,7 +109,7 @@ export default function Dashboard() {
       a.status === 'inspection_completed'
     ).length,
     inspectionScheduled: applications.filter(a => a.status === 'inspection_scheduled').length,
-    paymentPending: applications.filter(a => a.status === 'payment_pending').length,
+    paymentPending: applications.filter(a => a.status === 'payment_pending' || a.status === 'verified_for_payment').length,
     approved: applications.filter(a => a.status === 'approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
     sentBack: applications.filter(a => a.status === 'sent_back_for_corrections').length,
@@ -129,6 +129,7 @@ export default function Dashboard() {
       inspection_scheduled: { variant: "secondary", label: "Inspection Scheduled" },
       inspection_completed: { variant: "secondary", label: "Inspection Completed" },
       payment_pending: { variant: "secondary", label: "Payment Pending" },
+      verified_for_payment: { variant: "secondary", label: "Payment Pending" },
       approved: { variant: "default", label: "Approved" },
       rejected: { variant: "destructive", label: "Rejected" },
     };
@@ -185,7 +186,7 @@ export default function Dashboard() {
               </p>
               <Button 
                 onClick={() => {
-                  const paymentApp = applications.find(a => a.status === 'payment_pending');
+                  const paymentApp = applications.find(a => a.status === 'payment_pending' || a.status === 'verified_for_payment');
                   if (paymentApp) setLocation(`/applications/${paymentApp.id}/payment-gateway`);
                 }}
                 data-testid="button-make-payment"
@@ -482,7 +483,7 @@ export default function Dashboard() {
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Update Application
                       </Button>
-                    ) : app.status === 'payment_pending' ? (
+                    ) : (app.status === 'payment_pending' || app.status === 'verified_for_payment') ? (
                       <Button 
                         size="sm" 
                         onClick={(e) => {
