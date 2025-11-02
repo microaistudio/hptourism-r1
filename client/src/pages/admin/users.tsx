@@ -385,6 +385,8 @@ export default function AdminUsers() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="property_owner">Property Owner</SelectItem>
+                              <SelectItem value="dealing_assistant">Dealing Assistant (DA)</SelectItem>
+                              <SelectItem value="district_tourism_officer">District Tourism Officer (DTDO)</SelectItem>
                               <SelectItem value="district_officer">District Officer</SelectItem>
                               <SelectItem value="state_officer">State Officer</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
