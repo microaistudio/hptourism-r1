@@ -16,6 +16,14 @@ Preferred communication style: Simple, everyday language.
 - **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, update page guard, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
 - **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated, and resubmit correctly with status changing back to 'submitted'
 
+### Comprehensive Application Update Form
+- **Expanded from 8 to 70+ fields**: Property owners can now update all application sections when sent back for corrections, not just basic property/owner info
+- **Complete sections included**: Property Information, Room Configuration (with per-type rates), LGD Hierarchical Address, Distances to facilities, Public Areas, Amenities (11 checkboxes), Additional Facilities, Owner Information, GSTIN, Certificate Validity
+- **DTDO/DA workflow field additions**: Added missing schema fields (`dtdoId`, `dtdoRemarks`, `dtdoReviewDate`, `daId`, `daReviewDate`, `daForwardedDate`) to support full workflow tracking
+- **Data integrity protection**: Implemented submit-time sanitization that converts empty/zero optional numeric fields (distances, room sizes, rates, public areas) to `undefined` instead of overwriting existing data with 0
+- **Dual feedback display**: Update page shows both DA feedback (`clarificationRequested`) and DTDO feedback (`dtdoRemarks`) alerts when applications are reverted
+- **Future enhancement planned**: Hybrid Option 2 where only officer-marked sections are editable by default, with toggle to show all fields
+
 ## System Architecture
 
 ### UI/UX Decisions
