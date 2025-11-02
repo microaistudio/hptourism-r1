@@ -2996,8 +2996,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // RESET DATABASE - Clear all test data (admin only)
   app.post("/api/admin/reset-db", requireRole('admin'), async (req, res) => {
     try {
-      const { preserveDdoCodes = false } = req.body;
-      console.log("[admin] Starting database reset...", { preserveDdoCodes });
+      const { 
+        preserveDdoCodes = false,
+        preservePropertyOwners = false,
+        preserveDistrictOfficers = false,
+        preserveStateOfficers = false
+      } = req.body;
+      console.log("[admin] Starting database reset...", { 
+        preserveDdoCodes,
+        preservePropertyOwners,
+        preserveDistrictOfficers,
+        preserveStateOfficers
+      });
       
       // Delete in correct order to respect foreign key constraints
       // Child tables first, then parent tables
@@ -3068,33 +3078,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[admin] ⊙ Preserved DDO codes (configuration data)`);
       }
       
-      // 16. Get admin user IDs to preserve their profiles
-      const adminUsers = await db.select({ id: users.id })
+      // 15b. System Settings (always preserved - configuration data)
+      console.log(`[admin] ⊙ Preserved system settings (configuration data)`);
+      
+      // 16. Build list of roles to preserve
+      const rolesToPreserve: string[] = ['admin', 'super_admin']; // Always preserve admins
+      
+      if (preservePropertyOwners) {
+        rolesToPreserve.push('property_owner');
+      }
+      
+      if (preserveDistrictOfficers) {
+        rolesToPreserve.push('dealing_assistant', 'district_tourism_officer', 'district_officer');
+      }
+      
+      if (preserveStateOfficers) {
+        rolesToPreserve.push('state_officer');
+      }
+      
+      // Get user IDs to preserve (for preserving their profiles)
+      const usersToPreserve = await db.select({ id: users.id, role: users.role })
         .from(users)
         .where(
-          notInArray(users.role, ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer'])
+          notInArray(users.role, ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer']
+            .filter(role => !rolesToPreserve.includes(role)))
         );
       
-      const adminUserIds = adminUsers.map(u => u.id);
+      const preservedUserIds = usersToPreserve.map(u => u.id);
       
-      // Delete user profiles for non-admin users
-      if (adminUserIds.length > 0) {
+      // Delete user profiles for non-preserved users
+      if (preservedUserIds.length > 0) {
         await db.delete(userProfiles)
-          .where(notInArray(userProfiles.userId, adminUserIds));
+          .where(notInArray(userProfiles.userId, preservedUserIds));
       } else {
         await db.delete(userProfiles);
       }
-      console.log(`[admin] ✓ Deleted all non-admin user profiles`);
+      console.log(`[admin] ✓ Deleted user profiles (preserved ${preservedUserIds.length} profiles)`);
       
-      // 17. Users (keep admins and super_admins)
+      // 17. Users (delete based on preservation settings)
       const deletedUsers = await db.delete(users)
         .where(
-          notInArray(users.role, ['admin', 'super_admin'])
+          notInArray(users.role, rolesToPreserve)
         )
         .returning();
       
-      const preservedAdmins = await db.select().from(users);
-      console.log(`[admin] ✓ Deleted ${deletedUsers.length} non-admin users (preserved ${preservedAdmins.length} admin accounts)`);
+      const preservedUsers = await db.select().from(users);
+      
+      // Count preserved users by role
+      const preservedCounts = preservedUsers.reduce((acc, user) => {
+        acc[user.role] = (acc[user.role] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      console.log(`[admin] ✓ Deleted ${deletedUsers.length} users (preserved ${preservedUsers.length} accounts)`);
       
       // TODO: Delete uploaded files from object storage
       // This would require listing and deleting files from GCS bucket
@@ -3120,12 +3156,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           auditLogs: "all",
           productionStats: "all",
           ddoCodes: ddoCodesStatus,
-          userProfiles: "non-admin only",
-          users: "non-admin only"
+          userProfiles: `${deletedUsers.length} deleted, ${preservedUserIds.length} preserved`,
+          users: `${deletedUsers.length} deleted`
         },
         preserved: {
-          adminAccounts: preservedAdmins.length,
-          ddoCodes: preserveDdoCodes
+          totalUsers: preservedUsers.length,
+          byRole: preservedCounts,
+          ddoCodes: preserveDdoCodes,
+          propertyOwners: preservePropertyOwners,
+          districtOfficers: preserveDistrictOfficers,
+          stateOfficers: preserveStateOfficers,
+          systemSettings: "always preserved"
         }
       });
     } catch (error) {

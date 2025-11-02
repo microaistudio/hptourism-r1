@@ -95,6 +95,14 @@ export default function SuperAdminConsole() {
     queryKey: ["/api/admin/stats"],
   });
 
+  // Fetch test payment mode status
+  const { data: testModeData, isLoading: testModeLoading, refetch: refetchTestMode } = useQuery<{
+    enabled: boolean;
+    isDefault: boolean;
+  }>({
+    queryKey: ["/api/admin/settings/payment/test-mode"],
+  });
+
   // Reset mutation
   const resetMutation = useMutation({
     mutationFn: async ({ operation, confirmationText, reason }: {
@@ -144,6 +152,29 @@ export default function SuperAdminConsole() {
       toast({
         title: "Seed failed",
         description: error.message || "Failed to generate test data",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle test payment mode mutation
+  const toggleTestModeMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiRequest("POST", "/api/admin/settings/payment/test-mode/toggle", { enabled }) as Promise<any>;
+    },
+    onSuccess: (data, variables) => {
+      toast({
+        title: variables ? "Test payment mode enabled" : "Test payment mode disabled",
+        description: variables 
+          ? "🧪 Payment requests will send ₹1 to gateway (for testing)"
+          : "Payment requests will send actual calculated amounts",
+      });
+      refetchTestMode();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update test mode",
+        description: error.message || "An error occurred",
         variant: "destructive",
       });
     },
@@ -409,6 +440,61 @@ export default function SuperAdminConsole() {
                   </Button>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              <CardTitle>Payment Settings</CardTitle>
+            </div>
+            <CardDescription>
+              Configure payment gateway test mode
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Test Payment Mode</h3>
+                  {testModeData?.enabled && (
+                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                      🧪 Active
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {testModeData?.enabled 
+                    ? "Payment requests send ₹1 to gateway (actual fee is calculated but not charged)"
+                    : "Payment requests send actual calculated amounts to gateway"
+                  }
+                </p>
+                {testModeData?.enabled && (
+                  <p className="text-xs text-yellow-600 mt-1">
+                    ⚠️ Applications will calculate real fees, but only ₹1 will be sent to payment gateway for testing
+                  </p>
+                )}
+              </div>
+              <Button
+                variant={testModeData?.enabled ? "destructive" : "default"}
+                onClick={() => toggleTestModeMutation.mutate(!testModeData?.enabled)}
+                disabled={testModeLoading || toggleTestModeMutation.isPending}
+                data-testid="button-toggle-test-payment-mode"
+              >
+                {toggleTestModeMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    {testModeData?.enabled ? "Disable" : "Enable"}
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>

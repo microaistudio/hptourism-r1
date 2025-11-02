@@ -13,16 +13,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, Database, Trash2, RefreshCw } from "lucide-react";
 
 export default function AdminConsole() {
   const { toast } = useToast();
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [preserveDdoCodes, setPreserveDdoCodes] = useState(true);
+  const [preservePropertyOwners, setPreservePropertyOwners] = useState(false);
+  const [preserveDistrictOfficers, setPreserveDistrictOfficers] = useState(false);
+  const [preserveStateOfficers, setPreserveStateOfficers] = useState(false);
 
   const resetDbMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/reset-db");
+      return apiRequest("POST", "/api/admin/reset-db", {
+        preserveDdoCodes,
+        preservePropertyOwners,
+        preserveDistrictOfficers,
+        preserveStateOfficers,
+      });
     },
     onSuccess: (data) => {
       toast({
@@ -126,21 +137,79 @@ export default function AdminConsole() {
 
       {/* Confirmation Dialog */}
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
+            <AlertDialogDescription className="space-y-3">
               <p>
                 This will permanently delete all test data from the database including:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>All homestay applications</li>
+                <li>All homestay applications and related records</li>
                 <li>All uploaded documents</li>
                 <li>All payment records</li>
-                <li>All non-admin users</li>
+                <li>Users (based on preservation settings below)</li>
                 <li>All production statistics</li>
               </ul>
-              <p className="font-semibold mt-3">
+              
+              <div className="border-t pt-3 mt-3">
+                <p className="font-semibold text-sm mb-3 text-foreground">Preservation Options:</p>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="preserve-ddo"
+                      checked={preserveDdoCodes}
+                      onCheckedChange={(checked) => setPreserveDdoCodes(checked as boolean)}
+                      data-testid="checkbox-preserve-ddo"
+                    />
+                    <Label htmlFor="preserve-ddo" className="text-sm font-normal cursor-pointer">
+                      Preserve DDO Codes (configuration data)
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="preserve-owners"
+                      checked={preservePropertyOwners}
+                      onCheckedChange={(checked) => setPreservePropertyOwners(checked as boolean)}
+                      data-testid="checkbox-preserve-owners"
+                    />
+                    <Label htmlFor="preserve-owners" className="text-sm font-normal cursor-pointer">
+                      Preserve Property Owners
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="preserve-district"
+                      checked={preserveDistrictOfficers}
+                      onCheckedChange={(checked) => setPreserveDistrictOfficers(checked as boolean)}
+                      data-testid="checkbox-preserve-district"
+                    />
+                    <Label htmlFor="preserve-district" className="text-sm font-normal cursor-pointer">
+                      Preserve District Officers (DA, DTDO)
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="preserve-state"
+                      checked={preserveStateOfficers}
+                      onCheckedChange={(checked) => setPreserveStateOfficers(checked as boolean)}
+                      data-testid="checkbox-preserve-state"
+                    />
+                    <Label htmlFor="preserve-state" className="text-sm font-normal cursor-pointer">
+                      Preserve State Officers
+                    </Label>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ℹ️ Admin and Super Admin accounts are always preserved
+                  </p>
+                </div>
+              </div>
+              
+              <p className="font-semibold mt-3 text-destructive">
                 This action cannot be undone.
               </p>
             </AlertDialogDescription>
@@ -153,6 +222,7 @@ export default function AdminConsole() {
               onClick={() => resetDbMutation.mutate()}
               disabled={resetDbMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-reset"
             >
               {resetDbMutation.isPending ? "Resetting..." : "Yes, Reset Database"}
             </AlertDialogAction>
