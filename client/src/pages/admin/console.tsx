@@ -35,10 +35,31 @@ export default function AdminConsole() {
         preserveStateOfficers,
       });
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
+      // Build detailed success message
+      const preservedInfo = data.preserved;
+      const preservedByRole = preservedInfo?.byRole || {};
+      const roleList = Object.entries(preservedByRole)
+        .map(([role, count]) => `${role}: ${count}`)
+        .join(", ");
+      
       toast({
         title: "Database reset successful",
-        description: "All test data has been cleared from the database.",
+        description: (
+          <div className="space-y-2">
+            <p>All test data has been cleared from the database.</p>
+            {preservedInfo?.totalUsers > 0 && (
+              <div className="mt-2 text-xs">
+                <p className="font-semibold">Preserved {preservedInfo.totalUsers} user(s):</p>
+                <p className="text-muted-foreground">{roleList}</p>
+                {preservedInfo.ddoCodes && <p className="text-muted-foreground">✓ DDO Codes preserved</p>}
+                {preservedInfo.propertyOwners && <p className="text-muted-foreground">✓ Property owners preserved</p>}
+                {preservedInfo.districtOfficers && <p className="text-muted-foreground">✓ District officers preserved</p>}
+                {preservedInfo.stateOfficers && <p className="text-muted-foreground">✓ State officers preserved</p>}
+              </div>
+            )}
+          </div>
+        ),
       });
       setShowResetDialog(false);
     },

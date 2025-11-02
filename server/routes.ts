@@ -3096,24 +3096,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rolesToPreserve.push('state_officer');
       }
       
-      // Get user IDs to preserve (for preserving their profiles)
-      const usersToPreserve = await db.select({ id: users.id, role: users.role })
-        .from(users)
+      console.log(`[admin] Roles to preserve:`, rolesToPreserve);
+      
+      // Delete user profiles for users whose roles are NOT in rolesToPreserve
+      // Use a subquery to delete profiles based on user role
+      const deletedProfiles = await db.delete(userProfiles)
         .where(
-          notInArray(users.role, ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer']
-            .filter(role => !rolesToPreserve.includes(role)))
-        );
+          sql`${userProfiles.userId} IN (SELECT id FROM ${users} WHERE ${notInArray(users.role, rolesToPreserve)})`
+        )
+        .returning();
       
-      const preservedUserIds = usersToPreserve.map(u => u.id);
-      
-      // Delete user profiles for non-preserved users
-      if (preservedUserIds.length > 0) {
-        await db.delete(userProfiles)
-          .where(notInArray(userProfiles.userId, preservedUserIds));
-      } else {
-        await db.delete(userProfiles);
-      }
-      console.log(`[admin] ✓ Deleted user profiles (preserved ${preservedUserIds.length} profiles)`);
+      console.log(`[admin] ✓ Deleted ${deletedProfiles.length} user profiles for non-preserved roles`);
       
       // 17. Users (delete based on preservation settings)
       const deletedUsers = await db.delete(users)
@@ -3156,7 +3149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           auditLogs: "all",
           productionStats: "all",
           ddoCodes: ddoCodesStatus,
-          userProfiles: `${deletedUsers.length} deleted, ${preservedUserIds.length} preserved`,
+          userProfiles: `${deletedProfiles.length} deleted, ${preservedUsers.length} preserved`,
           users: `${deletedUsers.length} deleted`
         },
         preserved: {
