@@ -6,10 +6,11 @@ import { z } from "zod";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -17,19 +18,82 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
 import type { HomestayApplication } from "@shared/schema";
 
+// Comprehensive update form schema with all application fields
 const updateFormSchema = z.object({
+  // Property Information
   propertyName: z.string().min(1, "Property name is required"),
   category: z.enum(['diamond', 'gold', 'silver']),
-  singleBedRooms: z.coerce.number().min(0, "Must be 0 or more").default(0),
-  doubleBedRooms: z.coerce.number().min(0, "Must be 0 or more").default(0),
-  familySuites: z.coerce.number().min(0, "Must be 0 or more").default(0),
-  address: z.string().min(1, "Address is required"),
+  locationType: z.enum(['mc', 'tcp', 'gp']),
+  projectType: z.enum(['new_rooms', 'new_project']),
+  propertyArea: z.coerce.number().min(1, "Property area is required"),
+  propertyOwnership: z.enum(['owned', 'leased']),
+  
+  // LGD Address
   district: z.string().min(1, "District is required"),
+  tehsil: z.string().min(1, "Tehsil is required"),
+  block: z.string().optional().or(z.literal("")),
+  gramPanchayat: z.string().optional().or(z.literal("")),
+  gramPanchayatOther: z.string().optional().or(z.literal("")),
+  urbanBody: z.string().optional().or(z.literal("")),
+  urbanBodyOther: z.string().optional().or(z.literal("")),
+  ward: z.string().optional().or(z.literal("")),
+  address: z.string().min(1, "Address is required"),
   pincode: z.string().min(1, "Pincode is required"),
+  telephone: z.string().optional().or(z.literal("")),
+  
+  // Room Configuration
+  singleBedRooms: z.coerce.number().min(0).default(0),
+  singleBedRoomSize: z.coerce.number().min(0).optional(),
+  singleBedRoomRate: z.coerce.number().min(0).optional(),
+  doubleBedRooms: z.coerce.number().min(0).default(0),
+  doubleBedRoomSize: z.coerce.number().min(0).optional(),
+  doubleBedRoomRate: z.coerce.number().min(0).optional(),
+  familySuites: z.coerce.number().min(0).default(0),
+  familySuiteSize: z.coerce.number().min(0).optional(),
+  familySuiteRate: z.coerce.number().min(0).optional(),
+  attachedWashrooms: z.coerce.number().min(0),
+  
+  // Distances (in km)
+  distanceAirport: z.coerce.number().min(0).optional(),
+  distanceRailway: z.coerce.number().min(0).optional(),
+  distanceCityCenter: z.coerce.number().min(0).optional(),
+  distanceShopping: z.coerce.number().min(0).optional(),
+  distanceBusStand: z.coerce.number().min(0).optional(),
+  
+  // Public Areas (in sq ft)
+  lobbyArea: z.coerce.number().min(0).optional(),
+  diningArea: z.coerce.number().min(0).optional(),
+  parkingArea: z.string().optional().or(z.literal("")),
+  
+  // Additional Facilities
+  ecoFriendlyFacilities: z.string().optional().or(z.literal("")),
+  differentlyAbledFacilities: z.string().optional().or(z.literal("")),
+  fireEquipmentDetails: z.string().optional().or(z.literal("")),
+  nearestHospital: z.string().optional().or(z.literal("")),
+  
+  // Amenities (optional booleans)
+  amenitiesAc: z.boolean().optional(),
+  amenitiesWifi: z.boolean().optional(),
+  amenitiesParking: z.boolean().optional(),
+  amenitiesRestaurant: z.boolean().optional(),
+  amenitiesHotWater: z.boolean().optional(),
+  amenitiesTv: z.boolean().optional(),
+  amenitiesLaundry: z.boolean().optional(),
+  amenitiesRoomService: z.boolean().optional(),
+  amenitiesGarden: z.boolean().optional(),
+  amenitiesMountainView: z.boolean().optional(),
+  amenitiesPetFriendly: z.boolean().optional(),
+  
+  // Owner Information
   ownerName: z.string().min(1, "Owner name is required"),
+  ownerGender: z.enum(['male', 'female', 'other']),
   ownerMobile: z.string().min(10, "Valid mobile number required"),
   ownerEmail: z.string().email().optional().or(z.literal("")),
   ownerAadhaar: z.string().min(12, "Valid Aadhaar number required"),
+  
+  // GSTIN & Validity
+  gstin: z.string().optional().or(z.literal("")),
+  certificateValidityYears: z.coerce.number().min(1).max(3),
 }).refine(
   (data) => (data.singleBedRooms + data.doubleBedRooms + data.familySuites) >= 1,
   { message: "At least 1 room required", path: ["singleBedRooms"] }
@@ -53,16 +117,30 @@ export default function UpdateApplication() {
     defaultValues: {
       propertyName: "",
       category: "silver",
+      locationType: "gp",
+      projectType: "new_project",
+      propertyArea: 0,
+      propertyOwnership: "owned",
+      district: "",
+      tehsil: "",
+      block: "",
+      gramPanchayat: "",
+      urbanBody: "",
+      ward: "",
+      address: "",
+      pincode: "",
+      telephone: "",
       singleBedRooms: 0,
       doubleBedRooms: 0,
       familySuites: 0,
-      address: "",
-      district: "",
-      pincode: "",
+      attachedWashrooms: 0,
       ownerName: "",
+      ownerGender: "male",
       ownerMobile: "",
       ownerEmail: "",
       ownerAadhaar: "",
+      gstin: "",
+      certificateValidityYears: 1,
     },
   });
 
@@ -70,26 +148,113 @@ export default function UpdateApplication() {
   useEffect(() => {
     if (data?.application) {
       const app = data.application;
+      const amenities = app.amenities as any || {};
+      
       form.reset({
         propertyName: app.propertyName,
         category: app.category as "diamond" | "gold" | "silver",
-        singleBedRooms: app.singleBedRooms || 0,
-        doubleBedRooms: app.doubleBedRooms || 0,
-        familySuites: app.familySuites || 0,
-        address: app.address,
+        locationType: (app.locationType as "mc" | "tcp" | "gp") || "gp",
+        projectType: (app.projectType as "new_rooms" | "new_project") || "new_project",
+        propertyArea: Number(app.propertyArea) || 0,
+        propertyOwnership: (app.propertyOwnership as "owned" | "leased") || "owned",
         district: app.district,
+        tehsil: app.tehsil || "",
+        block: app.block || "",
+        gramPanchayat: app.gramPanchayat || "",
+        gramPanchayatOther: app.gramPanchayatOther || "",
+        urbanBody: app.urbanBody || "",
+        urbanBodyOther: app.urbanBodyOther || "",
+        ward: app.ward || "",
+        address: app.address,
         pincode: app.pincode,
+        telephone: app.telephone || "",
+        singleBedRooms: app.singleBedRooms || 0,
+        singleBedRoomSize: Number(app.singleBedRoomSize) || undefined,
+        singleBedRoomRate: Number(app.singleBedRoomRate) || undefined,
+        doubleBedRooms: app.doubleBedRooms || 0,
+        doubleBedRoomSize: Number(app.doubleBedRoomSize) || undefined,
+        doubleBedRoomRate: Number(app.doubleBedRoomRate) || undefined,
+        familySuites: app.familySuites || 0,
+        familySuiteSize: Number(app.familySuiteSize) || undefined,
+        familySuiteRate: Number(app.familySuiteRate) || undefined,
+        attachedWashrooms: app.attachedWashrooms || 0,
+        distanceAirport: Number(app.distanceAirport) || undefined,
+        distanceRailway: Number(app.distanceRailway) || undefined,
+        distanceCityCenter: Number(app.distanceCityCenter) || undefined,
+        distanceShopping: Number(app.distanceShopping) || undefined,
+        distanceBusStand: Number(app.distanceBusStand) || undefined,
+        lobbyArea: Number(app.lobbyArea) || undefined,
+        diningArea: Number(app.diningArea) || undefined,
+        parkingArea: app.parkingArea || "",
+        ecoFriendlyFacilities: app.ecoFriendlyFacilities || "",
+        differentlyAbledFacilities: app.differentlyAbledFacilities || "",
+        fireEquipmentDetails: app.fireEquipmentDetails || "",
+        nearestHospital: app.nearestHospital || "",
+        amenitiesAc: amenities.ac || false,
+        amenitiesWifi: amenities.wifi || false,
+        amenitiesParking: amenities.parking || false,
+        amenitiesRestaurant: amenities.restaurant || false,
+        amenitiesHotWater: amenities.hotWater || false,
+        amenitiesTv: amenities.tv || false,
+        amenitiesLaundry: amenities.laundry || false,
+        amenitiesRoomService: amenities.roomService || false,
+        amenitiesGarden: amenities.garden || false,
+        amenitiesMountainView: amenities.mountainView || false,
+        amenitiesPetFriendly: amenities.petFriendly || false,
         ownerName: app.ownerName,
+        ownerGender: (app.ownerGender as "male" | "female" | "other") || "male",
         ownerMobile: app.ownerMobile,
         ownerEmail: app.ownerEmail || "",
         ownerAadhaar: app.ownerAadhaar,
+        gstin: app.gstin || "",
+        certificateValidityYears: app.certificateValidityYears || 1,
       });
     }
   }, [data?.application, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (formData: UpdateFormData) => {
-      return apiRequest("PATCH", `/api/applications/${applicationId}`, formData);
+      // Convert amenities back to object format
+      const amenities = {
+        ac: formData.amenitiesAc,
+        wifi: formData.amenitiesWifi,
+        parking: formData.amenitiesParking,
+        restaurant: formData.amenitiesRestaurant,
+        hotWater: formData.amenitiesHotWater,
+        tv: formData.amenitiesTv,
+        laundry: formData.amenitiesLaundry,
+        roomService: formData.amenitiesRoomService,
+        garden: formData.amenitiesGarden,
+        mountainView: formData.amenitiesMountainView,
+        petFriendly: formData.amenitiesPetFriendly,
+      };
+
+      // Remove amenities fields from formData
+      const { amenitiesAc, amenitiesWifi, amenitiesParking, amenitiesRestaurant, 
+              amenitiesHotWater, amenitiesTv, amenitiesLaundry, amenitiesRoomService,
+              amenitiesGarden, amenitiesMountainView, amenitiesPetFriendly, ...rest } = formData;
+
+      // Convert empty/zero optional numeric fields to undefined to prevent overwriting existing data
+      const cleanedData: any = { ...rest, amenities };
+      
+      // List of optional numeric fields that should be undefined instead of 0
+      const optionalNumericFields = [
+        'singleBedRoomSize', 'singleBedRoomRate',
+        'doubleBedRoomSize', 'doubleBedRoomRate',
+        'familySuiteSize', 'familySuiteRate',
+        'distanceAirport', 'distanceRailway', 'distanceCityCenter', 
+        'distanceShopping', 'distanceBusStand',
+        'lobbyArea', 'diningArea'
+      ];
+
+      // Convert 0 or undefined to actual undefined for optional fields
+      optionalNumericFields.forEach(field => {
+        if (cleanedData[field] === 0 || cleanedData[field] === undefined || cleanedData[field] === '') {
+          cleanedData[field] = undefined;
+        }
+      });
+
+      return apiRequest("PATCH", `/api/applications/${applicationId}`, cleanedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
@@ -220,6 +385,8 @@ export default function UpdateApplication() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))} className="space-y-6">
+            
+            {/* Property Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Property Information</CardTitle>
@@ -240,38 +407,132 @@ export default function UpdateApplication() {
                   )}
                 />
 
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-category">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="diamond">Diamond</SelectItem>
+                            <SelectItem value="gold">Gold</SelectItem>
+                            <SelectItem value="silver">Silver</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="locationType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-location-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="mc">Municipal Corporation (MC)</SelectItem>
+                            <SelectItem value="tcp">Town/City Planning (TCP)</SelectItem>
+                            <SelectItem value="gp">Gram Panchayat (GP)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="projectType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-project-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="new_project">New Project</SelectItem>
+                            <SelectItem value="new_rooms">Adding New Rooms</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="propertyArea"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property Area (sq meters)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-property-area" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
-                  name="category"
+                  name="propertyOwnership"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel>Property Ownership</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-category">
+                          <SelectTrigger data-testid="select-property-ownership">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="diamond">Diamond</SelectItem>
-                          <SelectItem value="gold">Gold</SelectItem>
-                          <SelectItem value="silver">Silver</SelectItem>
+                          <SelectItem value="owned">Owned</SelectItem>
+                          <SelectItem value="leased">Leased</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
 
+            {/* Room Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Room Configuration (HP Homestay Rules 2025)</CardTitle>
+                <CardDescription>Provide details for each room type</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <div className="space-y-4">
-                  <div className="text-sm font-medium">Room Configuration (HP Homestay Rules 2025)</div>
+                  <div className="font-medium">Single Bed Rooms</div>
                   <div className="grid grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="singleBedRooms"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Single Bed Rooms</FormLabel>
+                          <FormLabel>Count</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} data-testid="input-single-rooms" />
                           </FormControl>
@@ -281,10 +542,42 @@ export default function UpdateApplication() {
                     />
                     <FormField
                       control={form.control}
+                      name="singleBedRoomSize"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Size (sq ft)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-single-size" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="singleBedRoomRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rate (₹/night)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-single-rate" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="font-medium">Double Bed Rooms</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
                       name="doubleBedRooms"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Double Bed Rooms</FormLabel>
+                          <FormLabel>Count</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} data-testid="input-double-rooms" />
                           </FormControl>
@@ -294,12 +587,25 @@ export default function UpdateApplication() {
                     />
                     <FormField
                       control={form.control}
-                      name="familySuites"
+                      name="doubleBedRoomSize"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Family Suites</FormLabel>
+                          <FormLabel>Size (sq ft)</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} data-testid="input-family-suites" />
+                            <Input type="number" {...field} data-testid="input-double-size" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="doubleBedRoomRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rate (₹/night)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-double-rate" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -307,6 +613,162 @@ export default function UpdateApplication() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-4">
+                  <div className="font-medium">Family Suites</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="familySuites"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Count</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-family-suites" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="familySuiteSize"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Size (sq ft)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-family-size" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="familySuiteRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rate (₹/night)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-family-rate" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="attachedWashrooms"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Attached Washrooms</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} data-testid="input-washrooms" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Address */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Address Details</CardTitle>
+                <CardDescription>Complete address information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="district"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>District</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-district" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="tehsil"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tehsil</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-tehsil" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="block"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Block (for GP)</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-block" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="gramPanchayat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gram Panchayat (for GP)</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-gram-panchayat" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="urbanBody"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Urban Body (for MC/TCP)</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-urban-body" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="ward"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ward (for MC/TCP)</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-ward" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -325,20 +787,6 @@ export default function UpdateApplication() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="district"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>District</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-district" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="pincode"
                     render={({ field }) => (
                       <FormItem>
@@ -350,10 +798,361 @@ export default function UpdateApplication() {
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="telephone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telephone (Optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-telephone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </CardContent>
             </Card>
 
+            {/* Distances & Public Areas */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Distances & Public Areas</CardTitle>
+                <CardDescription>Distances to key locations and public area details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="font-medium mb-2">Distances (in km)</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="distanceAirport"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Airport</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-distance-airport" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="distanceRailway"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Railway Station</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-distance-railway" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="distanceBusStand"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bus Stand</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-distance-bus" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="distanceCityCenter"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City Center</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-distance-city" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="distanceShopping"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Shopping Area</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-distance-shopping" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="font-medium mb-2 mt-6">Public Areas (in sq ft)</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="lobbyArea"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Lobby Area</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-lobby-area" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="diningArea"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dining Area</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-dining-area" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="parkingArea"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parking Facilities</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-parking-area" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Amenities */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Amenities</CardTitle>
+                <CardDescription>Select available amenities</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="amenitiesAc"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-ac" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Air Conditioning</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesWifi"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-wifi" />
+                        </FormControl>
+                        <FormLabel className="font-normal">WiFi</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesParking"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-parking" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Parking</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesRestaurant"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-restaurant" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Restaurant</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesHotWater"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-hot-water" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Hot Water</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesTv"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-tv" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Television</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesLaundry"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-laundry" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Laundry</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesRoomService"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-room-service" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Room Service</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesGarden"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-garden" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Garden</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesMountainView"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-mountain-view" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Mountain View</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amenitiesPetFriendly"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-pet-friendly" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Pet Friendly</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Additional Facilities */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Additional Facilities</CardTitle>
+                <CardDescription>Additional facility information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="ecoFriendlyFacilities"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Eco-Friendly Facilities</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-eco-facilities" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="differentlyAbledFacilities"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Differently Abled Facilities</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-differently-abled" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="fireEquipmentDetails"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fire Safety Equipment</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-fire-equipment" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="nearestHospital"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nearest Hospital</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-nearest-hospital" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Owner Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Owner Information</CardTitle>
@@ -374,13 +1173,36 @@ export default function UpdateApplication() {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="ownerGender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gender (Female owners get 5% discount)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-owner-gender">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="ownerMobile"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Mobile Number</FormLabel>
+                        <FormLabel>Mobile</FormLabel>
                         <FormControl>
                           <Input {...field} data-testid="input-owner-mobile" />
                         </FormControl>
@@ -411,7 +1233,7 @@ export default function UpdateApplication() {
                     <FormItem>
                       <FormLabel>Aadhaar Number</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-owner-aadhaar" />
+                        <Input {...field} maxLength={12} data-testid="input-owner-aadhaar" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -420,28 +1242,74 @@ export default function UpdateApplication() {
               </CardContent>
             </Card>
 
-            <div className="flex gap-4">
+            {/* GSTIN & Validity */}
+            <Card>
+              <CardHeader>
+                <CardTitle>GSTIN & Certificate Validity</CardTitle>
+                <CardDescription>Tax and certificate details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="gstin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>GSTIN (Mandatory for Diamond/Gold)</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-gstin" />
+                      </FormControl>
+                      <FormDescription>
+                        GSTIN is mandatory for Diamond and Gold categories
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="certificateValidityYears"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Certificate Validity</FormLabel>
+                      <Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value)}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-validity">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1">1 Year</SelectItem>
+                          <SelectItem value="3">3 Years (10% discount on lump sum)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        3-year lump sum payment gets 10% discount
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end gap-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setLocation("/dashboard")}
+                disabled={updateMutation.isPending}
                 data-testid="button-cancel"
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
+              <Button 
+                type="submit" 
                 disabled={updateMutation.isPending}
-                data-testid="button-resubmit"
+                data-testid="button-submit"
               >
-                {updateMutation.isPending ? (
-                  <>Resubmitting...</>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Resubmit Application
-                  </>
-                )}
+                {updateMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                Save & Resubmit
               </Button>
             </div>
           </form>
