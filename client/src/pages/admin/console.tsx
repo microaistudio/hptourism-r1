@@ -49,7 +49,7 @@ export default function AdminConsole() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
   // Fetch tables list
-  const { data: tablesData } = useQuery({
+  const { data: tablesData } = useQuery<{ tables: { table_name: string; size: string }[] }>({
     queryKey: ['/api/admin/db-console/tables'],
     enabled: true,
   });
@@ -229,6 +229,12 @@ export default function AdminConsole() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Dev-only notice */}
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                🛠️ <strong>Development Tool:</strong> This console is only available in development mode and is automatically disabled in production for security.
+              </p>
+            </div>
             {/* Query Templates */}
             <div className="space-y-2">
               <Label htmlFor="template-select">Quick Query Templates</Label>
@@ -322,7 +328,7 @@ export default function AdminConsole() {
                 </Label>
                 <ScrollArea className="h-[120px] border rounded-md p-3">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {tablesData.tables.map((table: any) => (
+                    {tablesData.tables.map((table) => (
                       <Button
                         key={table.table_name}
                         variant="ghost"

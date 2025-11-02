@@ -67,6 +67,14 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
   - **System Settings Table**: JSONB-based storage for configuration including test_payment_mode flag
   - **Admin Controls**: Toggle accessible in Super Admin console
   - **Transparent Testing**: Allows full workflow testing without processing real payments
+- **Database Console (Admin Tool)**: Interactive SQL console for development and testing:
+  - **SQL Query Execution**: Execute any SQL query with real-time results display
+  - **Pre-made Templates**: 8 common query templates (user stats, application counts, table sizes, etc.)
+  - **Table Browser**: Quick-access buttons for all database tables with one-click populate queries
+  - **Query Type Detection**: Visual indicators for READ vs WRITE operations
+  - **Results Formatting**: Professional table display with NULL handling and JSON formatting
+  - **Security**: Development-only feature (automatically disabled in production)
+  - **Backend APIs**: `/api/admin/db-console/execute`, `/api/admin/db-console/tables`, `/api/admin/db-console/table/:tableName/schema`
 
 ### System Design Choices
 
