@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { himkoshTransactions, homestayApplications, ddoCodes } from '../../shared/schema';
+import { himkoshTransactions, homestayApplications, ddoCodes, systemSettings } from '../../shared/schema';
 import { HimKoshCrypto, buildRequestString, parseResponseString, buildVerificationString } from './crypto';
 import { getHimKoshConfig } from './config';
 import { eq } from 'drizzle-orm';
@@ -62,8 +62,26 @@ router.post('/initiate', async (req, res) => {
     // Generate unique transaction reference
     const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
 
-    // Calculate amount (convert to integer rupees, no decimals)
-    const totalAmount = Math.round(parseFloat(application.totalFee.toString()));
+    // Calculate actual amount (convert to integer rupees, no decimals)
+    const actualAmount = Math.round(parseFloat(application.totalFee.toString()));
+
+    // Check if test payment mode is enabled
+    const [testModeSetting] = await db
+      .select()
+      .from(systemSettings)
+      .where(eq(systemSettings.settingKey, 'payment_test_mode'))
+      .limit(1);
+    
+    const isTestMode = testModeSetting 
+      ? (testModeSetting.settingValue as { enabled: boolean }).enabled 
+      : false;
+    
+    // Use ₹1 for gateway if test mode is enabled, otherwise use actual amount
+    const gatewayAmount = isTestMode ? 1 : actualAmount;
+    
+    if (isTestMode) {
+      console.log(`[himkosh] 🧪 TEST PAYMENT MODE ACTIVE - Sending ₹1 to gateway instead of ₹${actualAmount}`);
+    }
 
     // Get current date in DD-MM-YYYY format (as per HP Government code)
     const now = new Date();
@@ -74,11 +92,11 @@ router.post('/initiate', async (req, res) => {
     const requestParams = {
       deptId: config.deptId,
       deptRefNo: application.applicationNumber,
-      totalAmount,
+      totalAmount: gatewayAmount, // Use gateway amount (₹1 in test mode)
       tenderBy: application.ownerName,
       appRefNo,
       head1: config.heads.registrationFee,
-      amount1: totalAmount,
+      amount1: gatewayAmount, // Use gateway amount (₹1 in test mode)
       head2: config.heads.registrationFee, // Same head, amount 0 (required by HimKosh)
       amount2: 0,
       ddo: ddoCode,
@@ -124,19 +142,19 @@ router.post('/initiate', async (req, res) => {
     console.log('[himkosh-encryption] Encrypted data:', encryptedData);
     console.log('[himkosh-encryption] Encrypted length:', encryptedData.length);
 
-    // Save transaction to database
+    // Save transaction to database (store gateway amount that was actually sent)
     await db.insert(himkoshTransactions).values({
       applicationId,
       deptRefNo: application.applicationNumber,
       appRefNo,
-      totalAmount,
+      totalAmount: gatewayAmount, // Store what was sent to gateway
       tenderBy: application.ownerName,
       merchantCode: config.merchantCode,
       deptId: config.deptId,
       serviceCode: config.serviceCode,
       ddo: ddoCode,
       head1: config.heads.registrationFee,
-      amount1: totalAmount,
+      amount1: gatewayAmount, // Store what was sent to gateway
       periodFrom: periodDate,
       periodTo: periodDate,
       encryptedRequest: encryptedData,
@@ -152,14 +170,19 @@ router.post('/initiate', async (req, res) => {
       encdata: encryptedData,
       checksum: checksum, // CRITICAL: Send checksum separately (NOT encrypted)
       appRefNo,
-      totalAmount,
+      totalAmount: gatewayAmount, // Gateway amount (₹1 in test mode)
+      actualAmount, // Actual calculated fee (for display purposes)
+      isTestMode, // Flag to indicate test mode
       isConfigured: config.isConfigured,
-      message: config.isConfigured 
-        ? 'Payment initiated successfully' 
-        : 'Using test configuration - waiting for CTP credentials',
+      message: isTestMode 
+        ? `🧪 TEST MODE: Sending ₹1 to gateway (actual fee: ₹${actualAmount})`
+        : (config.isConfigured 
+          ? 'Payment initiated successfully' 
+          : 'Using test configuration - waiting for CTP credentials'),
     };
     
     console.log('[himkosh] Response isConfigured:', config.isConfigured);
+    console.log('[himkosh] Response isTestMode:', isTestMode);
     res.json(response);
   } catch (error) {
     console.error('HimKosh initiation error:', error);
