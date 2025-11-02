@@ -860,26 +860,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Application can only be updated when sent back for corrections" });
       }
       
-      // Use same schema as create, but make all fields optional
+      // Comprehensive update schema with proper validation matching insert schema
+      // All fields optional since owner may only update specific fields
       const updateSchema = z.object({
-        propertyName: z.string().optional(),
+        // Property Details
+        propertyName: z.string().min(3, "Property name must be at least 3 characters").optional(),
         category: z.enum(['diamond', 'gold', 'silver']).optional(),
-        totalRooms: z.coerce.number().optional(),
-        address: z.string().optional(),
-        district: z.string().optional(),
-        pincode: z.string().optional(),
-        latitude: z.string().optional(),
-        longitude: z.string().optional(),
-        ownerName: z.string().optional(),
-        ownerMobile: z.string().optional(),
-        ownerEmail: z.string().optional(),
-        ownerAadhaar: z.string().optional(),
-        amenities: z.any().optional(),
-        rooms: z.any().optional(),
-        baseFee: z.string().optional(),
-        perRoomFee: z.string().optional(),
-        gstAmount: z.string().optional(),
-        totalFee: z.string().optional(),
+        locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
+        // totalRooms is derived from room counts, should not be directly updated
+        
+        // LGD Hierarchical Address
+        district: z.string().min(2, "District is required").optional(),
+        districtOther: z.string().optional().or(z.literal('')),
+        tehsil: z.string().min(2, "Tehsil is required").optional(),
+        tehsilOther: z.string().optional().or(z.literal('')),
+        block: z.string().optional().or(z.literal('')),
+        blockOther: z.string().optional().or(z.literal('')),
+        gramPanchayat: z.string().optional().or(z.literal('')),
+        gramPanchayatOther: z.string().optional().or(z.literal('')),
+        urbanBody: z.string().optional().or(z.literal('')),
+        urbanBodyOther: z.string().optional().or(z.literal('')),
+        ward: z.string().optional().or(z.literal('')),
+        
+        // Address Details
+        address: z.string().min(10, "Address must be at least 10 characters").optional(),
+        pincode: z.string().regex(/^[1-9]\d{5}$/, "Invalid pincode").optional(),
+        telephone: z.string().optional().or(z.literal('')),
+        fax: z.string().optional().or(z.literal('')),
+        latitude: z.string().optional().or(z.literal('')),
+        longitude: z.string().optional().or(z.literal('')),
+        
+        // Owner Details
+        ownerName: z.string().min(3, "Name must be at least 3 characters").optional(),
+        ownerGender: z.enum(['male', 'female', 'other']).optional(),
+        ownerMobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid mobile number").optional(),
+        ownerEmail: z.string().email("Invalid email").optional().or(z.literal('')),
+        ownerAadhaar: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional(),
+        propertyOwnership: z.enum(['owned', 'leased']).optional(),
+        
+        // Room & Category Details
+        projectType: z.enum(['new_rooms', 'new_project']).optional(),
+        propertyArea: z.coerce.number().min(1, "Property area must be at least 1 sq meter").optional(),
+        
+        // Per Room Type Details (2025 Rules)
+        singleBedRooms: z.coerce.number().int().min(0).optional(),
+        singleBedRoomSize: z.coerce.number().min(0).optional(),
+        singleBedRoomRate: z.coerce.number().min(100, "Rate must be at least ₹100").optional(),
+        doubleBedRooms: z.coerce.number().int().min(0).optional(),
+        doubleBedRoomSize: z.coerce.number().min(0).optional(),
+        doubleBedRoomRate: z.coerce.number().min(100, "Rate must be at least ₹100").optional(),
+        familySuites: z.coerce.number().int().min(0).max(3).optional(),
+        familySuiteSize: z.coerce.number().min(0).optional(),
+        familySuiteRate: z.coerce.number().min(100, "Rate must be at least ₹100").optional(),
+        
+        attachedWashrooms: z.coerce.number().int().min(0).optional(),
+        gstin: z.string().optional().or(z.literal('')),
+        
+        // Certificate Validity & Discounts
+        certificateValidityYears: z.coerce.number().int().min(1).max(3).optional(),
+        isPangiSubDivision: z.boolean().optional(),
+        
+        // Distances from key locations (in km)
+        distanceAirport: z.coerce.number().min(0).optional(),
+        distanceRailway: z.coerce.number().min(0).optional(),
+        distanceCityCenter: z.coerce.number().min(0).optional(),
+        distanceShopping: z.coerce.number().min(0).optional(),
+        distanceBusStand: z.coerce.number().min(0).optional(),
+        
+        // Public Areas (in sq ft)
+        lobbyArea: z.coerce.number().min(0).optional(),
+        diningArea: z.coerce.number().min(0).optional(),
+        parkingArea: z.string().optional().or(z.literal('')),
+        
+        // Additional Facilities
+        ecoFriendlyFacilities: z.string().optional().or(z.literal('')),
+        differentlyAbledFacilities: z.string().optional().or(z.literal('')),
+        fireEquipmentDetails: z.string().optional().or(z.literal('')),
+        nearestHospital: z.string().optional().or(z.literal('')),
+        
+        // Amenities (validated JSONB structure)
+        amenities: z.object({
+          ac: z.boolean().optional(),
+          wifi: z.boolean().optional(),
+          parking: z.boolean().optional(),
+          restaurant: z.boolean().optional(),
+          hotWater: z.boolean().optional(),
+          tv: z.boolean().optional(),
+          laundry: z.boolean().optional(),
+          roomService: z.boolean().optional(),
+          garden: z.boolean().optional(),
+          mountainView: z.boolean().optional(),
+          petFriendly: z.boolean().optional(),
+        }).optional(),
+        
+        // Rooms (legacy field - use with caution)
+        rooms: z.array(z.object({
+          roomType: z.string(),
+          size: z.coerce.number(),
+          count: z.coerce.number(),
+        })).optional(),
+        
+        // Fee Calculation (calculated fields - typically set by server)
+        baseFee: z.coerce.number().optional(),
+        totalBeforeDiscounts: z.coerce.number().optional(),
+        validityDiscount: z.coerce.number().optional(),
+        femaleOwnerDiscount: z.coerce.number().optional(),
+        pangiDiscount: z.coerce.number().optional(),
+        totalDiscount: z.coerce.number().optional(),
+        totalFee: z.coerce.number().optional(),
+        
+        // Legacy fee fields
+        perRoomFee: z.coerce.number().optional(),
+        gstAmount: z.coerce.number().optional(),
+        
+        // Documents (validated JSONB structure)
+        documents: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          type: z.string(),
+          url: z.string(),
+          uploadedAt: z.string().optional(),
+          required: z.boolean().optional(),
+        })).optional(),
+        
+        // Legacy document URLs (for backward compatibility)
         ownershipProofUrl: z.string().optional(),
         aadhaarCardUrl: z.string().optional(),
         panCardUrl: z.string().optional(),
@@ -890,11 +994,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = updateSchema.parse(req.body);
       
       // Update the application and change status back to submitted
+      // NOTE: Clearing clarificationRequested and dtdoRemarks removes officer feedback
+      // from the application record. If audit trail is required, consider logging
+      // these to an application_actions table before clearing.
       const updatedApplication = await storage.updateApplication(id, {
         ...validatedData,
         status: 'submitted',
         submittedAt: new Date(),
-        clarificationRequested: null, // Clear feedback after resubmission
+        clarificationRequested: null, // Clear DA feedback after resubmission
+        dtdoRemarks: null, // Clear DTDO feedback after resubmission
       });
       
       res.json({ application: updatedApplication });
