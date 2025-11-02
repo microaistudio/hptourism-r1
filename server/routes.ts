@@ -3682,7 +3682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get test payment mode status (specific endpoint for convenience)
-  app.get("/api/admin/settings/payment/test-mode", requireRole('admin'), async (req, res) => {
+  app.get("/api/admin/settings/payment/test-mode", requireRole('admin', 'super_admin'), async (req, res) => {
     try {
       const [setting] = await db
         .select()
@@ -3704,7 +3704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Toggle test payment mode
-  app.post("/api/admin/settings/payment/test-mode/toggle", requireRole('admin'), async (req, res) => {
+  app.post("/api/admin/settings/payment/test-mode/toggle", requireRole('admin', 'super_admin'), async (req, res) => {
     try {
       const { enabled } = req.body;
       const userId = req.user?.id;

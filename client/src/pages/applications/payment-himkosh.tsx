@@ -23,6 +23,8 @@ export default function HimKoshPaymentPage() {
     appRefNo: string;
     totalAmount: number;
     isConfigured: boolean;
+    isTestMode?: boolean;
+    message?: string;
   } | null>(null);
 
   const { data: applicationData, isLoading: appLoading } = useQuery<{ application: HomestayApplication }>({
@@ -273,6 +275,24 @@ export default function HimKoshPaymentPage() {
                   </ol>
                 </AlertDescription>
               </Alert>
+
+              {paymentData?.isTestMode && (
+                <Alert className="bg-orange-50 border-orange-300">
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                  <AlertDescription className="text-orange-900">
+                    <div className="font-bold mb-2">🧪 TEST PAYMENT MODE ACTIVE</div>
+                    <p className="text-sm mb-2">
+                      Gateway will receive: <span className="font-bold">₹1</span> (Test Amount)
+                    </p>
+                    <p className="text-sm">
+                      Actual fee: <span className="font-bold">₹{totalFee.toLocaleString('en-IN')}</span> (For reference only)
+                    </p>
+                    <p className="text-xs mt-2 text-orange-700">
+                      This is a test transaction. Disable test mode in Super Admin Console for production payments.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {!paymentData && (
                 <Button
