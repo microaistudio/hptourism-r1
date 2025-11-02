@@ -2917,7 +2917,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/users/:id", requireRole('admin'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { role, isActive, fullName, email, district, password } = req.body;
+      const { 
+        role, isActive, fullName, email, district, password,
+        firstName, lastName, username, alternatePhone,
+        designation, department, employeeId, officeAddress, officePhone
+      } = req.body;
       
       // Fetch target user first to check their role
       const targetUser = await storage.getUser(id);
@@ -2928,15 +2932,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Whitelist only safe fields for admin updates
       const updates: Partial<User> = {};
       
-      // Profile fields that can always be updated
+      // Basic profile fields
       if (fullName !== undefined && fullName !== null && fullName.trim()) {
         updates.fullName = fullName.trim();
       }
+      
+      // Name fields (for staff users)
+      if (firstName !== undefined && firstName !== null) {
+        updates.firstName = firstName.trim() || null;
+      }
+      if (lastName !== undefined && lastName !== null) {
+        updates.lastName = lastName.trim() || null;
+      }
+      if (username !== undefined && username !== null) {
+        updates.username = username.trim() || null;
+      }
+      
+      // Contact fields
       if (email !== undefined && email !== null) {
         updates.email = email.trim() || null;
       }
+      if (alternatePhone !== undefined && alternatePhone !== null) {
+        updates.alternatePhone = alternatePhone.trim() || null;
+      }
+      
+      // Official fields (for staff users)
+      if (designation !== undefined && designation !== null) {
+        updates.designation = designation.trim() || null;
+      }
+      if (department !== undefined && department !== null) {
+        updates.department = department.trim() || null;
+      }
+      if (employeeId !== undefined && employeeId !== null) {
+        updates.employeeId = employeeId.trim() || null;
+      }
       if (district !== undefined && district !== null) {
         updates.district = district.trim() || null;
+      }
+      if (officeAddress !== undefined && officeAddress !== null) {
+        updates.officeAddress = officeAddress.trim() || null;
+      }
+      if (officePhone !== undefined && officePhone !== null) {
+        updates.officePhone = officePhone.trim() || null;
       }
       
       // Hash password if provided
