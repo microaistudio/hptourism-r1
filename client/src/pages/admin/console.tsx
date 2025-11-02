@@ -60,6 +60,8 @@ export default function AdminConsole() {
       return apiRequest("POST", "/api/admin/db-console/execute", { query });
     },
     onSuccess: (data: any) => {
+      console.log('[DB Console] Query result:', data);
+      console.log('[DB Console] Success:', data.success, 'Row count:', data.rowCount, 'Data length:', data.data?.length);
       setQueryResult(data);
       toast({
         title: "Query executed successfully",
@@ -67,12 +69,13 @@ export default function AdminConsole() {
       });
     },
     onError: (error: any) => {
+      console.error('[DB Console] Query error:', error);
       toast({
         title: "Query execution failed",
         description: error.message || "An error occurred while executing the query",
         variant: "destructive",
       });
-      setQueryResult({ success: false, error: error.message });
+      setQueryResult({ success: false, error: error.message || "Unknown error" });
     },
   });
 
