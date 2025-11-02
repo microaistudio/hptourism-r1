@@ -28,9 +28,17 @@ export default function AdminUsers() {
     password: "",
   });
   const [editUserData, setEditUserData] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
+    username: "",
     email: "",
+    alternatePhone: "",
+    designation: "",
+    department: "",
+    employeeId: "",
     district: "",
+    officeAddress: "",
+    officePhone: "",
     password: "",
   });
 
@@ -121,9 +129,17 @@ export default function AdminUsers() {
       setEditDialogOpen(false);
       setEditingUser(null);
       setEditUserData({
-        fullName: "",
+        firstName: "",
+        lastName: "",
+        username: "",
         email: "",
+        alternatePhone: "",
+        designation: "",
+        department: "",
+        employeeId: "",
         district: "",
+        officeAddress: "",
+        officePhone: "",
         password: "",
       });
       toast({
@@ -155,9 +171,17 @@ export default function AdminUsers() {
   const handleEditUser = (user: User) => {
     setEditingUser(user);
     setEditUserData({
-      fullName: user.fullName,
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      username: user.username || "",
       email: user.email || "",
+      alternatePhone: user.alternatePhone || "",
+      designation: user.designation || "",
+      department: user.department || "",
+      employeeId: user.employeeId || "",
       district: user.district || "",
+      officeAddress: user.officeAddress || "",
+      officePhone: user.officePhone || "",
       password: "",
     });
     setEditDialogOpen(true);
@@ -166,23 +190,33 @@ export default function AdminUsers() {
   const handleSaveEdit = () => {
     if (!editingUser) return;
     
-    if (!editUserData.fullName) {
-      toast({
-        title: "Validation Error",
-        description: "Full name is required",
-        variant: "destructive",
-      });
-      return;
+    // Validate required fields for staff users
+    if (editingUser.role !== 'property_owner') {
+      if (!editUserData.firstName || !editUserData.lastName) {
+        toast({
+          title: "Validation Error",
+          description: "First name and last name are required for staff users",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     const updates: any = {
-      fullName: editUserData.fullName,
+      ...editUserData,
       email: editUserData.email || null,
       district: editUserData.district || null,
+      alternatePhone: editUserData.alternatePhone || null,
+      designation: editUserData.designation || null,
+      department: editUserData.department || null,
+      employeeId: editUserData.employeeId || null,
+      officeAddress: editUserData.officeAddress || null,
+      officePhone: editUserData.officePhone || null,
     };
 
-    if (editUserData.password) {
-      updates.password = editUserData.password;
+    // Remove password if empty (keep current password)
+    if (!editUserData.password) {
+      delete updates.password;
     }
 
     editUserMutation.mutate({ userId: editingUser.id, updates });
@@ -615,58 +649,180 @@ export default function AdminUsers() {
 
     {/* Edit User Dialog */}
     <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
+          <DialogTitle>Edit Staff Profile</DialogTitle>
           <DialogDescription>
-            Update user information. Leave password empty to keep current password.
+            Update comprehensive staff profile information. Leave password empty to keep current password.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="edit-fullName">Full Name *</Label>
-            <Input
-              id="edit-fullName"
-              placeholder="Enter full name"
-              value={editUserData.fullName}
-              onChange={(e) => setEditUserData({ ...editUserData, fullName: e.target.value })}
-              data-testid="input-edit-fullname"
-            />
+        
+        {editingUser && editingUser.role !== 'property_owner' ? (
+          <div className="space-y-6 py-4">
+            {/* Personal Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-2">Personal Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-firstName">First Name *</Label>
+                  <Input
+                    id="edit-firstName"
+                    placeholder="Enter first name"
+                    value={editUserData.firstName}
+                    onChange={(e) => setEditUserData({ ...editUserData, firstName: e.target.value })}
+                    data-testid="input-edit-firstname"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-lastName">Last Name *</Label>
+                  <Input
+                    id="edit-lastName"
+                    placeholder="Enter last name"
+                    value={editUserData.lastName}
+                    onChange={(e) => setEditUserData({ ...editUserData, lastName: e.target.value })}
+                    data-testid="input-edit-lastname"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-username">Username</Label>
+                  <Input
+                    id="edit-username"
+                    placeholder="Enter username"
+                    value={editUserData.username}
+                    onChange={(e) => setEditUserData({ ...editUserData, username: e.target.value })}
+                    data-testid="input-edit-username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mobile Number</Label>
+                  <Input
+                    value={editingUser.mobile}
+                    disabled
+                    className="bg-muted"
+                    data-testid="input-edit-mobile"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-2">Contact Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={editUserData.email}
+                    onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
+                    data-testid="input-edit-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-alternatePhone">Alternate Phone</Label>
+                  <Input
+                    id="edit-alternatePhone"
+                    placeholder="10-digit phone number"
+                    value={editUserData.alternatePhone}
+                    onChange={(e) => setEditUserData({ ...editUserData, alternatePhone: e.target.value })}
+                    data-testid="input-edit-alternatephone"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Official Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-2">Official Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-designation">Designation</Label>
+                  <Input
+                    id="edit-designation"
+                    placeholder="Job title/position"
+                    value={editUserData.designation}
+                    onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })}
+                    data-testid="input-edit-designation"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-department">Department</Label>
+                  <Input
+                    id="edit-department"
+                    placeholder="Department name"
+                    value={editUserData.department}
+                    onChange={(e) => setEditUserData({ ...editUserData, department: e.target.value })}
+                    data-testid="input-edit-department"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-employeeId">Employee ID</Label>
+                  <Input
+                    id="edit-employeeId"
+                    placeholder="Official employee ID"
+                    value={editUserData.employeeId}
+                    onChange={(e) => setEditUserData({ ...editUserData, employeeId: e.target.value })}
+                    data-testid="input-edit-employeeid"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-district">District</Label>
+                  <Input
+                    id="edit-district"
+                    placeholder="e.g., Shimla, Kullu, Mandi"
+                    value={editUserData.district}
+                    onChange={(e) => setEditUserData({ ...editUserData, district: e.target.value })}
+                    data-testid="input-edit-district"
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="edit-officeAddress">Office Address</Label>
+                  <Input
+                    id="edit-officeAddress"
+                    placeholder="Complete office address"
+                    value={editUserData.officeAddress}
+                    onChange={(e) => setEditUserData({ ...editUserData, officeAddress: e.target.value })}
+                    data-testid="input-edit-officeaddress"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-officePhone">Office Phone</Label>
+                  <Input
+                    id="edit-officePhone"
+                    placeholder="10-digit phone number"
+                    value={editUserData.officePhone}
+                    onChange={(e) => setEditUserData({ ...editUserData, officePhone: e.target.value })}
+                    data-testid="input-edit-officephone"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Security Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-2">Security</h3>
+              <div className="space-y-2">
+                <Label htmlFor="edit-password">New Password (optional)</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  placeholder="Leave empty to keep current password"
+                  value={editUserData.password}
+                  onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })}
+                  data-testid="input-edit-password"
+                />
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-email">Email</Label>
-            <Input
-              id="edit-email"
-              type="email"
-              placeholder="user@example.com"
-              value={editUserData.email}
-              onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
-              data-testid="input-edit-email"
-            />
+        ) : (
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Property owner profile editing coming soon...</p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-district">District</Label>
-            <Input
-              id="edit-district"
-              placeholder="e.g., Shimla, Kullu, Mandi"
-              value={editUserData.district}
-              onChange={(e) => setEditUserData({ ...editUserData, district: e.target.value })}
-              data-testid="input-edit-district"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-password">New Password (optional)</Label>
-            <Input
-              id="edit-password"
-              type="password"
-              placeholder="Leave empty to keep current password"
-              value={editUserData.password}
-              onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })}
-              data-testid="input-edit-password"
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
+        )}
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
           <Button 
             variant="outline" 
             onClick={() => setEditDialogOpen(false)}
@@ -676,7 +832,7 @@ export default function AdminUsers() {
           </Button>
           <Button 
             onClick={handleSaveEdit}
-            disabled={editUserMutation.isPending}
+            disabled={editUserMutation.isPending || (editingUser?.role === 'property_owner')}
             data-testid="button-save-edit"
           >
             {editUserMutation.isPending ? "Saving..." : "Save Changes"}
