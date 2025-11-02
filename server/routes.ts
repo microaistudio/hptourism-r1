@@ -1095,7 +1095,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ application: updatedApplication });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.errors[0].message });
+        console.error("Resubmit validation error:", JSON.stringify(error.errors, null, 2));
+        return res.status(400).json({ message: error.errors[0].message, errors: error.errors });
       }
       console.error("Error updating application:", error);
       res.status(500).json({ message: "Failed to update application" });
