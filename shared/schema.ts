@@ -1078,3 +1078,122 @@ export const insertSystemSettingSchema = createInsertSchema(systemSettings, {
 export const selectSystemSettingSchema = createSelectSchema(systemSettings);
 export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// ====================================================================
+// LGD Master Tables (Local Government Directory - Himachal Pradesh)
+// ====================================================================
+
+// LGD Districts Master
+export const lgdDistricts = pgTable("lgd_districts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lgdCode: varchar("lgd_code", { length: 20 }).unique(), // Official LGD code
+  districtName: varchar("district_name", { length: 100 }).notNull().unique(),
+  divisionName: varchar("division_name", { length: 100 }), // Shimla, Mandi, Kangra
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLgdDistrictSchema = createInsertSchema(lgdDistricts, {
+  districtName: z.string().min(2),
+  lgdCode: z.string().optional(),
+  divisionName: z.string().optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, isActive: true });
+
+export const selectLgdDistrictSchema = createSelectSchema(lgdDistricts);
+export type InsertLgdDistrict = z.infer<typeof insertLgdDistrictSchema>;
+export type LgdDistrict = typeof lgdDistricts.$inferSelect;
+
+// LGD Tehsils/Sub-Divisions Master
+export const lgdTehsils = pgTable("lgd_tehsils", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lgdCode: varchar("lgd_code", { length: 20 }).unique(), // Official LGD code
+  tehsilName: varchar("tehsil_name", { length: 100 }).notNull(),
+  districtId: varchar("district_id").notNull().references(() => lgdDistricts.id, { onDelete: 'cascade' }),
+  tehsilType: varchar("tehsil_type", { length: 50 }).default('tehsil'), // 'tehsil', 'sub_division', 'sub_tehsil'
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLgdTehsilSchema = createInsertSchema(lgdTehsils, {
+  tehsilName: z.string().min(2),
+  districtId: z.string().uuid(),
+  lgdCode: z.string().optional(),
+  tehsilType: z.enum(['tehsil', 'sub_division', 'sub_tehsil']).optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, isActive: true });
+
+export const selectLgdTehsilSchema = createSelectSchema(lgdTehsils);
+export type InsertLgdTehsil = z.infer<typeof insertLgdTehsilSchema>;
+export type LgdTehsil = typeof lgdTehsils.$inferSelect;
+
+// LGD Development Blocks Master (for rural areas)
+export const lgdBlocks = pgTable("lgd_blocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lgdCode: varchar("lgd_code", { length: 20 }).unique(), // Official LGD code
+  blockName: varchar("block_name", { length: 100 }).notNull(),
+  districtId: varchar("district_id").notNull().references(() => lgdDistricts.id, { onDelete: 'cascade' }),
+  tehsilId: varchar("tehsil_id").references(() => lgdTehsils.id, { onDelete: 'set null' }), // Optional linkage
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLgdBlockSchema = createInsertSchema(lgdBlocks, {
+  blockName: z.string().min(2),
+  districtId: z.string().uuid(),
+  lgdCode: z.string().optional(),
+  tehsilId: z.string().uuid().optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, isActive: true });
+
+export const selectLgdBlockSchema = createSelectSchema(lgdBlocks);
+export type InsertLgdBlock = z.infer<typeof insertLgdBlockSchema>;
+export type LgdBlock = typeof lgdBlocks.$inferSelect;
+
+// LGD Gram Panchayats Master (for rural areas)
+export const lgdGramPanchayats = pgTable("lgd_gram_panchayats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lgdCode: varchar("lgd_code", { length: 20 }).unique(), // Official LGD code
+  gramPanchayatName: varchar("gram_panchayat_name", { length: 100 }).notNull(),
+  districtId: varchar("district_id").notNull().references(() => lgdDistricts.id, { onDelete: 'cascade' }),
+  blockId: varchar("block_id").references(() => lgdBlocks.id, { onDelete: 'cascade' }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLgdGramPanchayatSchema = createInsertSchema(lgdGramPanchayats, {
+  gramPanchayatName: z.string().min(2),
+  districtId: z.string().uuid(),
+  blockId: z.string().uuid().optional(),
+  lgdCode: z.string().optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, isActive: true });
+
+export const selectLgdGramPanchayatSchema = createSelectSchema(lgdGramPanchayats);
+export type InsertLgdGramPanchayat = z.infer<typeof insertLgdGramPanchayatSchema>;
+export type LgdGramPanchayat = typeof lgdGramPanchayats.$inferSelect;
+
+// LGD Urban Bodies Master (Municipal Corporations, Councils, Nagar Panchayats)
+export const lgdUrbanBodies = pgTable("lgd_urban_bodies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lgdCode: varchar("lgd_code", { length: 20 }).unique(), // Official LGD code
+  urbanBodyName: varchar("urban_body_name", { length: 200 }).notNull(),
+  districtId: varchar("district_id").notNull().references(() => lgdDistricts.id, { onDelete: 'cascade' }),
+  bodyType: varchar("body_type", { length: 50 }).notNull(), // 'mc' (Municipal Corporation), 'tcp' (Town & Country Planning), 'np' (Nagar Panchayat)
+  numberOfWards: integer("number_of_wards"), // Total wards in this urban body
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLgdUrbanBodySchema = createInsertSchema(lgdUrbanBodies, {
+  urbanBodyName: z.string().min(2),
+  districtId: z.string().uuid(),
+  bodyType: z.enum(['mc', 'tcp', 'np']),
+  lgdCode: z.string().optional(),
+  numberOfWards: z.number().int().positive().optional(),
+}).omit({ id: true, createdAt: true, updatedAt: true, isActive: true });
+
+export const selectLgdUrbanBodySchema = createSelectSchema(lgdUrbanBodies);
+export type InsertLgdUrbanBody = z.infer<typeof insertLgdUrbanBodySchema>;
+export type LgdUrbanBody = typeof lgdUrbanBodies.$inferSelect;
