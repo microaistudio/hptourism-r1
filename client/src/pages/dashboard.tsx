@@ -138,8 +138,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="bg-background p-6">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="p-6">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold">Welcome, {user.fullName}!</h2>
