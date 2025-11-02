@@ -48,6 +48,21 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
 - **Frontend Route Guards**: `ProtectedRoute` component validates user roles and redirects unauthorized access.
 - **Official 2025 Policy Compliance**: Fully implements the **Himachal Pradesh Home Stay Rules, 2025**, covering room specifications, tiered fee structure (GST Included), discount system, GSTIN requirements, certificate validity, and a 60-day processing timeline.
 
+## Recent Updates (November 2025)
+
+### HimKosh Payment Gateway Critical Fixes
+Fixed 3 undocumented DLL behavior issues causing CHECK_SUM_MISMATCH errors:
+1. **Checksum Casing Fix**: Changed MD5 checksum from UPPERCASE to lowercase - actual DLL returns lowercase hex (documentation incorrectly implied uppercase)
+2. **Integer Amounts Only**: All amounts now strictly integers using Math.round() on totalAmount, amount1-10 - prevents ASP.NET FormatException triggered by decimals like "100.00"
+3. **AES IV Configuration**: IV now equals key (first 16 bytes of echallan.key) instead of separate IV - matches actual DLL encryption/decryption behavior (documentation and dummy code were misleading)
+
+### Payment Module UI & Backend Fixes
+- Backend accepts both `payment_pending` AND `verified_for_payment` statuses for HimKosh initiation
+- Payment pages display 2025 fee structure with discount breakdown (Base Fee, Validity Discount, Female Owner Discount, Pangi Discount)
+- Eliminated double scrollbars by removing `min-h-screen` from payment pages
+- Added null safety checks for `totalFee` field
+- Created `system_settings` table for payment configuration
+
 ## External Dependencies
 
 - **UI Component Libraries**: `@radix-ui/*`, `cmdk`, `embla-carousel-react`, `lucide-react`, `recharts`
