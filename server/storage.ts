@@ -12,6 +12,7 @@ export interface IStorage {
   // Homestay Application methods
   getApplication(id: string): Promise<HomestayApplication | undefined>;
   getApplicationsByUser(userId: string): Promise<HomestayApplication[]>;
+  getUserActiveApplication(userId: string): Promise<HomestayApplication | undefined>;
   getApplicationsByDistrict(district: string): Promise<HomestayApplication[]>;
   getApplicationsByStatus(status: string): Promise<HomestayApplication[]>;
   getAllApplications(): Promise<HomestayApplication[]>;
@@ -118,6 +119,16 @@ export class MemStorage implements IStorage {
 
   async getApplicationsByUser(userId: string): Promise<HomestayApplication[]> {
     return Array.from(this.applications.values()).filter(app => app.userId === userId);
+  }
+
+  async getUserActiveApplication(userId: string): Promise<HomestayApplication | undefined> {
+    // One owner = one application rule
+    // Active means: draft, pending, or any status before final (approved/rejected)
+    // After certificate issued, modifications happen on the SAME application
+    const activeStatuses = ['draft', 'pending', 'verified_for_payment', 'payment_pending', 'under_review', 'clarification_needed', 'approved'];
+    return Array.from(this.applications.values()).find(
+      app => app.userId === userId && activeStatuses.includes(app.status)
+    );
   }
 
   async getApplicationsByDistrict(district: string): Promise<HomestayApplication[]> {
