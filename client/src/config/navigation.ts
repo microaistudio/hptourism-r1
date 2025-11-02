@@ -145,6 +145,16 @@ export const daNavigation: NavSection[] = [
         icon: ClipboardCheck,
       },
       {
+        title: "Analytics",
+        url: "/analytics",
+        icon: BarChart,
+      },
+      {
+        title: "Workflow Monitor",
+        url: "/workflow-monitoring",
+        icon: Activity,
+      },
+      {
         title: "My Profile",
         url: "/da/profile",
         icon: User,

@@ -134,10 +134,10 @@ function Router() {
       
       {/* Officer-Only Routes */}
       <Route path="/analytics">
-        {() => <ProtectedRoute component={AnalyticsPage} allowedRoles={['district_officer', 'state_officer']} />}
+        {() => <ProtectedRoute component={AnalyticsPage} allowedRoles={['dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer', 'admin']} />}
       </Route>
       <Route path="/workflow-monitoring">
-        {() => <ProtectedRoute component={WorkflowMonitoring} allowedRoles={['district_officer', 'state_officer']} />}
+        {() => <ProtectedRoute component={WorkflowMonitoring} allowedRoles={['dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer', 'admin']} />}
       </Route>
       <Route path="/payment-verification">
         {() => <ProtectedRoute component={PaymentVerification} allowedRoles={['district_officer', 'state_officer']} />}

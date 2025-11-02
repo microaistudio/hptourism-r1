@@ -27,6 +27,12 @@ Preferred communication style: Simple, everyday language.
 - **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
 - **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated via in-place editing, and resubmit correctly with status changing back to 'submitted'
 
+### Payment Status & Analytics Access Updates
+- **Fixed payment status recognition**: Dashboard now recognizes both `payment_pending` and `verified_for_payment` statuses (DTDO-approved applications awaiting payment)
+- **Payment alerts & buttons**: "Payment Required" alert and "Make Payment" buttons now appear for applications in either payment status
+- **Expanded Analytics & Workflow access**: Analytics Dashboard and Workflow Monitoring pages now accessible to DA (Dealing Assistant) and DTDO in addition to District Officers, State Officers, and Admins
+- **Navigation updates**: Added Analytics and Workflow Monitor menu items to DA sidebar navigation for better discoverability
+
 ## System Architecture
 
 ### UI/UX Decisions
