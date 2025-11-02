@@ -7,7 +7,10 @@
 
 import type { Express, Request } from 'express';
 import { documentService } from './document-service';
+import { db } from './db';
+import { homestayApplications } from '@shared/schema';
 import type { User } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 // Extend Express Request with session user info
 interface AuthenticatedRequest extends Request {
@@ -18,9 +21,44 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
+ * Check if user can access an application's documents
+ * Property owners can only access their own applications
+ * Officers can access applications in their district
+ * Admins can access all applications
+ */
+async function canAccessApplication(userId: string, userRole: string, applicationId: string, userDistrict?: string): Promise<boolean> {
+  // Get application details
+  const [application] = await db.select()
+    .from(homestayApplications)
+    .where(eq(homestayApplications.id, applicationId));
+  
+  if (!application) {
+    return false; // Application doesn't exist
+  }
+  
+  // Property owners can only access their own applications
+  if (userRole === 'property_owner') {
+    return application.userId === userId;
+  }
+  
+  // District-level roles can access applications in their district
+  if (['district_officer', 'dealing_assistant', 'district_tourism_officer'].includes(userRole)) {
+    if (!userDistrict) return false;
+    return application.district === userDistrict;
+  }
+  
+  // State officers, admins, and super_admins can access all applications
+  if (['state_officer', 'admin', 'super_admin'].includes(userRole)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Register document management routes
  */
-export function registerDocumentRoutes(app: Express, requireAuth: any) {
+export function registerDocumentRoutes(app: Express, requireAuth: any, storage: any) {
   
   /**
    * GET /api/documents/:id
@@ -36,13 +74,25 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
         return res.status(404).json({ message: 'Document not found' });
       }
       
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization
+      const hasAccess = await canAccessApplication(userId, user.role, document.applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
       // Log document view
       await documentService.logAction({
         documentId: id,
         applicationId: document.applicationId,
         action: 'view',
         actionBy: userId,
-        userRole: req.session.user?.role,
+        userRole: user.role,
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
       });
@@ -61,7 +111,20 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
   app.get('/api/documents/application/:applicationId', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { applicationId } = req.params;
+      const userId = req.session.userId;
       const includeDeleted = req.query.includeDeleted === 'true';
+      
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization
+      const hasAccess = await canAccessApplication(userId, user.role, applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
       
       const documents = await documentService.getApplicationDocuments(applicationId, includeDeleted);
       
@@ -79,6 +142,19 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
   app.get('/api/documents/versions/:documentType/:applicationId', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { documentType, applicationId } = req.params;
+      const userId = req.session.userId;
+      
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization
+      const hasAccess = await canAccessApplication(userId, user.role, applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
       
       const versions = await documentService.getDocumentVersions(documentType, applicationId);
       
@@ -109,6 +185,18 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
       // Validate required fields
       if (!applicationId || !fileName || !filePath || !fileSize || !mimeType || !documentType) {
         return res.status(400).json({ message: 'Missing required fields' });
+      }
+      
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization - only property owner can upload to their own application
+      const hasAccess = await canAccessApplication(userId, user.role, applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied - you can only upload documents to your own applications' });
       }
       
       const document = await documentService.uploadDocument({
@@ -153,6 +241,24 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
       
+      // Get existing document to check authorization
+      const existingDoc = await documentService.getDocument(id);
+      if (!existingDoc) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization - only owner can create new versions
+      const hasAccess = await canAccessApplication(userId, user.role, existingDoc.applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied - you can only create new versions for your own documents' });
+      }
+      
       const newVersion = await documentService.createNewVersion(
         id,
         {
@@ -181,13 +287,26 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
     try {
       const { id } = req.params;
       const userId = req.session.userId;
-      const { applicationId } = req.body;
       
-      if (!applicationId) {
-        return res.status(400).json({ message: 'Application ID is required' });
+      // Get the document first to verify its actual applicationId
+      const document = await documentService.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
       }
       
-      const deletedDocument = await documentService.deleteDocument(id, userId, applicationId);
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization using the document's ACTUAL applicationId (not caller-supplied)
+      const hasAccess = await canAccessApplication(userId, user.role, document.applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const deletedDocument = await documentService.deleteDocument(id, userId, document.applicationId);
       
       res.json({ document: deletedDocument });
     } catch (error) {
@@ -203,6 +322,25 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
   app.get('/api/documents/:id/audit-logs', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
+      const userId = req.session.userId;
+      
+      // Get document to verify access to its application
+      const document = await documentService.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization
+      const hasAccess = await canAccessApplication(userId, user.role, document.applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
       
       const logs = await documentService.getDocumentAuditLogs(id);
       
@@ -220,6 +358,19 @@ export function registerDocumentRoutes(app: Express, requireAuth: any) {
   app.get('/api/documents/application/:applicationId/audit-logs', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { applicationId } = req.params;
+      const userId = req.session.userId;
+      
+      // Get user details for authorization
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      
+      // Check authorization
+      const hasAccess = await canAccessApplication(userId, user.role, applicationId, user.district || undefined);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
       
       const logs = await documentService.getApplicationAuditLogs(applicationId);
       

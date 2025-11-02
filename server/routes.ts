@@ -4354,7 +4354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log('[himkosh] Payment gateway routes registered');
 
   // Document Management Routes
-  registerDocumentRoutes(app, requireAuth);
+  registerDocumentRoutes(app, requireAuth, storage);
 
   // Start production stats scraper (runs on boot and hourly)
   startScraperScheduler();
