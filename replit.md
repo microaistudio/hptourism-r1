@@ -34,6 +34,7 @@ The frontend is built with React 18+, TypeScript, and Vite, leveraging Shadcn/ui
 - **LGD Master Data Integration**: Comprehensive Local Government Directory tables for Himachal Pradesh's 5-tier administrative hierarchy (Districts → Tehsils/Sub-Divisions → Development Blocks → Gram Panchayats / Urban Bodies), including "Other" custom fields for specifying unlisted locations.
 - **Database Console (Admin Tool)**: Interactive SQL console for development with query execution, pre-made templates, table browser, and results formatting (development-only).
 - **LGD Master Data Import Tool**: Admin interface for importing official Local Government Directory data via CSV, with separate workflows for Villages/Hierarchy and Urban Bodies, including CSV parsing, validation, hierarchical data population, and import statistics.
+- **Admin User Creation System**: Dialog-based interface for administrators to create new users with various roles (Property Owner, Dealing Assistant, District Tourism Officer, District Officer, State Officer, Admin) directly from the admin interface, with bcrypt password hashing, role-based validation, and conditional district assignment.
 
 ### System Design Choices
 
