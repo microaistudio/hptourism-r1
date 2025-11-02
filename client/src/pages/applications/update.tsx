@@ -3,7 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
@@ -15,8 +15,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, RefreshCw, FileText } from "lucide-react";
 import type { HomestayApplication } from "@shared/schema";
+import { ObjectUploader, UploadedFileMetadata } from "@/components/ObjectUploader";
 
 // Comprehensive update form schema with all application fields
 const updateFormSchema = z.object({
@@ -144,11 +145,67 @@ export default function UpdateApplication() {
     },
   });
 
-  // Update form when data loads
+  // Document upload state
+  const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, UploadedFileMetadata[]>>({
+    revenuePapers: [],
+    affidavitSection29: [],
+    undertakingFormC: [],
+    registerForVerification: [],
+    billBook: [],
+  });
+  const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
+
+  // Update form and documents when data loads
   useEffect(() => {
     if (data?.application) {
       const app = data.application;
       const amenities = app.amenities as any || {};
+      
+      // Load existing documents
+      if (app.documents && Array.isArray(app.documents)) {
+        const docs = app.documents as any[];
+        const docsByType: Record<string, UploadedFileMetadata[]> = {
+          revenuePapers: [],
+          affidavitSection29: [],
+          undertakingFormC: [],
+          registerForVerification: [],
+          billBook: [],
+        };
+        const photos: UploadedFileMetadata[] = [];
+        
+        docs.forEach((doc: any) => {
+          const file: UploadedFileMetadata = {
+            filePath: doc.fileUrl || doc.filePath, // Support both formats
+            fileName: doc.fileName,
+            fileSize: doc.fileSize || 0,
+            mimeType: doc.mimeType || 'application/octet-stream',
+          };
+          
+          switch (doc.documentType) {
+            case 'revenue_papers':
+              docsByType.revenuePapers.push(file);
+              break;
+            case 'affidavit_section_29':
+              docsByType.affidavitSection29.push(file);
+              break;
+            case 'undertaking_form_c':
+              docsByType.undertakingFormC.push(file);
+              break;
+            case 'register_for_verification':
+              docsByType.registerForVerification.push(file);
+              break;
+            case 'bill_book':
+              docsByType.billBook.push(file);
+              break;
+            case 'property_photo':
+              photos.push(file);
+              break;
+          }
+        });
+        
+        setUploadedDocuments(docsByType);
+        setPropertyPhotos(photos);
+      }
       
       form.reset({
         propertyName: app.propertyName,
@@ -253,6 +310,16 @@ export default function UpdateApplication() {
           cleanedData[field] = undefined;
         }
       });
+
+      // Include updated documents
+      cleanedData.documents = [
+        ...uploadedDocuments.revenuePapers.map(f => ({ ...f, documentType: 'revenue_papers' })),
+        ...uploadedDocuments.affidavitSection29.map(f => ({ ...f, documentType: 'affidavit_section_29' })),
+        ...uploadedDocuments.undertakingFormC.map(f => ({ ...f, documentType: 'undertaking_form_c' })),
+        ...uploadedDocuments.registerForVerification.map(f => ({ ...f, documentType: 'register_for_verification' })),
+        ...uploadedDocuments.billBook.map(f => ({ ...f, documentType: 'bill_book' })),
+        ...propertyPhotos.map(f => ({ ...f, documentType: 'property_photo' })),
+      ];
 
       return apiRequest("PATCH", `/api/applications/${applicationId}`, cleanedData);
     },
@@ -1149,6 +1216,117 @@ export default function UpdateApplication() {
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
+
+            {/* Documents (ANNEXURE-II) */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Documents (ANNEXURE-II)</CardTitle>
+                <CardDescription>Upload or update required documents</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Revenue Papers (Property Documents) <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Property ownership proof, title deed, or lease agreement
+                  </p>
+                  <ObjectUploader
+                    label="Upload Revenue Papers"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    maxFiles={2}
+                    fileType="revenue-papers"
+                    onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: paths }))}
+                    existingFiles={uploadedDocuments.revenuePapers}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Affidavit under Section 29 <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Sworn statement as per homestay regulations
+                  </p>
+                  <ObjectUploader
+                    label="Upload Affidavit"
+                    accept=".pdf"
+                    maxFiles={1}
+                    fileType="affidavit-section29"
+                    onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: paths }))}
+                    existingFiles={uploadedDocuments.affidavitSection29}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Undertaking in Form-C <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Signed undertaking form as per prescribed format
+                  </p>
+                  <ObjectUploader
+                    label="Upload Form-C"
+                    accept=".pdf"
+                    maxFiles={1}
+                    fileType="undertaking-form-c"
+                    onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: paths }))}
+                    existingFiles={uploadedDocuments.undertakingFormC}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Register for Verification <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Guest register or booking register
+                  </p>
+                  <ObjectUploader
+                    label="Upload Register"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    maxFiles={1}
+                    fileType="register-verification"
+                    onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: paths }))}
+                    existingFiles={uploadedDocuments.registerForVerification}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Bill Book <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Sample bill or receipt book
+                  </p>
+                  <ObjectUploader
+                    label="Upload Bill Book"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    maxFiles={1}
+                    fileType="bill-book"
+                    onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, billBook: paths }))}
+                    existingFiles={uploadedDocuments.billBook}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Property Photographs <span className="text-destructive">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Clear photos of property exterior, rooms, and facilities (minimum 2 photos)
+                  </p>
+                  <ObjectUploader
+                    label="Upload Property Photos"
+                    accept="image/*"
+                    maxFiles={10}
+                    fileType="property-photos"
+                    onUploadComplete={(paths) => setPropertyPhotos(paths)}
+                    existingFiles={propertyPhotos}
+                  />
+                </div>
               </CardContent>
             </Card>
 
