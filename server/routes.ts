@@ -116,8 +116,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Mobile number already registered" });
       }
       
-      // For demo: simple password (in production, use bcrypt)
-      const user = await storage.createUser(data);
+      // Hash password before storing
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const user = await storage.createUser({
+        ...data,
+        password: hashedPassword,
+      });
       
       // Auto-login after registration
       req.session.userId = user.id;
