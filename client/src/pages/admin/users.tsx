@@ -23,6 +23,16 @@ export default function AdminUsers() {
   const [newUserData, setNewUserData] = useState({
     mobile: "",
     fullName: "",
+    firstName: "",
+    lastName: "",
+    username: "",
+    email: "",
+    alternatePhone: "",
+    designation: "",
+    department: "",
+    employeeId: "",
+    officeAddress: "",
+    officePhone: "",
     role: "property_owner",
     district: "",
     password: "",
@@ -102,6 +112,16 @@ export default function AdminUsers() {
       setNewUserData({
         mobile: "",
         fullName: "",
+        firstName: "",
+        lastName: "",
+        username: "",
+        email: "",
+        alternatePhone: "",
+        designation: "",
+        department: "",
+        employeeId: "",
+        officeAddress: "",
+        officePhone: "",
         role: "property_owner",
         district: "",
         password: "",
@@ -157,15 +177,36 @@ export default function AdminUsers() {
   });
 
   const handleCreateUser = () => {
-    if (!newUserData.mobile || !newUserData.fullName || !newUserData.password) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
+    // Validate based on role type
+    if (newUserData.role !== 'property_owner') {
+      // Staff users require firstName, lastName, mobile, and password
+      if (!newUserData.firstName || !newUserData.lastName || !newUserData.mobile || !newUserData.password) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in first name, last name, mobile, and password",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // Property owners require fullName, mobile, and password
+      if (!newUserData.mobile || !newUserData.fullName || !newUserData.password) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        });
+        return;
+      }
     }
-    createUserMutation.mutate(newUserData);
+
+    // For staff users, auto-generate fullName from firstName + lastName if not set
+    const userData = { ...newUserData };
+    if (newUserData.role !== 'property_owner' && newUserData.firstName && newUserData.lastName) {
+      userData.fullName = `${newUserData.firstName} ${newUserData.lastName}`;
+    }
+
+    createUserMutation.mutate(userData);
   };
 
   const handleEditUser = (user: User) => {
@@ -315,34 +356,15 @@ export default function AdminUsers() {
                 Create User
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
-                  Add a new user to the system. Choose the appropriate role and district assignment.
+                  Add a new user to the system. Choose the appropriate role and enter the required information.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="mobile">Mobile Number *</Label>
-                  <Input
-                    id="mobile"
-                    placeholder="10-digit mobile number"
-                    value={newUserData.mobile}
-                    onChange={(e) => setNewUserData({ ...newUserData, mobile: e.target.value })}
-                    data-testid="input-mobile"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name *</Label>
-                  <Input
-                    id="fullName"
-                    placeholder="Enter full name"
-                    value={newUserData.fullName}
-                    onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
-                    data-testid="input-fullname"
-                  />
-                </div>
+              <div className="space-y-6 py-4">
+                {/* Role Selection - Always shown first */}
                 <div className="space-y-2">
                   <Label htmlFor="role">Role *</Label>
                   <Select
@@ -362,30 +384,194 @@ export default function AdminUsers() {
                     </SelectContent>
                   </Select>
                 </div>
-                {(newUserData.role === 'dealing_assistant' || 
-                  newUserData.role === 'district_tourism_officer' || 
-                  newUserData.role === 'district_officer') && (
+
+                {/* Comprehensive fields for staff users */}
+                {newUserData.role !== 'property_owner' ? (
+                  <>
+                    {/* Personal Information */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold text-foreground">Personal Information</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="create-firstName">First Name *</Label>
+                          <Input
+                            id="create-firstName"
+                            placeholder="First name"
+                            value={newUserData.firstName}
+                            onChange={(e) => setNewUserData({ ...newUserData, firstName: e.target.value })}
+                            data-testid="input-create-firstname"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="create-lastName">Last Name *</Label>
+                          <Input
+                            id="create-lastName"
+                            placeholder="Last name"
+                            value={newUserData.lastName}
+                            onChange={(e) => setNewUserData({ ...newUserData, lastName: e.target.value })}
+                            data-testid="input-create-lastname"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-username">Username</Label>
+                        <Input
+                          id="create-username"
+                          placeholder="e.g., rajesh.kumar"
+                          value={newUserData.username}
+                          onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
+                          data-testid="input-create-username"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Contact Information */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold text-foreground">Contact Information</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-mobile">Mobile Number *</Label>
+                        <Input
+                          id="create-mobile"
+                          placeholder="10-digit mobile number"
+                          value={newUserData.mobile}
+                          onChange={(e) => setNewUserData({ ...newUserData, mobile: e.target.value })}
+                          data-testid="input-create-mobile"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-email">Email</Label>
+                        <Input
+                          id="create-email"
+                          type="email"
+                          placeholder="email@hp.gov.in"
+                          value={newUserData.email}
+                          onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                          data-testid="input-create-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-alternatePhone">Alternate Phone</Label>
+                        <Input
+                          id="create-alternatePhone"
+                          placeholder="Alternate contact number"
+                          value={newUserData.alternatePhone}
+                          onChange={(e) => setNewUserData({ ...newUserData, alternatePhone: e.target.value })}
+                          data-testid="input-create-alternate-phone"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Official Information */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold text-foreground">Official Information</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="create-designation">Designation</Label>
+                          <Input
+                            id="create-designation"
+                            placeholder="e.g., District Tourism Officer"
+                            value={newUserData.designation}
+                            onChange={(e) => setNewUserData({ ...newUserData, designation: e.target.value })}
+                            data-testid="input-create-designation"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="create-department">Department</Label>
+                          <Input
+                            id="create-department"
+                            placeholder="e.g., Tourism Department"
+                            value={newUserData.department}
+                            onChange={(e) => setNewUserData({ ...newUserData, department: e.target.value })}
+                            data-testid="input-create-department"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-employeeId">Employee ID</Label>
+                        <Input
+                          id="create-employeeId"
+                          placeholder="e.g., HP-DTO-001"
+                          value={newUserData.employeeId}
+                          onChange={(e) => setNewUserData({ ...newUserData, employeeId: e.target.value })}
+                          data-testid="input-create-employee-id"
+                        />
+                      </div>
+                      {(newUserData.role === 'dealing_assistant' || 
+                        newUserData.role === 'district_tourism_officer' || 
+                        newUserData.role === 'district_officer') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="create-district">District Assignment</Label>
+                          <Input
+                            id="create-district"
+                            placeholder="e.g., Shimla, Kullu, Mandi"
+                            value={newUserData.district}
+                            onChange={(e) => setNewUserData({ ...newUserData, district: e.target.value })}
+                            data-testid="input-create-district"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="create-officeAddress">Office Address</Label>
+                        <Input
+                          id="create-officeAddress"
+                          placeholder="Full office address"
+                          value={newUserData.officeAddress}
+                          onChange={(e) => setNewUserData({ ...newUserData, officeAddress: e.target.value })}
+                          data-testid="input-create-office-address"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-officePhone">Office Phone</Label>
+                        <Input
+                          id="create-officePhone"
+                          placeholder="Office contact number"
+                          value={newUserData.officePhone}
+                          onChange={(e) => setNewUserData({ ...newUserData, officePhone: e.target.value })}
+                          data-testid="input-create-office-phone"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Simple fields for property owners */}
+                    <div className="space-y-2">
+                      <Label htmlFor="create-mobile">Mobile Number *</Label>
+                      <Input
+                        id="create-mobile"
+                        placeholder="10-digit mobile number"
+                        value={newUserData.mobile}
+                        onChange={(e) => setNewUserData({ ...newUserData, mobile: e.target.value })}
+                        data-testid="input-create-mobile"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="create-fullName">Full Name *</Label>
+                      <Input
+                        id="create-fullName"
+                        placeholder="Enter full name"
+                        value={newUserData.fullName}
+                        onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
+                        data-testid="input-create-fullname"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Security - Always shown */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-foreground">Security</h3>
                   <div className="space-y-2">
-                    <Label htmlFor="district">District Assignment</Label>
+                    <Label htmlFor="create-password">Password *</Label>
                     <Input
-                      id="district"
-                      placeholder="e.g., Shimla, Kullu, Mandi"
-                      value={newUserData.district}
-                      onChange={(e) => setNewUserData({ ...newUserData, district: e.target.value })}
-                      data-testid="input-district"
+                      id="create-password"
+                      type="password"
+                      placeholder="Enter password"
+                      value={newUserData.password}
+                      onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                      data-testid="input-create-password"
                     />
                   </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter password"
-                    value={newUserData.password}
-                    onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
-                    data-testid="input-password"
-                  />
                 </div>
               </div>
               <div className="flex justify-end gap-2">

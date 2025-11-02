@@ -3066,13 +3066,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new user (admin only)
   app.post("/api/admin/users", requireRole('admin', 'super_admin'), async (req, res) => {
     try {
-      const { mobile, fullName, role, district, password } = req.body;
+      const { 
+        mobile, fullName, role, district, password,
+        firstName, lastName, username, email, alternatePhone,
+        designation, department, employeeId, officeAddress, officePhone
+      } = req.body;
 
-      // Validate required fields
-      if (!mobile || !fullName || !role || !password) {
-        return res.status(400).json({ 
-          message: "Mobile, full name, role, and password are required" 
-        });
+      // Validate required fields based on role
+      if (role !== 'property_owner') {
+        // Staff users require firstName, lastName, mobile, and password
+        if (!mobile || !firstName || !lastName || !password) {
+          return res.status(400).json({ 
+            message: "Mobile, first name, last name, and password are required for staff users" 
+          });
+        }
+      } else {
+        // Property owners require fullName, mobile, and password
+        if (!mobile || !fullName || !password) {
+          return res.status(400).json({ 
+            message: "Mobile, full name, and password are required" 
+          });
+        }
       }
 
       // Validate mobile format
@@ -3109,20 +3123,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Prepare user data with comprehensive profile fields
+      const userData: any = {
+        mobile,
+        fullName: fullName || `${firstName} ${lastName}`, // Auto-generate for staff
+        role,
+        district: district?.trim() || null,
+        password: hashedPassword,
+        isActive: true,
+      };
+
+      // Add comprehensive profile fields for staff users
+      if (role !== 'property_owner') {
+        userData.firstName = firstName?.trim() || null;
+        userData.lastName = lastName?.trim() || null;
+        userData.username = username?.trim() || null;
+        userData.email = email?.trim() || null;
+        userData.alternatePhone = alternatePhone?.trim() || null;
+        userData.designation = designation?.trim() || null;
+        userData.department = department?.trim() || null;
+        userData.employeeId = employeeId?.trim() || null;
+        userData.officeAddress = officeAddress?.trim() || null;
+        userData.officePhone = officePhone?.trim() || null;
+      }
+
       // Create user
       const [newUser] = await db
         .insert(users)
-        .values({
-          mobile,
-          fullName,
-          role,
-          district: district || null,
-          password: hashedPassword,
-          isActive: true,
-        })
+        .values(userData)
         .returning();
 
-      console.log(`[admin] Created new user: ${fullName} (${role}) - ${mobile}`);
+      console.log(`[admin] Created new user: ${userData.fullName} (${role}) - ${mobile}`);
 
       res.json({ 
         user: newUser,
