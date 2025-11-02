@@ -249,9 +249,19 @@ export const homestayApplications = pgTable("homestay_applications", {
   districtReviewDate: timestamp("district_review_date"),
   districtNotes: text("district_notes"),
   
+  // DA (Dealing Assistant) Details
+  daId: varchar("da_id").references(() => users.id),
+  daReviewDate: timestamp("da_review_date"),
+  daForwardedDate: timestamp("da_forwarded_date"),
+  
   stateOfficerId: varchar("state_officer_id").references(() => users.id),
   stateReviewDate: timestamp("state_review_date"),
   stateNotes: text("state_notes"),
+  
+  // DTDO (District Tourism Development Officer) Details
+  dtdoId: varchar("dtdo_id").references(() => users.id),
+  dtdoReviewDate: timestamp("dtdo_review_date"),
+  dtdoRemarks: text("dtdo_remarks"),
   
   rejectionReason: text("rejection_reason"),
   clarificationRequested: text("clarification_requested"),
