@@ -7,8 +7,25 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   mobile: varchar("mobile", { length: 15 }).notNull().unique(),
-  email: varchar("email", { length: 255 }),
+  
+  // Name fields (fullName kept for backward compatibility, firstName/lastName for staff)
   fullName: text("full_name").notNull(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  username: varchar("username", { length: 50 }),
+  
+  // Contact Information
+  email: varchar("email", { length: 255 }),
+  alternatePhone: varchar("alternate_phone", { length: 15 }),
+  
+  // Official Information (for staff users)
+  designation: varchar("designation", { length: 100 }), // Job title/position
+  department: varchar("department", { length: 100 }),
+  employeeId: varchar("employee_id", { length: 50 }),
+  officeAddress: text("office_address"),
+  officePhone: varchar("office_phone", { length: 15 }),
+  
+  // System fields
   role: varchar("role", { length: 50 }).notNull().default('property_owner'), // 'property_owner', 'district_officer', 'state_officer', 'admin', 'dealing_assistant', 'district_tourism_officer', 'super_admin'
   aadhaarNumber: varchar("aadhaar_number", { length: 12 }).unique(),
   district: varchar("district", { length: 100 }),
@@ -22,6 +39,15 @@ export const insertUserSchema = createInsertSchema(users, {
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Invalid mobile number"),
   email: z.string().email().optional().or(z.literal('')),
   fullName: z.string().min(3, "Name must be at least 3 characters"),
+  firstName: z.string().min(1).optional().or(z.literal('')),
+  lastName: z.string().min(1).optional().or(z.literal('')),
+  username: z.string().min(3).optional().or(z.literal('')),
+  alternatePhone: z.string().regex(/^[6-9]\d{9}$/, "Invalid phone number").optional().or(z.literal('')),
+  designation: z.string().optional().or(z.literal('')),
+  department: z.string().optional().or(z.literal('')),
+  employeeId: z.string().optional().or(z.literal('')),
+  officeAddress: z.string().optional().or(z.literal('')),
+  officePhone: z.string().regex(/^[6-9]\d{9}$/, "Invalid phone number").optional().or(z.literal('')),
   role: z.enum(['property_owner', 'district_officer', 'state_officer', 'admin', 'dealing_assistant', 'district_tourism_officer', 'super_admin']),
   aadhaarNumber: z.string().regex(/^\d{12}$/, "Invalid Aadhaar number").optional().or(z.literal('')),
   district: z.string().optional().or(z.literal('')),
