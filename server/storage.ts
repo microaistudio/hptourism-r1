@@ -122,12 +122,13 @@ export class MemStorage implements IStorage {
   }
 
   async getUserActiveApplication(userId: string): Promise<HomestayApplication | undefined> {
-    // One owner = one application rule
-    // Active means: draft, pending, or any status before final (approved/rejected)
-    // After certificate issued, modifications happen on the SAME application
-    const activeStatuses = ['draft', 'pending', 'verified_for_payment', 'payment_pending', 'under_review', 'clarification_needed', 'approved'];
+    // ONE-APPLICATION-PER-OWNER: Get active application (not in terminal states)
+    // Terminal states: rejected, withdrawn
+    // NOTE: 'approved' is NOT terminal - owners modify the SAME application after certificate
+    // (for add/delete rooms, corrections, change of owner)
+    const terminalStatuses = ['rejected', 'withdrawn'];
     return Array.from(this.applications.values()).find(
-      app => app.userId === userId && activeStatuses.includes(app.status)
+      app => app.userId === userId && !terminalStatuses.includes(app.status)
     );
   }
 

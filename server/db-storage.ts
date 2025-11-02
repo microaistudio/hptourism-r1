@@ -56,11 +56,12 @@ export class DbStorage implements IStorage {
 
   async getUserActiveApplication(userId: string): Promise<HomestayApplication | undefined> {
     // ONE-APPLICATION-PER-OWNER: Get active application (not in terminal states)
-    // Terminal states: rejected, approved, withdrawn
-    // Query directly with WHERE clause (no limit) to catch all applications
+    // Terminal states: rejected, withdrawn
+    // NOTE: 'approved' is NOT terminal - owners modify the SAME application after certificate
+    // (for add/delete rooms, corrections, change of owner)
     const { sql: rawSql, inArray, and, not } = await import('drizzle-orm');
     
-    const terminalStatuses = ['rejected', 'approved', 'withdrawn'];
+    const terminalStatuses = ['rejected', 'withdrawn'];
     
     const result = await db.select().from(homestayApplications)
       .where(
