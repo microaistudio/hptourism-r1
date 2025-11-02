@@ -469,14 +469,14 @@ export default function DAApplicationDetail() {
         <TabsContent value="documents" className="space-y-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Side - Document Preview */}
-            <Card className="h-[calc(100vh-320px)]">
+            <Card>
               <CardHeader>
                 <CardTitle>Document Preview</CardTitle>
                 <CardDescription>
                   {selectedDocument ? selectedDocument.fileName : "Select a document to preview"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="h-[calc(100%-100px)] overflow-auto">
+              <CardContent>
                 {selectedDocument ? (
                   <div className="space-y-4">
                     {/* Document Info */}
@@ -537,7 +537,7 @@ export default function DAApplicationDetail() {
             </Card>
 
             {/* Right Side - Document Checklist & Verification */}
-            <Card className="h-[calc(100vh-320px)]">
+            <Card>
               <CardHeader className="space-y-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
@@ -610,7 +610,7 @@ export default function DAApplicationDetail() {
                   </div>
                 )}
               </CardHeader>
-              <CardContent className="h-[calc(100%-100px)] overflow-auto">
+              <CardContent>
                 {documents.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
