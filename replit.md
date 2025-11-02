@@ -42,6 +42,7 @@ The frontend is built with React 18+, TypeScript, and Vite, leveraging Shadcn/ui
 - **Database Console (Admin Tool)**: Interactive SQL console for development with query execution, pre-made templates, table browser, and results formatting (development-only).
 - **LGD Master Data Import Tool**: Admin interface for importing official Local Government Directory data via CSV, with separate workflows for Villages/Hierarchy and Urban Bodies, including CSV parsing, validation, hierarchical data population, and import statistics.
 - **Admin User Creation System**: Dialog-based interface for administrators to create new users with various roles (Property Owner, Dealing Assistant, District Tourism Officer, District Officer, State Officer, Admin) directly from the admin interface, with bcrypt password hashing, role-based validation, and conditional district assignment.
+- **Tabbed User Management Interface**: Enhanced admin user management with tabbed categorization separating "Staff Users" (DA, DTDO, District Officer, State Officer, Admin) from "Property Owners" for improved organization. Includes comprehensive edit functionality allowing admins to update user profiles (Full Name, Email, District, Password) through an intuitive dialog interface. Backend supports PATCH /api/admin/users/:id with proper null handling and password hashing for secure updates.
 
 ### System Design Choices
 
