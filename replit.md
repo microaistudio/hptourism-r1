@@ -19,6 +19,7 @@ Preferred communication style: Simple, everyday language.
 ### Comprehensive Application Update Form
 - **Expanded from 8 to 70+ fields**: Property owners can now update all application sections when sent back for corrections, not just basic property/owner info
 - **Complete sections included**: Property Information, Room Configuration (with per-type rates), LGD Hierarchical Address, Distances to facilities, Public Areas, Amenities (11 checkboxes), Additional Facilities, Owner Information, GSTIN, Certificate Validity
+- **Document upload/replacement functionality**: Property owners can re-upload or replace ANNEXURE-II documents (Revenue Papers, Affidavit Section-29, Undertaking Form-C, Register for Verification, Bill Book) and Property Photos through integrated ObjectUploader components; existing documents are displayed for review and can be selectively replaced
 - **DTDO/DA workflow field additions**: Added missing schema fields (`dtdoId`, `dtdoRemarks`, `dtdoReviewDate`, `daId`, `daReviewDate`, `daForwardedDate`) to support full workflow tracking
 - **Data integrity protection**: Implemented submit-time sanitization that converts empty/zero optional numeric fields (distances, room sizes, rates, public areas) to `undefined` instead of overwriting existing data with 0
 - **Dual feedback display**: Update page shows both DA feedback (`clarificationRequested`) and DTDO feedback (`dtdoRemarks`) alerts when applications are reverted
