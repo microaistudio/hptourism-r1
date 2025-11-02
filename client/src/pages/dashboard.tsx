@@ -475,7 +475,7 @@ export default function Dashboard() {
                         size="sm" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLocation(`/applications/${app.id}/update`);
+                          setLocation(`/applications/${app.id}`);
                         }}
                         data-testid={`button-update-${app.id}`}
                       >

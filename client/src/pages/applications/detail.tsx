@@ -897,10 +897,11 @@ export default function ApplicationDetail() {
                         <Label>Property Photos</Label>
                         <ObjectUploader
                           label="Property Photos"
-                          uploadedFiles={propertyPhotos}
-                          onFilesChange={setPropertyPhotos}
-                          bucketPath="property-photos"
-                          allowedTypes={["image/*"]}
+                          existingFiles={propertyPhotos}
+                          onUploadComplete={setPropertyPhotos}
+                          fileType="property-photos"
+                          accept="image/*"
+                          multiple={true}
                           maxFiles={10}
                         />
                       </div>
@@ -910,10 +911,11 @@ export default function ApplicationDetail() {
                         <Label>Revenue Papers (Jamabandi / Mutation)</Label>
                         <ObjectUploader
                           label="Revenue Papers"
-                          uploadedFiles={uploadedDocuments.revenuePapers}
-                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: files }))}
-                          bucketPath="documents/revenue-papers"
-                          allowedTypes={["application/pdf", "image/*"]}
+                          existingFiles={uploadedDocuments.revenuePapers}
+                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: files }))}
+                          fileType="documents/revenue-papers"
+                          accept="application/pdf,image/*"
+                          multiple={true}
                           maxFiles={5}
                         />
                       </div>
@@ -923,10 +925,11 @@ export default function ApplicationDetail() {
                         <Label>Affidavit Under Section 29</Label>
                         <ObjectUploader
                           label="Affidavit Section 29"
-                          uploadedFiles={uploadedDocuments.affidavitSection29}
-                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: files }))}
-                          bucketPath="documents/affidavit"
-                          allowedTypes={["application/pdf", "image/*"]}
+                          existingFiles={uploadedDocuments.affidavitSection29}
+                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: files }))}
+                          fileType="documents/affidavit"
+                          accept="application/pdf,image/*"
+                          multiple={true}
                           maxFiles={5}
                         />
                       </div>
@@ -936,10 +939,11 @@ export default function ApplicationDetail() {
                         <Label>Undertaking in Form-C</Label>
                         <ObjectUploader
                           label="Undertaking Form C"
-                          uploadedFiles={uploadedDocuments.undertakingFormC}
-                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: files }))}
-                          bucketPath="documents/undertaking"
-                          allowedTypes={["application/pdf", "image/*"]}
+                          existingFiles={uploadedDocuments.undertakingFormC}
+                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: files }))}
+                          fileType="documents/undertaking"
+                          accept="application/pdf,image/*"
+                          multiple={true}
                           maxFiles={5}
                         />
                       </div>
@@ -949,10 +953,11 @@ export default function ApplicationDetail() {
                         <Label>Register for Verification</Label>
                         <ObjectUploader
                           label="Register for Verification"
-                          uploadedFiles={uploadedDocuments.registerForVerification}
-                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: files }))}
-                          bucketPath="documents/register"
-                          allowedTypes={["application/pdf", "image/*"]}
+                          existingFiles={uploadedDocuments.registerForVerification}
+                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: files }))}
+                          fileType="documents/register"
+                          accept="application/pdf,image/*"
+                          multiple={true}
                           maxFiles={5}
                         />
                       </div>
@@ -962,10 +967,11 @@ export default function ApplicationDetail() {
                         <Label>Bill Book</Label>
                         <ObjectUploader
                           label="Bill Book"
-                          uploadedFiles={uploadedDocuments.billBook}
-                          onFilesChange={(files) => setUploadedDocuments(prev => ({ ...prev, billBook: files }))}
-                          bucketPath="documents/bill-book"
-                          allowedTypes={["application/pdf", "image/*"]}
+                          existingFiles={uploadedDocuments.billBook}
+                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, billBook: files }))}
+                          fileType="documents/bill-book"
+                          accept="application/pdf,image/*"
+                          multiple={true}
                           maxFiles={5}
                         />
                       </div>
