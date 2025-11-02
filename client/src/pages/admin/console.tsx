@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +15,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Database, Trash2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Database, Trash2, RefreshCw, Terminal, Play, Table2, FileCode } from "lucide-react";
+
+// Pre-made SQL query templates
+const QUERY_TEMPLATES = {
+  "View all users": "SELECT id, username, role, created_at FROM users ORDER BY created_at DESC LIMIT 20;",
+  "Count applications by status": "SELECT status, COUNT(*) as count FROM homestay_applications GROUP BY status ORDER BY count DESC;",
+  "View recent applications": "SELECT id, property_name, status, created_at FROM homestay_applications ORDER BY created_at DESC LIMIT 10;",
+  "View all DDO codes": "SELECT * FROM ddo_codes ORDER BY district;",
+  "View LGD districts": "SELECT * FROM lgd_districts ORDER BY name;",
+  "Count users by role": "SELECT role, COUNT(*) as count FROM users GROUP BY role;",
+  "View recent payments": "SELECT id, application_id, amount, status, created_at FROM payments ORDER BY created_at DESC LIMIT 10;",
+  "Table sizes": "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;",
+};
 
 export default function AdminConsole() {
   const { toast } = useToast();
@@ -26,6 +42,39 @@ export default function AdminConsole() {
   const [preserveDistrictOfficers, setPreserveDistrictOfficers] = useState(false);
   const [preserveStateOfficers, setPreserveStateOfficers] = useState(false);
   const [preserveLgdData, setPreserveLgdData] = useState(true);
+  
+  // DB Console state
+  const [sqlQuery, setSqlQuery] = useState("");
+  const [queryResult, setQueryResult] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+
+  // Fetch tables list
+  const { data: tablesData } = useQuery({
+    queryKey: ['/api/admin/db-console/tables'],
+    enabled: true,
+  });
+
+  // Execute SQL query mutation
+  const executeQueryMutation = useMutation({
+    mutationFn: async (query: string) => {
+      return apiRequest("POST", "/api/admin/db-console/execute", { query });
+    },
+    onSuccess: (data: any) => {
+      setQueryResult(data);
+      toast({
+        title: "Query executed successfully",
+        description: `${data.type === 'read' ? 'Read' : 'Write'} query returned ${data.rowCount} row(s)`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Query execution failed",
+        description: error.message || "An error occurred while executing the query",
+        variant: "destructive",
+      });
+      setQueryResult({ success: false, error: error.message });
+    },
+  });
 
   const resetDbMutation = useMutation({
     mutationFn: async () => {
@@ -165,6 +214,202 @@ export default function AdminConsole() {
             <p className="text-sm text-muted-foreground">
               Coming soon: Real-time system metrics, database size, active users, etc.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Database Console Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Terminal className="w-5 h-5 text-primary" />
+              <CardTitle>Database Console</CardTitle>
+            </div>
+            <CardDescription>
+              Execute SQL queries and explore database tables (Development only)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Query Templates */}
+            <div className="space-y-2">
+              <Label htmlFor="template-select">Quick Query Templates</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={selectedTemplate}
+                  onValueChange={(value) => {
+                    setSelectedTemplate(value);
+                    setSqlQuery(QUERY_TEMPLATES[value as keyof typeof QUERY_TEMPLATES] || "");
+                  }}
+                >
+                  <SelectTrigger className="flex-1" id="template-select">
+                    <SelectValue placeholder="Select a template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(QUERY_TEMPLATES).map((template) => (
+                      <SelectItem key={template} value={template}>
+                        {template}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedTemplate("");
+                    setSqlQuery("");
+                    setQueryResult(null);
+                  }}
+                  data-testid="button-clear-query"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+
+            {/* SQL Editor */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="sql-input">SQL Query</Label>
+                {sqlQuery.trim().toLowerCase().startsWith('select') && (
+                  <Badge variant="outline" className="text-xs">
+                    <FileCode className="w-3 h-3 mr-1" />
+                    READ
+                  </Badge>
+                )}
+                {sqlQuery && !sqlQuery.trim().toLowerCase().startsWith('select') && !sqlQuery.trim().toLowerCase().startsWith('show') && !sqlQuery.trim().toLowerCase().startsWith('explain') && (
+                  <Badge variant="destructive" className="text-xs">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    WRITE
+                  </Badge>
+                )}
+              </div>
+              <Textarea
+                id="sql-input"
+                placeholder="Enter your SQL query here... (e.g., SELECT * FROM users LIMIT 10;)"
+                value={sqlQuery}
+                onChange={(e) => setSqlQuery(e.target.value)}
+                className="font-mono text-sm min-h-[120px]"
+                data-testid="textarea-sql-query"
+              />
+            </div>
+
+            {/* Execute Button */}
+            <Button
+              onClick={() => executeQueryMutation.mutate(sqlQuery)}
+              disabled={!sqlQuery.trim() || executeQueryMutation.isPending}
+              className="w-full sm:w-auto"
+              data-testid="button-execute-query"
+            >
+              {executeQueryMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Executing...
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  Execute Query
+                </>
+              )}
+            </Button>
+
+            {/* Tables List */}
+            {tablesData?.tables && tablesData.tables.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Table2 className="w-4 h-4" />
+                  Available Tables ({tablesData.tables.length})
+                </Label>
+                <ScrollArea className="h-[120px] border rounded-md p-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {tablesData.tables.map((table: any) => (
+                      <Button
+                        key={table.table_name}
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start h-auto py-1.5 px-2 text-xs font-mono"
+                        onClick={() => setSqlQuery(`SELECT * FROM ${table.table_name} LIMIT 10;`)}
+                        data-testid={`button-table-${table.table_name}`}
+                      >
+                        {table.table_name}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {/* Query Results */}
+            {queryResult && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Query Results</Label>
+                  {queryResult.success && (
+                    <Badge variant="outline" className="text-xs">
+                      {queryResult.rowCount} row(s)
+                    </Badge>
+                  )}
+                </div>
+                <ScrollArea className="h-[400px] border rounded-md p-4">
+                  {queryResult.success ? (
+                    <div className="space-y-2">
+                      {queryResult.data && queryResult.data.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b">
+                                {Object.keys(queryResult.data[0]).map((key) => (
+                                  <th
+                                    key={key}
+                                    className="text-left p-2 font-semibold bg-muted/50"
+                                  >
+                                    {key}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {queryResult.data.map((row: any, idx: number) => (
+                                <tr key={idx} className="border-b hover:bg-muted/30">
+                                  {Object.values(row).map((value: any, vidx: number) => (
+                                    <td key={vidx} className="p-2 font-mono">
+                                      {value === null ? (
+                                        <span className="text-muted-foreground italic">NULL</span>
+                                      ) : typeof value === 'object' ? (
+                                        <span className="text-xs">{JSON.stringify(value)}</span>
+                                      ) : (
+                                        String(value)
+                                      )}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Query executed successfully. No rows returned.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                      <p className="text-sm font-semibold text-destructive mb-1">Error:</p>
+                      <p className="text-xs font-mono text-destructive/90">
+                        {queryResult.error || "Unknown error"}
+                      </p>
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            )}
+
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                💡 <strong>Tip:</strong> Click on any table name to quickly view its contents. Use the templates for common queries.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
