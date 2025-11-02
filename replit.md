@@ -59,9 +59,24 @@ Fixed 3 undocumented DLL behavior issues causing CHECK_SUM_MISMATCH errors:
 ### Payment Module UI & Backend Fixes
 - Backend accepts both `payment_pending` AND `verified_for_payment` statuses for HimKosh initiation
 - Payment pages display 2025 fee structure with discount breakdown (Base Fee, Validity Discount, Female Owner Discount, Pangi Discount)
-- Eliminated double scrollbars by removing `min-h-screen` from payment pages
+- Eliminated double scrollbars by setting `body { overflow: hidden }` in global CSS to prevent body scroll while AuthLayout handles all scrolling
 - Added null safety checks for `totalFee` field
 - Created `system_settings` table for payment configuration
+
+### Test Payment Mode Implementation
+- **Test Mode Toggle**: Super Admin Console includes payment test mode toggle
+- **Gateway Override**: When enabled, all payment gateways receive ₹1 instead of actual calculated amount (for testing)
+- **Visual Indicators**: Payment pages display prominent orange alert when test mode is active
+- **Backend Flag**: `isTestMode` flag passed to frontend for UI display
+- **Real Fee Calculation**: Applications calculate real fees (with all discounts) but gateway receives test amount
+
+### Role Hierarchy System (November 2025)
+Implemented proper role inheritance where `super_admin` is a true superset of `admin`:
+- **ROLE_HIERARCHY Map**: Defines which roles inherit permissions from others
+- **Automatic Permission Inheritance**: `super_admin` automatically has all `admin` privileges plus additional super_admin-only features
+- **Simplified Authorization**: Endpoints specify minimum required role (e.g., `requireRole('admin')`), and super_admin automatically satisfies this
+- **Scalable Design**: New admin endpoints automatically accessible to super_admin without manual updates
+- **Clear Separation**: Super-admin-only features (system settings, role management, database resets) require `requireRole('super_admin')`
 
 ## External Dependencies
 

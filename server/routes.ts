@@ -49,6 +49,23 @@ declare module 'express-session' {
   }
 }
 
+// Role Hierarchy: Maps each role to all roles it can act as (including itself)
+// super_admin inherits all admin privileges plus additional super_admin-only features
+const ROLE_HIERARCHY: Record<string, string[]> = {
+  'property_owner': ['property_owner'],
+  'dealing_assistant': ['dealing_assistant'],
+  'district_tourism_officer': ['district_tourism_officer'],
+  'district_officer': ['district_officer'],
+  'state_officer': ['state_officer'],
+  'admin': ['admin'],
+  'super_admin': ['super_admin', 'admin'], // super_admin inherits all admin permissions
+};
+
+// Get effective roles for a user (includes inherited roles)
+function getEffectiveRoles(userRole: string): string[] {
+  return ROLE_HIERARCHY[userRole] || [userRole];
+}
+
 // Auth middleware
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
@@ -57,7 +74,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Role-based middleware
+// Role-based middleware with hierarchy support
+// super_admin automatically satisfies any admin check
 export function requireRole(...roles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.session.userId) {
@@ -65,7 +83,17 @@ export function requireRole(...roles: string[]) {
     }
     
     const user = await storage.getUser(req.session.userId);
-    if (!user || !roles.includes(user.role)) {
+    if (!user) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
+    
+    // Get effective roles including inherited ones
+    const effectiveRoles = getEffectiveRoles(user.role);
+    
+    // Check if user has any of the required roles (including via inheritance)
+    const hasPermission = roles.some(role => effectiveRoles.includes(role));
+    
+    if (!hasPermission) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
     
@@ -3172,7 +3200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new user (admin only)
-  app.post("/api/admin/users", requireRole('admin', 'super_admin'), async (req, res) => {
+  app.post("/api/admin/users", requireRole('admin'), async (req, res) => {
     try {
       const { 
         mobile, fullName, role, district, password,
@@ -3682,7 +3710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get test payment mode status (specific endpoint for convenience)
-  app.get("/api/admin/settings/payment/test-mode", requireRole('admin', 'super_admin'), async (req, res) => {
+  app.get("/api/admin/settings/payment/test-mode", requireRole('admin'), async (req, res) => {
     try {
       const [setting] = await db
         .select()
@@ -3704,7 +3732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Toggle test payment mode
-  app.post("/api/admin/settings/payment/test-mode/toggle", requireRole('admin', 'super_admin'), async (req, res) => {
+  app.post("/api/admin/settings/payment/test-mode/toggle", requireRole('admin'), async (req, res) => {
     try {
       const { enabled } = req.body;
       const userId = req.user?.id;
