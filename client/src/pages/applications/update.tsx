@@ -20,7 +20,9 @@ import type { HomestayApplication } from "@shared/schema";
 const updateFormSchema = z.object({
   propertyName: z.string().min(1, "Property name is required"),
   category: z.enum(['diamond', 'gold', 'silver']),
-  totalRooms: z.coerce.number().min(1, "At least 1 room required"),
+  singleBedRooms: z.coerce.number().min(0, "Must be 0 or more").default(0),
+  doubleBedRooms: z.coerce.number().min(0, "Must be 0 or more").default(0),
+  familySuites: z.coerce.number().min(0, "Must be 0 or more").default(0),
   address: z.string().min(1, "Address is required"),
   district: z.string().min(1, "District is required"),
   pincode: z.string().min(1, "Pincode is required"),
@@ -28,7 +30,10 @@ const updateFormSchema = z.object({
   ownerMobile: z.string().min(10, "Valid mobile number required"),
   ownerEmail: z.string().email().optional().or(z.literal("")),
   ownerAadhaar: z.string().min(12, "Valid Aadhaar number required"),
-});
+}).refine(
+  (data) => (data.singleBedRooms + data.doubleBedRooms + data.familySuites) >= 1,
+  { message: "At least 1 room required", path: ["singleBedRooms"] }
+);
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
 
@@ -48,7 +53,9 @@ export default function UpdateApplication() {
     defaultValues: {
       propertyName: "",
       category: "silver",
-      totalRooms: 1,
+      singleBedRooms: 0,
+      doubleBedRooms: 0,
+      familySuites: 0,
       address: "",
       district: "",
       pincode: "",
@@ -66,7 +73,9 @@ export default function UpdateApplication() {
       form.reset({
         propertyName: app.propertyName,
         category: app.category as "diamond" | "gold" | "silver",
-        totalRooms: app.totalRooms,
+        singleBedRooms: app.singleBedRooms || 0,
+        doubleBedRooms: app.doubleBedRooms || 0,
+        familySuites: app.familySuites || 0,
         address: app.address,
         district: app.district,
         pincode: app.pincode,
@@ -191,9 +200,20 @@ export default function UpdateApplication() {
         {application.clarificationRequested && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Officer Feedback - Please Address</AlertTitle>
+            <AlertTitle>DA Feedback - Please Address</AlertTitle>
             <AlertDescription className="mt-2 whitespace-pre-wrap">
               {application.clarificationRequested}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* DTDO Feedback Alert */}
+        {application.dtdoRemarks && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>DTDO Feedback - Please Address</AlertTitle>
+            <AlertDescription className="mt-2 whitespace-pre-wrap">
+              {application.dtdoRemarks}
             </AlertDescription>
           </Alert>
         )}
@@ -243,19 +263,50 @@ export default function UpdateApplication() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="totalRooms"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Rooms</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} data-testid="input-total-rooms" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                  <div className="text-sm font-medium">Room Configuration (HP Homestay Rules 2025)</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="singleBedRooms"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Single Bed Rooms</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-single-rooms" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="doubleBedRooms"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Double Bed Rooms</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-double-rooms" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="familySuites"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Family Suites</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} data-testid="input-family-suites" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
                 <FormField
                   control={form.control}
