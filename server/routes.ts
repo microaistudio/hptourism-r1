@@ -2998,6 +2998,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new user (admin only)
+  app.post("/api/admin/users", requireRole('admin', 'super_admin'), async (req, res) => {
+    try {
+      const { mobile, fullName, role, district, password } = req.body;
+
+      // Validate required fields
+      if (!mobile || !fullName || !role || !password) {
+        return res.status(400).json({ 
+          message: "Mobile, full name, role, and password are required" 
+        });
+      }
+
+      // Validate mobile format
+      if (!/^[6-9]\d{9}$/.test(mobile)) {
+        return res.status(400).json({ message: "Invalid mobile number format" });
+      }
+
+      // Validate role
+      const allowedRoles = [
+        'property_owner', 
+        'dealing_assistant', 
+        'district_tourism_officer',
+        'district_officer', 
+        'state_officer', 
+        'admin'
+      ];
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      // Check if mobile already exists
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.mobile, mobile))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({ 
+          message: "A user with this mobile number already exists" 
+        });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          mobile,
+          fullName,
+          role,
+          district: district || null,
+          password: hashedPassword,
+          isActive: true,
+        })
+        .returning();
+
+      console.log(`[admin] Created new user: ${fullName} (${role}) - ${mobile}`);
+
+      res.json({ 
+        user: newUser,
+        message: "User created successfully" 
+      });
+    } catch (error) {
+      console.error("Failed to create user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   // RESET DATABASE - Clear all test data (admin only)
   app.post("/api/admin/reset-db", requireRole('admin'), async (req, res) => {
     try {
