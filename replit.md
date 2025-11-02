@@ -8,6 +8,14 @@ The HP Tourism Digital Ecosystem is a digital transformation platform for modern
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Updates (November 2025)
+
+### Workflow Revert System Fix
+- **Fixed critical workflow visibility bug**: Applications reverted by DA (`reverted_to_applicant`) or DTDO (`reverted_by_dtdo`) now properly appear in owner's dashboard "Pending Review" and "Sent Back" sections with "Update Application" buttons
+- **Dual-revert status support**: Owner dashboard distinguishes between DA reverts (badge: "Reverted by DA", shows `clarificationRequested`) and DTDO reverts (badge: "Reverted by DTDO", shows `dtdoRemarks`)
+- **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, update page guard, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
+- **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated, and resubmit correctly with status changing back to 'submitted'
+
 ## System Architecture
 
 ### UI/UX Decisions
