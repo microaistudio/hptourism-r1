@@ -41,6 +41,7 @@ import { eq, desc, ne, notInArray, and, sql } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
 import himkoshRoutes from "./himkosh/routes";
+import { registerDocumentRoutes } from "./document-routes";
 
 // Extend express-session types
 declare module 'express-session' {
@@ -4351,6 +4352,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HimKosh Payment Gateway Routes
   app.use("/api/himkosh", himkoshRoutes);
   console.log('[himkosh] Payment gateway routes registered');
+
+  // Document Management Routes
+  registerDocumentRoutes(app, requireAuth);
 
   // Start production stats scraper (runs on boot and hourly)
   startScraperScheduler();

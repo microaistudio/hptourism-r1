@@ -467,11 +467,28 @@ export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
   documentType: varchar("document_type", { length: 100 }).notNull(), // 'property_photo', 'ownership_proof', 'fire_noc', etc.
+  
+  // File Storage Details
   fileName: varchar("file_name", { length: 255 }).notNull(),
   filePath: text("file_path").notNull(),
   fileSize: integer("file_size").notNull(),
   mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileCategory: varchar("file_category", { length: 50 }).notNull().default('document'), // 'document', 'image', 'photo' - for organizing storage
+  
+  // Versioning Support
+  version: integer("version").notNull().default(1), // Document version number
+  previousVersionId: varchar("previous_version_id").references((): any => documents.id), // Reference to previous version
+  isLatestVersion: boolean("is_latest_version").default(true), // Quick flag to find current version
+  
+  // Upload Metadata
+  uploadedBy: varchar("uploaded_by").references(() => users.id), // Who uploaded this file (optional for backward compatibility)
   uploadDate: timestamp("upload_date").defaultNow(),
+  
+  // Lifecycle Management
+  status: varchar("status", { length: 50 }).notNull().default('active'), // 'active', 'superseded', 'archived', 'deleted'
+  isDeleted: boolean("is_deleted").default(false), // Soft delete flag
+  deletedBy: varchar("deleted_by").references(() => users.id),
+  deletedAt: timestamp("deleted_at"),
   
   // AI Verification (for future)
   aiVerificationStatus: varchar("ai_verification_status", { length: 50 }), // 'pending', 'verified', 'flagged'
@@ -486,10 +503,35 @@ export const documents = pgTable("documents", {
   verificationNotes: text("verification_notes"),
 });
 
-export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, uploadDate: true });
+export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, uploadDate: true, deletedAt: true });
 export const selectDocumentSchema = createSelectSchema(documents);
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// Document Audit Logs Table - Track all document access for compliance
+export const documentAuditLogs = pgTable("document_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  applicationId: varchar("application_id").notNull().references(() => homestayApplications.id, { onDelete: 'cascade' }),
+  
+  // Action Details
+  action: varchar("action", { length: 50 }).notNull(), // 'upload', 'view', 'download', 'verify', 'delete'
+  actionBy: varchar("action_by").notNull().references(() => users.id), // Who performed the action
+  actionAt: timestamp("action_at").defaultNow(),
+  
+  // Context
+  userRole: varchar("user_role", { length: 50 }), // Role at time of action
+  ipAddress: varchar("ip_address", { length: 45 }), // IPv4 or IPv6
+  userAgent: text("user_agent"), // Browser/client info
+  
+  // Additional metadata
+  notes: text("notes"), // Optional notes about the action
+});
+
+export const insertDocumentAuditLogSchema = createInsertSchema(documentAuditLogs).omit({ id: true, actionAt: true });
+export const selectDocumentAuditLogSchema = createSelectSchema(documentAuditLogs);
+export type InsertDocumentAuditLog = z.infer<typeof insertDocumentAuditLogSchema>;
+export type DocumentAuditLog = typeof documentAuditLogs.$inferSelect;
 
 // Payments Table
 export const payments = pgTable("payments", {
