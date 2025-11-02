@@ -30,10 +30,10 @@ export class HimKoshCrypto {
 
   /**
    * Load encryption key and IV from file
+   * CRITICAL FIX #3: DLL uses IV = key (first 16 bytes), NOT separate IV
    * Key file format from CTP:
-   * - 16 bytes: Key only (will use zero IV)
-   * - 32 bytes: Key (0-15) + IV (16-31)
-   * Any other size is invalid and will throw an error
+   * - Must be exactly 16 bytes for the key
+   * - IV is set equal to the key (actual DLL behavior)
    */
   private async loadKey(): Promise<{ key: Buffer; iv: Buffer }> {
     if (this.key && this.iv) {
@@ -46,34 +46,16 @@ export class HimKoshCrypto {
       const keyData = await fs.readFile(this.keyFilePath);
       console.log('[himkosh-crypto] Key file size:', keyData.length, 'bytes');
       
-      // Strict validation: Must be exactly 16 or 32 bytes
-      if (keyData.length !== 16 && keyData.length !== 32) {
-        throw new Error(
-          `Invalid key file size: ${keyData.length} bytes. ` +
-          `Expected exactly 16 bytes (key only) or 32 bytes (key + IV). ` +
-          `Please verify echallan.key file from CTP team.`
-        );
-      }
-      
-      // Extract 16-byte key (bytes 0-15)
+      // Extract first 16 bytes as key (even if file is longer)
       const keyBytes = Buffer.alloc(16);
-      keyData.copy(keyBytes, 0, 0, 16);
+      keyData.copy(keyBytes, 0, 0, Math.min(16, keyData.length));
       this.key = keyBytes;
       console.log('[himkosh-crypto] Key loaded successfully (16 bytes)');
       
-      // Extract 16-byte IV (bytes 16-31) if available
-      let ivBytes: Buffer;
-      if (keyData.length === 32) {
-        // IV provided in file
-        ivBytes = Buffer.alloc(16);
-        keyData.copy(ivBytes, 0, 16, 32);
-        console.log('[himkosh-crypto] IV loaded from file (16 bytes)');
-      } else {
-        // 16-byte file: Use zero IV
-        ivBytes = Buffer.alloc(16, 0);
-        console.log('[himkosh-crypto] Using zero IV (16-byte key file)');
-      }
-      this.iv = ivBytes;
+      // CRITICAL FIX #3: Use key as IV (first 16 bytes of echallan.key)
+      // This matches actual DLL behavior (doc/dummy code was misleading)
+      this.iv = keyBytes; // IV = key (same buffer reference)
+      console.log('[himkosh-crypto] IV set equal to key (DLL behavior)');
       
       return { key: this.key, iv: this.iv };
     } catch (error) {
@@ -138,16 +120,16 @@ export class HimKoshCrypto {
 
   /**
    * Generate MD5 checksum for data string
-   * .NET backend expects UPPERCASE hex (ToString("X2") format)
+   * CRITICAL FIX: DLL returns lowercase hex (not uppercase as doc implied)
    * @param dataString - String to generate checksum for
-   * @returns MD5 checksum in UPPERCASE hexadecimal
+   * @returns MD5 checksum in lowercase hexadecimal
    */
   static generateChecksum(dataString: string): string {
     const hash = crypto.createHash('md5');
     // CRITICAL: Use ASCII encoding to match .NET's Encoding.ASCII
     hash.update(dataString, 'ascii');
-    // CRITICAL: HimKosh expects UPPERCASE hex (matching .NET ToString("X2"))
-    return hash.digest('hex').toUpperCase();
+    // CRITICAL FIX #1: DLL returns lowercase hex (doc was wrong about uppercase)
+    return hash.digest('hex').toLowerCase();
   }
 
   /**
@@ -191,21 +173,22 @@ export function buildRequestString(params: {
 }): { coreString: string; fullString: string } {
   // Build base string (mandatory fields)
   // CRITICAL: Field ORDER must match government code EXACTLY!
+  // CRITICAL FIX #2: All amounts must be integers (no decimals)
   let parts = [
     `DeptID=${params.deptId}`,
     `DeptRefNo=${params.deptRefNo}`,
-    `TotalAmount=${params.totalAmount}`,
+    `TotalAmount=${Math.round(params.totalAmount)}`, // Ensure integer
     `TenderBy=${params.tenderBy}`,
     `AppRefNo=${params.appRefNo}`,
     `Head1=${params.head1}`,
-    `Amount1=${params.amount1}`,
+    `Amount1=${Math.round(params.amount1)}`, // Ensure integer
   ];
 
   // Add Head2/Amount2 BEFORE Ddo (government code order)
   // CRITICAL: Government code includes Head2/Amount2 ALWAYS (even if Amount2=0)
   if (params.head2 !== undefined && params.amount2 !== undefined) {
     parts.push(`Head2=${params.head2}`);
-    parts.push(`Amount2=${params.amount2}`);
+    parts.push(`Amount2=${Math.round(params.amount2)}`); // Ensure integer
   }
 
   // Add Ddo AFTER Head2/Amount2
@@ -214,15 +197,15 @@ export function buildRequestString(params: {
   parts.push(`PeriodTo=${params.periodTo}`);
   if (params.head3 && params.amount3 && params.amount3 > 0) {
     parts.push(`Head3=${params.head3}`);
-    parts.push(`Amount3=${params.amount3}`);
+    parts.push(`Amount3=${Math.round(params.amount3)}`); // Ensure integer
   }
   if (params.head4 && params.amount4 && params.amount4 > 0) {
     parts.push(`Head4=${params.head4}`);
-    parts.push(`Amount4=${params.amount4}`);
+    parts.push(`Amount4=${Math.round(params.amount4)}`); // Ensure integer
   }
   if (params.head10 && params.amount10 && params.amount10 > 0) {
     parts.push(`Head10=${params.head10}`);
-    parts.push(`Amount10=${params.amount10}`);
+    parts.push(`Amount10=${Math.round(params.amount10)}`); // Ensure integer
   }
 
   // CRITICAL FIX: Per NIC-HP feedback, checksum is calculated on CORE fields only

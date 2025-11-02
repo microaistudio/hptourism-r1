@@ -62,11 +62,12 @@ router.post('/initiate', async (req, res) => {
     // Generate unique transaction reference
     const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
 
-    // Calculate actual amount (convert to integer rupees, no decimals)
+    // CRITICAL FIX #2: Amounts must be integers only (no decimals like 100.00)
+    // DLL expects whole rupees, decimals trigger ASP.NET FormatException
     if (!application.totalFee) {
       return res.status(400).json({ error: 'Total fee not calculated for this application' });
     }
-    const actualAmount = Math.round(parseFloat(application.totalFee.toString()));
+    const actualAmount = Math.round(parseFloat(application.totalFee.toString())); // Ensure integer
 
     // Check if test payment mode is enabled
     const [testModeSetting] = await db
