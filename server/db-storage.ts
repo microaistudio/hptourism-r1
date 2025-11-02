@@ -10,7 +10,6 @@ import {
   type ApplicationAction, type InsertApplicationAction
 } from '../shared/schema';
 import type { IStorage } from './storage';
-import bcrypt from 'bcrypt';
 
 export class DbStorage implements IStorage {
   // User methods
@@ -29,11 +28,9 @@ export class DbStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    // Hash password before storing
-    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
-    const userWithHashedPassword = { ...insertUser, password: hashedPassword };
-    
-    const result = await db.insert(users).values(userWithHashedPassword).returning();
+    // Password should already be hashed by the caller (routes.ts)
+    // Do NOT hash here to avoid double-hashing
+    const result = await db.insert(users).values(insertUser).returning();
     return result[0];
   }
 

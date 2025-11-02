@@ -101,8 +101,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register
   app.post("/api/auth/register", async (req, res) => {
     try {
+      // SECURITY: Force role to property_owner BEFORE validation
+      // This prevents role escalation attacks via direct API calls
       const rawData = {
         ...req.body,
+        role: 'property_owner', // FORCE property_owner role - override any client input
         email: req.body.email || undefined,
         aadhaarNumber: req.body.aadhaarNumber || undefined,
         district: req.body.district || undefined,

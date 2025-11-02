@@ -6,7 +6,6 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -18,17 +17,10 @@ const registerSchema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
   email: z.string().email("Enter a valid email").optional().or(z.literal("")),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["property_owner", "district_officer", "state_officer"]),
-  district: z.string().optional(),
   aadhaarNumber: z.string().regex(/^\d{12}$/, "Aadhaar must be 12 digits").optional().or(z.literal("")),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
-
-const HP_DISTRICTS = [
-  "Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu",
-  "Lahaul and Spiti", "Mandi", "Shimla", "Sirmaur", "Solan", "Una"
-];
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -41,21 +33,17 @@ export default function Register() {
       mobile: "",
       email: "",
       password: "",
-      role: "property_owner",
-      district: "",
       aadhaarNumber: "",
     },
   });
-
-  const selectedRole = form.watch("role");
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterForm) => {
       const cleanData = {
         ...data,
+        role: "property_owner", // Hardcoded: public registration only for property owners
         email: data.email || undefined,
         aadhaarNumber: data.aadhaarNumber || undefined,
-        district: data.district || undefined,
       };
       const response = await apiRequest("POST", "/api/auth/register", cleanData);
       return response.json();
@@ -95,9 +83,9 @@ export default function Register() {
               <Mountain className="w-7 h-7 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
+          <CardTitle className="text-2xl">Property Owner Registration</CardTitle>
           <CardDescription>
-            Register to access HP Tourism eServices
+            Create an account to register and manage your homestay properties
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -183,76 +171,21 @@ export default function Register() {
 
               <FormField
                 control={form.control}
-                name="role"
+                name="aadhaarNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Account Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-role">
-                          <SelectValue placeholder="Select your role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="property_owner">Property Owner</SelectItem>
-                        <SelectItem value="district_officer">District Tourism Officer</SelectItem>
-                        <SelectItem value="state_officer">State Tourism Officer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Select "Property Owner" for homestay registration
-                    </FormDescription>
+                    <FormLabel>Aadhaar Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="12-digit Aadhaar number"
+                        data-testid="input-aadhaar"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {(selectedRole === "district_officer" || selectedRole === "state_officer") && (
-                <FormField
-                  control={form.control}
-                  name="district"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>District</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-district">
-                            <SelectValue placeholder="Select your district" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {HP_DISTRICTS.map((district) => (
-                            <SelectItem key={district} value={district}>
-                              {district}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {selectedRole === "property_owner" && (
-                <FormField
-                  control={form.control}
-                  name="aadhaarNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Aadhaar Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="12-digit Aadhaar number"
-                          data-testid="input-aadhaar"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
 
               <Button 
                 type="submit" 
