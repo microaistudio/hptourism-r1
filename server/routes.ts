@@ -3481,6 +3481,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // DATABASE CONSOLE ROUTES (Admin/Super Admin)
+  // ========================================
+
+  // Execute SQL query (for development/testing)
+  app.post("/api/admin/db-console/execute", requireRole('admin'), async (req, res) => {
+    try {
+      const { query: sqlQuery } = req.body;
+      
+      if (!sqlQuery || typeof sqlQuery !== 'string') {
+        return res.status(400).json({ message: "SQL query is required" });
+      }
+
+      // Check environment - only allow in development
+      const environment = process.env.NODE_ENV || 'development';
+      if (environment === 'production') {
+        return res.status(403).json({ 
+          message: "Database console is disabled in production for security" 
+        });
+      }
+
+      const trimmedQuery = sqlQuery.trim().toLowerCase();
+      
+      // Detect query type
+      const isSelect = trimmedQuery.startsWith('select');
+      const isShow = trimmedQuery.startsWith('show');
+      const isDescribe = trimmedQuery.startsWith('describe') || trimmedQuery.startsWith('\\d');
+      const isExplain = trimmedQuery.startsWith('explain');
+      const isReadOnly = isSelect || isShow || isDescribe || isExplain;
+
+      console.log(`[db-console] Executing ${isReadOnly ? 'READ' : 'WRITE'} query:`, sqlQuery.substring(0, 100));
+
+      // Execute the query
+      const result = await db.execute(sql.raw(sqlQuery));
+      
+      // Format response
+      const response = {
+        success: true,
+        type: isReadOnly ? 'read' : 'write',
+        rowCount: Array.isArray(result) ? result.length : 0,
+        data: result,
+        query: sqlQuery
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("[db-console] Query execution failed:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Query execution failed",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Get list of all tables
+  app.get("/api/admin/db-console/tables", requireRole('admin'), async (req, res) => {
+    try {
+      const environment = process.env.NODE_ENV || 'development';
+      if (environment === 'production') {
+        return res.status(403).json({ 
+          message: "Database console is disabled in production" 
+        });
+      }
+
+      // Query to get all tables
+      const result = await db.execute(sql`
+        SELECT table_name, 
+               pg_size_pretty(pg_total_relation_size(quote_ident(table_name))) as size
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `);
+
+      res.json({ tables: result });
+    } catch (error) {
+      console.error("[db-console] Failed to fetch tables:", error);
+      res.status(500).json({ message: "Failed to fetch tables" });
+    }
+  });
+
+  // Get table schema/structure
+  app.get("/api/admin/db-console/table/:tableName/schema", requireRole('admin'), async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      
+      const environment = process.env.NODE_ENV || 'development';
+      if (environment === 'production') {
+        return res.status(403).json({ 
+          message: "Database console is disabled in production" 
+        });
+      }
+
+      // Get column information
+      const result = await db.execute(sql.raw(`
+        SELECT 
+          column_name,
+          data_type,
+          character_maximum_length,
+          is_nullable,
+          column_default
+        FROM information_schema.columns
+        WHERE table_schema = 'public' 
+        AND table_name = '${tableName}'
+        ORDER BY ordinal_position
+      `));
+
+      res.json({ schema: result });
+    } catch (error) {
+      console.error("[db-console] Failed to fetch table schema:", error);
+      res.status(500).json({ message: "Failed to fetch table schema" });
+    }
+  });
+
   // Reset operations
   app.post("/api/admin/reset/:operation", requireRole('super_admin'), async (req, res) => {
     try {
