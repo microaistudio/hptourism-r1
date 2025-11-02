@@ -25,6 +25,7 @@ export default function AdminConsole() {
   const [preservePropertyOwners, setPreservePropertyOwners] = useState(false);
   const [preserveDistrictOfficers, setPreserveDistrictOfficers] = useState(false);
   const [preserveStateOfficers, setPreserveStateOfficers] = useState(false);
+  const [preserveLgdData, setPreserveLgdData] = useState(true);
 
   const resetDbMutation = useMutation({
     mutationFn: async () => {
@@ -33,6 +34,7 @@ export default function AdminConsole() {
         preservePropertyOwners,
         preserveDistrictOfficers,
         preserveStateOfficers,
+        preserveLgdData,
       });
     },
     onSuccess: (data: any) => {
@@ -48,16 +50,27 @@ export default function AdminConsole() {
         description: (
           <div className="space-y-2">
             <p>All test data has been cleared from the database.</p>
-            {preservedInfo?.totalUsers > 0 && (
-              <div className="mt-2 text-xs">
-                <p className="font-semibold">Preserved {preservedInfo.totalUsers} user(s):</p>
-                <p className="text-muted-foreground">{roleList}</p>
-                {preservedInfo.ddoCodes && <p className="text-muted-foreground">✓ DDO Codes preserved</p>}
-                {preservedInfo.propertyOwners && <p className="text-muted-foreground">✓ Property owners preserved</p>}
-                {preservedInfo.districtOfficers && <p className="text-muted-foreground">✓ District officers preserved</p>}
-                {preservedInfo.stateOfficers && <p className="text-muted-foreground">✓ State officers preserved</p>}
-              </div>
-            )}
+            <div className="mt-2 text-xs space-y-1">
+              {/* Configuration data preservation (always show) */}
+              {preservedInfo?.ddoCodes && <p className="text-muted-foreground">✓ DDO Codes preserved</p>}
+              {!preservedInfo?.ddoCodes && <p className="text-muted-foreground">✗ DDO Codes deleted</p>}
+              {preservedInfo?.lgdData && <p className="text-muted-foreground">✓ LGD Master Data preserved</p>}
+              {!preservedInfo?.lgdData && <p className="text-muted-foreground">✗ LGD Master Data deleted</p>}
+              
+              {/* User preservation (conditional) */}
+              {preservedInfo?.totalUsers > 0 && (
+                <div className="mt-2">
+                  <p className="font-semibold">Preserved {preservedInfo.totalUsers} user(s):</p>
+                  <p className="text-muted-foreground">{roleList}</p>
+                  {preservedInfo.propertyOwners && <p className="text-muted-foreground">✓ Property owners preserved</p>}
+                  {preservedInfo.districtOfficers && <p className="text-muted-foreground">✓ District officers preserved</p>}
+                  {preservedInfo.stateOfficers && <p className="text-muted-foreground">✓ State officers preserved</p>}
+                </div>
+              )}
+              {preservedInfo?.totalUsers === 0 && (
+                <p className="text-muted-foreground">All non-admin users deleted</p>
+              )}
+            </div>
           </div>
         ),
       });
@@ -221,6 +234,18 @@ export default function AdminConsole() {
                     />
                     <Label htmlFor="preserve-state" className="text-sm font-normal cursor-pointer">
                       Preserve State Officers
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="preserve-lgd"
+                      checked={preserveLgdData}
+                      onCheckedChange={(checked) => setPreserveLgdData(checked as boolean)}
+                      data-testid="checkbox-preserve-lgd"
+                    />
+                    <Label htmlFor="preserve-lgd" className="text-sm font-normal cursor-pointer">
+                      Preserve LGD Master Data (HP Hierarchy)
                     </Label>
                   </div>
                   

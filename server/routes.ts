@@ -28,7 +28,12 @@ import {
   himkoshTransactions,
   ddoCodes,
   systemSettings,
-  type SystemSetting
+  type SystemSetting,
+  lgdDistricts,
+  lgdTehsils,
+  lgdBlocks,
+  lgdGramPanchayats,
+  lgdUrbanBodies
 } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -3000,13 +3005,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preserveDdoCodes = false,
         preservePropertyOwners = false,
         preserveDistrictOfficers = false,
-        preserveStateOfficers = false
+        preserveStateOfficers = false,
+        preserveLgdData = false
       } = req.body;
       console.log("[admin] Starting database reset...", { 
         preserveDdoCodes,
         preservePropertyOwners,
         preserveDistrictOfficers,
-        preserveStateOfficers
+        preserveStateOfficers,
+        preserveLgdData
       });
       
       // Delete in correct order to respect foreign key constraints
@@ -3080,6 +3087,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 15b. System Settings (always preserved - configuration data)
       console.log(`[admin] ⊙ Preserved system settings (configuration data)`);
+      
+      // 15c. LGD Master Data (optional - configuration data for Himachal Pradesh hierarchy)
+      let lgdDataStatus = "preserved (configuration data)";
+      if (!preserveLgdData) {
+        // Delete LGD tables in reverse hierarchy (child to parent)
+        await db.delete(lgdUrbanBodies);
+        await db.delete(lgdGramPanchayats);
+        await db.delete(lgdBlocks);
+        await db.delete(lgdTehsils);
+        await db.delete(lgdDistricts);
+        lgdDataStatus = "deleted";
+        console.log(`[admin] ✓ Deleted all LGD master data`);
+      } else {
+        console.log(`[admin] ⊙ Preserved LGD master data (configuration data)`);
+      }
       
       // 16. Build list of roles to preserve
       const rolesToPreserve: string[] = ['admin', 'super_admin']; // Always preserve admins
@@ -3159,6 +3181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           propertyOwners: preservePropertyOwners,
           districtOfficers: preserveDistrictOfficers,
           stateOfficers: preserveStateOfficers,
+          lgdData: preserveLgdData,
           systemSettings: "always preserved"
         }
       });
