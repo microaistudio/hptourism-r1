@@ -37,7 +37,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { eq, desc, ne, notInArray, and } from "drizzle-orm";
+import { eq, desc, ne, notInArray, and, sql } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
 import { ObjectStorageService } from "./objectStorage";
 import himkoshRoutes from "./himkosh/routes";
