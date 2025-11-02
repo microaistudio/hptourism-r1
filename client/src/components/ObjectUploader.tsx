@@ -126,13 +126,60 @@ export function ObjectUploader({
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const hasExistingFiles = uploadedFiles.length > 0;
+  const buttonLabel = hasExistingFiles 
+    ? (uploadedFiles.length < maxFiles ? "Add More" : "Replace")
+    : label;
+
   return (
     <div className={className}>
       <div className="space-y-2">
+        {hasExistingFiles && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Current Documents:</label>
+            {uploadedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 border rounded-md bg-card"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium truncate block">{file.fileName}</span>
+                    <span className="text-xs text-muted-foreground">{formatFileSize(file.fileSize)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    data-testid={`button-view-file-${index}`}
+                  >
+                    <a href={file.filePath} target="_blank" rel="noopener noreferrer">
+                      View
+                    </a>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                    data-testid={`button-remove-file-${index}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="outline"
+            variant={hasExistingFiles ? "secondary" : "outline"}
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading || uploadedFiles.length >= maxFiles}
             data-testid={`button-upload-${label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -145,7 +192,7 @@ export function ObjectUploader({
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                {label}
+                {buttonLabel}
               </>
             )}
           </Button>
@@ -164,35 +211,6 @@ export function ObjectUploader({
           onChange={handleFileSelect}
           className="hidden"
         />
-
-        {uploadedFiles.length > 0 && (
-          <div className="space-y-2 mt-3">
-            {uploadedFiles.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 border rounded-md bg-muted/50"
-              >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm truncate block">{file.fileName}</span>
-                    <span className="text-xs text-muted-foreground">{formatFileSize(file.fileSize)}</span>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFile(index)}
-                  data-testid={`button-remove-file-${index}`}
-                  className="flex-shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
