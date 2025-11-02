@@ -119,6 +119,7 @@ export default function UpdateApplication() {
 
   const updateMutation = useMutation({
     mutationFn: async (updates: any) => {
+      if (!applicationId) throw new Error("No application ID");
       const response = await fetch(`/api/applications/${applicationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -387,24 +388,17 @@ export default function UpdateApplication() {
                 </CardTitle>
                 <CardDescription>{totalDocuments} document(s) uploaded</CardDescription>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditingSection(editingSection === 'documents' ? null : 'documents')}
-                data-testid="button-edit-documents"
-              >
-                {editingSection === 'documents' ? (
-                  <>
-                    <X className="w-4 h-4 mr-2" />
-                    Cancel
-                  </>
-                ) : (
-                  <>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Update Documents
-                  </>
-                )}
-              </Button>
+              {!editingSection && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingSection('documents')}
+                  data-testid="button-edit-documents"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               
@@ -489,18 +483,27 @@ export default function UpdateApplication() {
                 </div>
               </div>
 
-              {/* Document Update Section */}
+              {/* Document Edit Section - Always visible when in edit mode */}
               {editingSection === 'documents' && (
                 <>
                   <Separator />
                   <div className="space-y-4 pt-4">
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Update Documents</AlertTitle>
-                      <AlertDescription>
-                        You can replace or add new documents below. Existing documents will remain unless you remove them.
-                      </AlertDescription>
-                    </Alert>
+                    <div className="flex items-center justify-between">
+                      <Alert className="flex-1 mr-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Update Documents</AlertTitle>
+                        <AlertDescription>
+                          You can replace or add new documents below. Existing documents will remain unless you remove them.
+                        </AlertDescription>
+                      </Alert>
+                      <Button
+                        variant="outline"
+                        onClick={() => setEditingSection(null)}
+                        data-testid="button-cancel-edit"
+                      >
+                        Done
+                      </Button>
+                    </div>
 
                     <ObjectUploader
                       label="Upload Property Photos"
