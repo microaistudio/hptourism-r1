@@ -57,7 +57,8 @@ export default function AdminConsole() {
   // Execute SQL query mutation
   const executeQueryMutation = useMutation({
     mutationFn: async (query: string) => {
-      return apiRequest("POST", "/api/admin/db-console/execute", { query });
+      const response = await apiRequest("POST", "/api/admin/db-console/execute", { query });
+      return response.json();
     },
     onSuccess: (data: any) => {
       console.log('[DB Console] Query result:', data);
