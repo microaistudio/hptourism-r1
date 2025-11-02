@@ -59,14 +59,16 @@ export default function Dashboard() {
           a.status === 'district_review' || 
           a.status === 'state_review' || 
           a.status === 'inspection_scheduled' || 
-          a.status === 'inspection_completed'
+          a.status === 'inspection_completed' ||
+          a.status === 'reverted_to_applicant'
         );
       case 'pending_review':
         return applications.filter(a => 
           a.status === 'submitted' || 
           a.status === 'district_review' || 
           a.status === 'state_review' ||
-          a.status === 'inspection_completed'
+          a.status === 'inspection_completed' ||
+          a.status === 'reverted_to_applicant'
         );
       case 'inspection':
         return applications.filter(a => a.status === 'inspection_scheduled');
@@ -75,7 +77,7 @@ export default function Dashboard() {
       case 'rejected':
         return applications.filter(a => a.status === 'rejected');
       case 'sent_back':
-        return applications.filter(a => a.status === 'sent_back_for_corrections');
+        return applications.filter(a => a.status === 'sent_back_for_corrections' || a.status === 'reverted_to_applicant');
       case 'payment_pending':
         return applications.filter(a => a.status === 'payment_pending');
       case 'all':
@@ -90,9 +92,9 @@ export default function Dashboard() {
   const stats = user.role === 'property_owner' ? {
     total: applications.length,
     draft: applications.filter(a => a.status === 'draft').length,
-    sentBack: applications.filter(a => a.status === 'sent_back_for_corrections').length,
+    sentBack: applications.filter(a => a.status === 'sent_back_for_corrections' || a.status === 'reverted_to_applicant').length,
     paymentPending: applications.filter(a => a.status === 'payment_pending').length,
-    pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review' || a.status === 'inspection_scheduled' || a.status === 'inspection_completed').length,
+    pending: applications.filter(a => a.status === 'submitted' || a.status === 'district_review' || a.status === 'state_review' || a.status === 'inspection_scheduled' || a.status === 'inspection_completed' || a.status === 'reverted_to_applicant').length,
     approved: applications.filter(a => a.status === 'approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
   } : {
@@ -120,6 +122,7 @@ export default function Dashboard() {
       district_review: { variant: "secondary", label: "District Review" },
       state_review: { variant: "secondary", label: "State Review" },
       sent_back_for_corrections: { variant: "destructive", label: "Sent Back for Corrections" },
+      reverted_to_applicant: { variant: "destructive", label: "Reverted to Applicant" },
       inspection_scheduled: { variant: "secondary", label: "Inspection Scheduled" },
       inspection_completed: { variant: "secondary", label: "Inspection Completed" },
       payment_pending: { variant: "secondary", label: "Payment Pending" },
@@ -211,7 +214,7 @@ export default function Dashboard() {
               <Button 
                 variant="destructive"
                 onClick={() => {
-                  const sentBackApp = applications.find(a => a.status === 'sent_back_for_corrections');
+                  const sentBackApp = applications.find(a => a.status === 'sent_back_for_corrections' || a.status === 'reverted_to_applicant');
                   if (sentBackApp) setLocation(`/applications/${sentBackApp.id}`);
                 }}
                 data-testid="button-view-sent-back"
@@ -443,7 +446,7 @@ export default function Dashboard() {
                       <p className="text-sm text-muted-foreground">
                         {app.applicationNumber} • {app.district} • {app.totalRooms} rooms
                       </p>
-                      {app.status === 'sent_back_for_corrections' && app.clarificationRequested && (
+                      {(app.status === 'sent_back_for_corrections' || app.status === 'reverted_to_applicant') && app.clarificationRequested && (
                         <p className="text-sm text-destructive mt-1">
                           <AlertCircle className="w-3 h-3 inline mr-1" />
                           {app.clarificationRequested}
@@ -463,7 +466,7 @@ export default function Dashboard() {
                         <FileText className="w-4 h-4 mr-2" />
                         Resume Editing
                       </Button>
-                    ) : app.status === 'sent_back_for_corrections' ? (
+                    ) : (app.status === 'sent_back_for_corrections' || app.status === 'reverted_to_applicant') ? (
                       <Button 
                         variant="destructive" 
                         size="sm" 

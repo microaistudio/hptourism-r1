@@ -138,7 +138,7 @@ export default function UpdateApplication() {
 
   const application = data.application;
 
-  if (application.status !== 'sent_back_for_corrections') {
+  if (application.status !== 'sent_back_for_corrections' && application.status !== 'reverted_to_applicant') {
     return (
       <div className="bg-background p-8">
         <div className="max-w-4xl mx-auto">
