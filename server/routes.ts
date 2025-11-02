@@ -1098,6 +1098,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dtdoRemarks: null, // Clear DTDO feedback after resubmission
       });
       
+      // Create document records if documents array is provided
+      if (validatedData.documents && validatedData.documents.length > 0) {
+        for (const doc of validatedData.documents) {
+          // Only create documents that have all required fields including fileSize
+          if (doc.filePath && doc.fileName && doc.fileSize && doc.mimeType && doc.documentType) {
+            await storage.createDocument({
+              applicationId: id,
+              documentType: doc.documentType,
+              fileName: doc.fileName,
+              filePath: doc.filePath,
+              fileSize: doc.fileSize,
+              mimeType: doc.mimeType,
+            });
+          }
+        }
+      }
+      
       res.json({ application: updatedApplication });
     } catch (error) {
       if (error instanceof z.ZodError) {
