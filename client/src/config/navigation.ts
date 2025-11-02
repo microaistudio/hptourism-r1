@@ -1,4 +1,4 @@
-import { Home, FileText, Bell, BarChart3, BarChart, Users, ClipboardList, Settings, Database, ClipboardCheck, User, Activity } from "lucide-react";
+import { Home, FileText, Bell, BarChart3, BarChart, Users, ClipboardList, Settings, Database, ClipboardCheck, User, Activity, MapPin } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -72,6 +72,11 @@ export const adminNavigation: NavSection[] = [
         icon: Users,
       },
       {
+        title: "LGD Import",
+        url: "/admin/lgd-import",
+        icon: MapPin,
+      },
+      {
         title: "Admin Console",
         url: "/admin/console",
         icon: Database,
@@ -94,6 +99,11 @@ export const superAdminNavigation: NavSection[] = [
         title: "User Management",
         url: "/admin/users",
         icon: Users,
+      },
+      {
+        title: "LGD Import",
+        url: "/admin/lgd-import",
+        icon: MapPin,
       },
       {
         title: "Super Console",

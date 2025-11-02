@@ -3821,6 +3821,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // LGD Master Data Import Endpoint
+  app.post("/api/admin/lgd/import", requireRole('admin'), async (req, res) => {
+    try {
+      const { csvData, dataType } = req.body;
+      
+      if (!csvData || !dataType) {
+        return res.status(400).json({ message: "Missing csvData or dataType" });
+      }
+
+      // Parse CSV (simple parsing - assumes well-formed CSV)
+      const lines = csvData.trim().split('\n');
+      const headers = lines[0].split(',');
+      
+      let inserted = {
+        districts: 0,
+        tehsils: 0,
+        blocks: 0,
+        gramPanchayats: 0,
+        urbanBodies: 0,
+      };
+
+      if (dataType === 'villages') {
+        // File 2: Villages/Gram Panchayats with hierarchy
+        // Headers: stateCode,stateNameEnglish,districtCode,districtNameEnglish,subdistrictCode,subdistrictNameEnglish,villageCode,villageNameEnglish,pincode
+        
+        const districtMap = new Map();
+        const tehsilMap = new Map();
+        const villages = [];
+
+        // Parse all rows
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',');
+          if (values.length < 9 || values[0] !== '2') continue; // Only HP data (stateCode = 2)
+
+          const districtCode = values[2];
+          const districtName = values[3];
+          const tehsilCode = values[4];
+          const tehsilName = values[5];
+          const villageCode = values[6];
+          const villageName = values[7];
+          const pincode = values[8];
+
+          // Collect unique districts
+          if (!districtMap.has(districtCode)) {
+            districtMap.set(districtCode, { code: districtCode, name: districtName });
+          }
+
+          // Collect unique tehsils
+          const tehsilKey = `${districtCode}-${tehsilCode}`;
+          if (!tehsilMap.has(tehsilKey)) {
+            tehsilMap.set(tehsilKey, {
+              code: tehsilCode,
+              name: tehsilName,
+              districtCode,
+            });
+          }
+
+          // Collect villages
+          villages.push({
+            code: villageCode,
+            name: villageName,
+            tehsilCode,
+            pincode: pincode || null,
+          });
+        }
+
+        // Insert districts
+        for (const [code, data] of districtMap) {
+          await db.insert(lgdDistricts)
+            .values({
+              code: data.code,
+              nameEnglish: data.name,
+              isActive: true,
+            })
+            .onConflictDoNothing();
+          inserted.districts++;
+        }
+
+        // Insert tehsils
+        for (const [key, data] of tehsilMap) {
+          // Get district ID
+          const district = await db.query.lgdDistricts.findFirst({
+            where: eq(lgdDistricts.code, data.districtCode),
+          });
+
+          if (district) {
+            await db.insert(lgdTehsils)
+              .values({
+                code: data.code,
+                nameEnglish: data.name,
+                districtId: district.id,
+                isActive: true,
+              })
+              .onConflictDoNothing();
+            inserted.tehsils++;
+          }
+        }
+
+        // Insert gram panchayats (villages)
+        for (const village of villages) {
+          // Get tehsil ID
+          const tehsil = await db.query.lgdTehsils.findFirst({
+            where: eq(lgdTehsils.code, village.tehsilCode),
+          });
+
+          if (tehsil) {
+            await db.insert(lgdGramPanchayats)
+              .values({
+                code: village.code,
+                nameEnglish: village.name,
+                tehsilId: tehsil.id,
+                pincode: village.pincode,
+                isActive: true,
+              })
+              .onConflictDoNothing();
+            inserted.gramPanchayats++;
+          }
+        }
+
+      } else if (dataType === 'urbanBodies') {
+        // File 1: Urban Bodies (municipalities, town panchayats)
+        // Headers: stateCode,stateNameEnglish,localBodyCode,localBodyNameEnglish,localBodyTypeName,pincode
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',');
+          if (values.length < 6 || values[0] !== '2') continue; // Only HP data
+
+          const bodyCode = values[2];
+          const bodyName = values[3];
+          const bodyType = values[4];
+          const pincode = values[5];
+
+          await db.insert(lgdUrbanBodies)
+            .values({
+              code: bodyCode,
+              nameEnglish: bodyName,
+              type: bodyType,
+              pincode: pincode || null,
+              isActive: true,
+            })
+            .onConflictDoNothing();
+          inserted.urbanBodies++;
+        }
+      } else {
+        return res.status(400).json({ message: "Invalid dataType. Must be 'villages' or 'urbanBodies'" });
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully imported LGD data (${dataType})`,
+        inserted,
+      });
+
+    } catch (error) {
+      console.error("[admin] LGD import failed:", error);
+      res.status(500).json({ message: "Failed to import LGD data", error: String(error) });
+    }
+  });
+
   // HimKosh Payment Gateway Routes
   app.use("/api/himkosh", himkoshRoutes);
   console.log('[himkosh] Payment gateway routes registered');

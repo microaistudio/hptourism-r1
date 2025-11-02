@@ -134,7 +134,7 @@ export default function PaymentRazorpay() {
                   <div className="border-t pt-3 mt-3">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total Amount</span>
-                      <span className="text-primary">₹{parseFloat(application.totalFee).toLocaleString('en-IN')}</span>
+                      <span className="text-primary">₹{parseFloat(application.totalFee || '0').toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -180,7 +180,7 @@ export default function PaymentRazorpay() {
                   ) : (
                     <>
                       <CreditCard className="h-4 w-4 mr-2" />
-                      Pay ₹{parseFloat(application.totalFee).toLocaleString('en-IN')}
+                      Pay ₹{parseFloat(application.totalFee || '0').toLocaleString('en-IN')}
                     </>
                   )}
                 </Button>

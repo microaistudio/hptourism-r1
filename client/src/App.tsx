@@ -29,6 +29,7 @@ import WorkflowMonitoring from "@/pages/workflow-monitoring";
 import PaymentVerification from "@/pages/payment-verification";
 import AdminUsers from "@/pages/admin/users";
 import AdminConsole from "@/pages/admin/console";
+import AdminLGDImport from "@/pages/admin/lgd-import";
 import SuperAdminConsole from "@/pages/admin/super-admin-console";
 import SuperAdminDashboard from "@/pages/admin/super-admin-dashboard";
 import DADashboard from "@/pages/da/dashboard";
@@ -152,6 +153,9 @@ function Router() {
       </Route>
       <Route path="/admin/console">
         {() => <ProtectedRoute component={AdminConsole} allowedRoles={['admin', 'super_admin']} />}
+      </Route>
+      <Route path="/admin/lgd-import">
+        {() => <ProtectedRoute component={AdminLGDImport} allowedRoles={['admin', 'super_admin']} />}
       </Route>
       
       {/* Super Admin Only Routes */}
