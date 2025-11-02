@@ -783,8 +783,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get ALL applications for workflow monitoring (officers only)
-  // RBAC: District officers see only their district, State officers see all
-  app.get("/api/applications/all", requireRole('district_officer', 'state_officer', 'admin'), async (req, res) => {
+  // RBAC: District officers/DA/DTDO see only their district, State officers see all
+  app.get("/api/applications/all", requireRole('dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer', 'admin'), async (req, res) => {
     try {
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
@@ -795,10 +795,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let applications: HomestayApplication[] = [];
       
-      // District officers: Only see applications from their assigned district
-      if (user.role === 'district_officer') {
+      // District officers, DA, DTDO: Only see applications from their assigned district
+      if (user.role === 'district_officer' || user.role === 'dealing_assistant' || user.role === 'district_tourism_officer') {
         if (!user.district) {
-          return res.status(400).json({ message: "District officer must have an assigned district" });
+          return res.status(400).json({ message: "District role must have an assigned district" });
         }
         // Get all applications in their district (not just pending)
         applications = await db.select().from(homestayApplications)
@@ -2325,7 +2325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics Routes (Officers Only)
   
   // Get production portal statistics (scraped from official portal)
-  app.get("/api/analytics/production-stats", requireRole("district_officer", "state_officer"), async (req, res) => {
+  app.get("/api/analytics/production-stats", requireRole("dealing_assistant", "district_tourism_officer", "district_officer", "state_officer", "admin"), async (req, res) => {
     try {
       const stats = await storage.getLatestProductionStats();
       res.json({ stats });
@@ -2336,7 +2336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get analytics dashboard data
-  app.get("/api/analytics/dashboard", requireRole("district_officer", "state_officer"), async (req, res) => {
+  app.get("/api/analytics/dashboard", requireRole("dealing_assistant", "district_tourism_officer", "district_officer", "state_officer", "admin"), async (req, res) => {
     try {
       const allApplications = await storage.getAllApplications();
       const allUsers = await storage.getAllUsers();

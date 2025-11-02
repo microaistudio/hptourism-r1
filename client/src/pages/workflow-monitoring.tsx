@@ -99,7 +99,7 @@ export default function WorkflowMonitoringPage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                This dashboard is restricted to district officers and state officers only. 
+                This dashboard is restricted to government officers (Dealing Assistants, DTDOs, District Officers, State Officers, and Administrators). 
                 Property owners can track their individual applications through the main dashboard.
               </p>
               <Button 
