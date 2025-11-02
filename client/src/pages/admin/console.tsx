@@ -24,7 +24,7 @@ import { AlertTriangle, Database, Trash2, RefreshCw, Terminal, Play, Table2, Fil
 
 // Pre-made SQL query templates
 const QUERY_TEMPLATES = {
-  "View all users": "SELECT id, username, role, created_at FROM users ORDER BY created_at DESC LIMIT 20;",
+  "View all users": "SELECT id, mobile, full_name, role, created_at FROM users ORDER BY created_at DESC LIMIT 20;",
   "Count applications by status": "SELECT status, COUNT(*) as count FROM homestay_applications GROUP BY status ORDER BY count DESC;",
   "View recent applications": "SELECT id, property_name, status, created_at FROM homestay_applications ORDER BY created_at DESC LIMIT 10;",
   "View all DDO codes": "SELECT * FROM ddo_codes ORDER BY district;",
