@@ -22,7 +22,7 @@ The frontend is built with React 18+, TypeScript, and Vite, leveraging Shadcn/ui
 
 - **Public Registration Security**: Public registration endpoint (`/api/auth/register`) strictly enforces property owner role creation only. The role parameter is forced to "property_owner" before schema validation, preventing role escalation attacks even through direct API calls.
 - **Password Security**: Single-layer bcrypt hashing (10 salt rounds) applied in route handlers before storage. DbStorage layer accepts pre-hashed passwords to prevent double-hashing bugs. All password comparisons use bcrypt.compare() for secure authentication.
-- **Admin-Only User Creation**: All government officials (Dealing Assistant, District Officer, State Officer, Admin) must be created exclusively through the admin interface (`/api/admin/users`) by existing admins or super_admins. This endpoint is protected by role-based middleware and uses direct database insertion with bcrypt password hashing.
+- **Admin-Only User Creation**: All government officials (Dealing Assistant, District Tourism Officer (DTDO), District Officer, State Officer, Admin) must be created exclusively through the admin interface (`/api/admin/users`) by existing admins or super_admins. This endpoint is protected by role-based middleware and uses direct database insertion with bcrypt password hashing.
 - **Defense in Depth**: Both frontend (hardcoded role) and backend (forced role) enforce property owner registration, ensuring security even if frontend is bypassed.
 
 ### Feature Specifications
