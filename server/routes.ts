@@ -845,6 +845,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if user has an active application (ONE-APPLICATION-PER-OWNER enforcement)
+  // Returns active application or null
+  app.get("/api/applications/active-check", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const activeApplication = await storage.getUserActiveApplication(userId);
+      
+      res.json({ 
+        hasActiveApplication: !!activeApplication,
+        activeApplication: activeApplication || null
+      });
+    } catch (error) {
+      console.error("Active application check error:", error);
+      res.status(500).json({ message: "Failed to check active application" });
+    }
+  });
+
   // Get ALL applications for workflow monitoring (officers only)
   // RBAC: District officers/DA/DTDO see only their district, State officers see all
   app.get("/api/applications/all", requireRole('dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer', 'admin'), async (req, res) => {
