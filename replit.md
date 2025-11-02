@@ -60,6 +60,7 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
   - **5-Tier Hierarchy**: Districts → Tehsils/Sub-Divisions → Development Blocks → Gram Panchayats (rural) / Urban Bodies (MC, TCP, NP)
   - **Schema Design**: UUID-based IDs, proper foreign key relationships, cascade deletion support, isActive flags for soft deletion
   - **Configuration Data**: Treated as configuration data (preserved by default during database resets)
+  - **"Other" Custom Fields**: Each hierarchical level (district, tehsil, block, gram panchayat, urban body) includes an "Other" text field allowing property owners to specify custom locations not present in LGD master data
   - **Future Use**: Will enable location-based dropdowns, hierarchical filtering, and district-specific workflows in application forms
 - **Test Payment Mode**: System-wide testing feature for payment gateway integration:
   - **Dual-Mode Operation**: Calculates actual fees but sends ₹1 to HimKosh gateway when test mode is enabled

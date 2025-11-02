@@ -97,14 +97,22 @@ export const homestayApplications = pgTable("homestay_applications", {
   
   // LGD Hierarchical Address Fields
   district: varchar("district", { length: 100 }).notNull(),
+  districtOther: varchar("district_other", { length: 100 }), // Custom district if not in LGD
+  
   tehsil: varchar("tehsil", { length: 100 }).notNull(),
+  tehsilOther: varchar("tehsil_other", { length: 100 }), // Custom tehsil if not in LGD
   
   // Rural Address (for GP - Gram Panchayat)
   block: varchar("block", { length: 100 }), // Mandatory for rural (gp)
+  blockOther: varchar("block_other", { length: 100 }), // Custom block if not in LGD
+  
   gramPanchayat: varchar("gram_panchayat", { length: 100 }), // Mandatory for rural (gp)
+  gramPanchayatOther: varchar("gram_panchayat_other", { length: 100 }), // Custom gram panchayat if not in LGD
   
   // Urban Address (for MC/TCP)
   urbanBody: varchar("urban_body", { length: 200 }), // Name of MC/TCP/Nagar Panchayat - Mandatory for urban
+  urbanBodyOther: varchar("urban_body_other", { length: 200 }), // Custom urban body if not in LGD
+  
   ward: varchar("ward", { length: 50 }), // Ward/Zone number - Mandatory for urban
   
   // Additional address details
