@@ -3,17 +3,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, UserCheck, Shield, Building2, MapPin, Search } from "lucide-react";
+import { Users, UserCheck, Shield, Building2, MapPin, Search, UserPlus } from "lucide-react";
 import { useState } from "react";
 import type { User } from "@shared/schema";
 
 export default function AdminUsers() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    mobile: "",
+    fullName: "",
+    role: "property_owner",
+    district: "",
+    password: "",
+  });
 
   const { data: usersData, isLoading } = useQuery<{ users: User[] }>({
     queryKey: ["/api/admin/users"],
@@ -64,6 +74,46 @@ export default function AdminUsers() {
       });
     },
   });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (data: typeof newUserData) => {
+      return await apiRequest("POST", "/api/admin/users", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setCreateDialogOpen(false);
+      setNewUserData({
+        mobile: "",
+        fullName: "",
+        role: "property_owner",
+        district: "",
+        password: "",
+      });
+      toast({
+        title: "User Created",
+        description: "New user has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create user. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateUser = () => {
+    if (!newUserData.mobile || !newUserData.fullName || !newUserData.password) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createUserMutation.mutate(newUserData);
+  };
 
   const filteredUsers = usersData?.users?.filter(user =>
     user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,12 +176,112 @@ export default function AdminUsers() {
     <div className="bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="w-8 h-8 text-primary" />
-            User Management
-          </h1>
-          <p className="text-muted-foreground mt-1">View and manage all system users</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              <Shield className="w-8 h-8 text-primary" />
+              User Management
+            </h1>
+            <p className="text-muted-foreground mt-1">View and manage all system users</p>
+          </div>
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-user">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Create New User</DialogTitle>
+                <DialogDescription>
+                  Add a new user to the system. Choose the appropriate role and district assignment.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="mobile">Mobile Number *</Label>
+                  <Input
+                    id="mobile"
+                    placeholder="10-digit mobile number"
+                    value={newUserData.mobile}
+                    onChange={(e) => setNewUserData({ ...newUserData, mobile: e.target.value })}
+                    data-testid="input-mobile"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name *</Label>
+                  <Input
+                    id="fullName"
+                    placeholder="Enter full name"
+                    value={newUserData.fullName}
+                    onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
+                    data-testid="input-fullname"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select
+                    value={newUserData.role}
+                    onValueChange={(value) => setNewUserData({ ...newUserData, role: value })}
+                  >
+                    <SelectTrigger data-testid="select-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="property_owner">Property Owner</SelectItem>
+                      <SelectItem value="dealing_assistant">Dealing Assistant (DA)</SelectItem>
+                      <SelectItem value="district_tourism_officer">District Tourism Officer (DTDO)</SelectItem>
+                      <SelectItem value="district_officer">District Officer</SelectItem>
+                      <SelectItem value="state_officer">State Officer</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(newUserData.role === 'dealing_assistant' || 
+                  newUserData.role === 'district_tourism_officer' || 
+                  newUserData.role === 'district_officer') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="district">District Assignment</Label>
+                    <Input
+                      id="district"
+                      placeholder="e.g., Shimla, Kullu, Mandi"
+                      value={newUserData.district}
+                      onChange={(e) => setNewUserData({ ...newUserData, district: e.target.value })}
+                      data-testid="input-district"
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter password"
+                    value={newUserData.password}
+                    onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                    data-testid="input-password"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCreateDialogOpen(false)}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateUser}
+                  disabled={createUserMutation.isPending}
+                  data-testid="button-submit-create"
+                >
+                  {createUserMutation.isPending ? "Creating..." : "Create User"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stats Cards */}
