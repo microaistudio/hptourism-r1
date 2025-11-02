@@ -50,6 +50,17 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
   - **DTDO Profile Page**: View/edit profile and change password
   - **Critical Workflow Fix**: Status transitions use intermediate `dtdo_review` state after acceptance, only moving to `inspection_scheduled` after successful inspection order creation, preventing orphaned records and workflow breakage
   - **District-Based Filtering**: All DTDO endpoints enforce district-level access control, ensuring officers only see applications from their assigned district
+- **Admin Database Reset with Granular Preservation**: Flexible database reset functionality for testing and development:
+  - **Always Preserved**: Admin and Super Admin accounts (hardcoded)
+  - **Optional Preservation**: DDO codes (configuration data), Property Owners, District Officers (DA, DTDO), State Officers
+  - **Role-Based Deletion**: Uses SQL subquery to delete user profiles based on role, ensuring no orphaned records
+  - **Detailed Statistics**: Returns comprehensive preservation statistics including byRole counts
+  - **UI Feedback**: Admin console displays detailed preservation information in success toast
+- **Test Payment Mode**: System-wide testing feature for payment gateway integration:
+  - **Dual-Mode Operation**: Calculates actual fees but sends ₹1 to HimKosh gateway when test mode is enabled
+  - **System Settings Table**: JSONB-based storage for configuration including test_payment_mode flag
+  - **Admin Controls**: Toggle accessible in Super Admin console
+  - **Transparent Testing**: Allows full workflow testing without processing real payments
 
 ### System Design Choices
 
