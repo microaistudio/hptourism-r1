@@ -1047,17 +1047,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })).optional(),
         
         // Fee Calculation (calculated fields - typically set by server)
-        baseFee: z.coerce.number().optional(),
-        totalBeforeDiscounts: z.coerce.number().optional(),
-        validityDiscount: z.coerce.number().optional(),
-        femaleOwnerDiscount: z.coerce.number().optional(),
-        pangiDiscount: z.coerce.number().optional(),
-        totalDiscount: z.coerce.number().optional(),
-        totalFee: z.coerce.number().optional(),
+        // Handle NaN values for incomplete fee calculations
+        baseFee: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        totalBeforeDiscounts: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        validityDiscount: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        femaleOwnerDiscount: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        pangiDiscount: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        totalDiscount: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        totalFee: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
         
         // Legacy fee fields
-        perRoomFee: z.coerce.number().optional(),
-        gstAmount: z.coerce.number().optional(),
+        perRoomFee: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
+        gstAmount: z.preprocess((val) => (val == null || (typeof val === 'number' && isNaN(val)) || val === 'NaN') ? undefined : val, z.coerce.number().optional()),
         
         // Documents (validated JSONB structure)
         documents: z.array(z.object({
