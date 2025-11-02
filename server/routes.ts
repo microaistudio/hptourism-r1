@@ -695,9 +695,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // ONE-APPLICATION-PER-OWNER RULE: Check if user already has an active application
+      const existingApp = await storage.getUserActiveApplication(userId);
+      
       // Build payload with ONLY allowed fields (ANNEXURE-I compliant)
-      // Pass trusted flag to allow server-controlled status override
-      const application = await storage.createApplication({
+      const applicationData = {
         // Basic property info
         propertyName: validatedData.propertyName,
         category: validatedData.category,
@@ -777,7 +779,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         status: 'submitted',
         submittedAt: new Date(),
-      }, { trusted: true });
+      };
+      
+      // ONE-APPLICATION-PER-OWNER: Update existing or create new
+      let application;
+      if (existingApp) {
+        // Update existing application and change status to submitted
+        application = await storage.updateApplication(existingApp.id, {
+          ...applicationData,
+          status: 'submitted',
+          submittedAt: new Date(),
+        } as any);
+      } else {
+        // Create new application only if none exists
+        application = await storage.createApplication(applicationData, { trusted: true });
+      }
+      
+      if (!application) {
+        return res.status(500).json({ message: "Failed to save application" });
+      }
       
       // Save documents with actual metadata if provided
       if (validatedData.documents && validatedData.documents.length > 0) {
