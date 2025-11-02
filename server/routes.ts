@@ -3516,9 +3516,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Execute the query
       const result = await db.execute(sql.raw(sqlQuery));
       
+      // Debug: log the structure
+      console.log(`[db-console] Result type:`, typeof result, 'isArray:', Array.isArray(result));
+      console.log(`[db-console] Result keys:`, Object.keys(result || {}));
+      
       // Extract rows from the result
       // db.execute returns an object with rows property for Neon driver
-      const rows = Array.isArray(result) ? result : (result as any).rows || [];
+      let rows: any[] = [];
+      if (Array.isArray(result)) {
+        rows = result;
+      } else if (result && (result as any).rows) {
+        rows = (result as any).rows;
+      } else if (result) {
+        // If result is the rows directly
+        rows = [result];
+      }
       
       // Format response
       const response = {
@@ -3529,7 +3541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         query: sqlQuery
       };
 
-      console.log(`[db-console] Query returned ${rows.length} row(s)`);
+      console.log(`[db-console] Query returned ${rows.length} row(s), first row:`, rows[0] || 'none');
       res.json(response);
     } catch (error) {
       console.error("[db-console] Query execution failed:", error);
