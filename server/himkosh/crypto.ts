@@ -55,28 +55,17 @@ export class HimKoshCrypto {
         
         console.log('[himkosh-crypto] Loaded key from text format (base64)');
       } else {
-        // Format 2: Binary format - raw bytes (key + IV concatenated)
-        // Assume 32 bytes = 16-byte key + 16-byte IV (AES-128)
-        // Or 48 bytes = 24-byte key + 16-byte IV (AES-192)  
-        // Or 64 bytes = 32-byte key + 16-byte IV (AES-256)
+        // Format 2: Binary format - raw bytes
+        // CRITICAL: Key = IV = first 16 bytes (CTP behavior)
+        // Second 16 bytes are IGNORED
         
-        if (raw.length === 32) {
-          // 32 bytes: 16-byte key + 16-byte IV (AES-128)
+        if (raw.length >= 16) {
+          // Use first 16 bytes for BOTH key and IV
           this.key = raw.subarray(0, 16);
-          this.iv = raw.subarray(16, 32);
-          console.log('[himkosh-crypto] Loaded key from binary format (AES-128: 16+16 bytes)');
-        } else if (raw.length === 48) {
-          // 48 bytes: 24-byte key + 16-byte IV (AES-192)
-          this.key = raw.subarray(0, 24);
-          this.iv = raw.subarray(24, 48);
-          console.log('[himkosh-crypto] Loaded key from binary format (AES-192: 24+16 bytes)');
-        } else if (raw.length === 64) {
-          // 64 bytes: 32-byte key + 16-byte IV (AES-256)
-          this.key = raw.subarray(0, 32);
-          this.iv = raw.subarray(32, 64);
-          console.log('[himkosh-crypto] Loaded key from binary format (AES-256: 32+16 bytes)');
+          this.iv = raw.subarray(0, 16); // SAME as key!
+          console.log('[himkosh-crypto] Loaded key from binary format (Key=IV=first 16 bytes, remaining bytes ignored)');
         } else {
-          throw new Error(`Unsupported key file size: ${raw.length} bytes. Expected 32 (AES-128), 48 (AES-192), or 64 (AES-256) bytes for binary format, or text format with base64-encoded key and IV on separate lines.`);
+          throw new Error(`Unsupported key file size: ${raw.length} bytes. Expected at least 16 bytes.`);
         }
       }
 
