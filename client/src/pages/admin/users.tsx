@@ -265,6 +265,15 @@ export default function AdminUsers() {
     }
   };
 
+  const getUserDisplayName = (user: User) => {
+    // For staff users, prefer firstName + lastName if available
+    if (user.role !== 'property_owner' && user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    // Fall back to fullName
+    return user.fullName;
+  };
+
   const handleRoleChange = (userId: string, newRole: string) => {
     updateUserRoleMutation.mutate({ userId, role: newRole });
   };
@@ -498,7 +507,7 @@ export default function AdminUsers() {
                       ) : (
                         staffUsers.map((user) => (
                           <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                            <TableCell className="font-medium">{user.fullName}</TableCell>
+                            <TableCell className="font-medium">{getUserDisplayName(user)}</TableCell>
                             <TableCell>{user.mobile}</TableCell>
                             <TableCell>{user.email || '-'}</TableCell>
                             <TableCell>{user.district || '-'}</TableCell>
@@ -583,7 +592,7 @@ export default function AdminUsers() {
                   ) : (
                     propertyOwners.map((user) => (
                       <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                        <TableCell className="font-medium">{user.fullName}</TableCell>
+                        <TableCell className="font-medium">{getUserDisplayName(user)}</TableCell>
                         <TableCell>{user.mobile}</TableCell>
                         <TableCell>{user.email || '-'}</TableCell>
                         <TableCell>{user.district || '-'}</TableCell>
