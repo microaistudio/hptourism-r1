@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info, MapPin, Wind, ParkingCircle, UtensilsCrossed, Droplets, Tv, Shirt, ConciergeBell, Trees, Mountain, PawPrint } from "lucide-react";
 import type { User, HomestayApplication, UserProfile } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, type CategoryType, type LocationType } from "@shared/fee-calculator";
@@ -196,17 +196,17 @@ type ApplicationForm = z.infer<typeof applicationSchema>;
 type DraftForm = z.infer<typeof draftSchema>;
 
 const AMENITIES = [
-  { id: "ac", label: "Air Conditioning" },
-  { id: "wifi", label: "WiFi" },
-  { id: "parking", label: "Parking" },
-  { id: "restaurant", label: "Restaurant" },
-  { id: "hotWater", label: "Hot Water 24/7" },
-  { id: "tv", label: "Television" },
-  { id: "laundry", label: "Laundry Service" },
-  { id: "roomService", label: "Room Service" },
-  { id: "garden", label: "Garden" },
-  { id: "mountainView", label: "Mountain View" },
-  { id: "petFriendly", label: "Pet Friendly" },
+  { id: "ac", label: "Air Conditioning", icon: Wind },
+  { id: "wifi", label: "WiFi", icon: Wifi },
+  { id: "parking", label: "Parking", icon: ParkingCircle },
+  { id: "restaurant", label: "Restaurant", icon: UtensilsCrossed },
+  { id: "hotWater", label: "Hot Water 24/7", icon: Droplets },
+  { id: "tv", label: "Television", icon: Tv },
+  { id: "laundry", label: "Laundry Service", icon: Shirt },
+  { id: "roomService", label: "Room Service", icon: ConciergeBell },
+  { id: "garden", label: "Garden", icon: Trees },
+  { id: "mountainView", label: "Mountain View", icon: Mountain },
+  { id: "petFriendly", label: "Pet Friendly", icon: PawPrint },
 ];
 
 // Fee structure as per ANNEXURE-I (location-based)
@@ -2177,26 +2177,30 @@ export default function NewApplication() {
                   <div className="space-y-4">
                     <h4 className="font-medium">Property Amenities</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {AMENITIES.map((amenity) => (
-                        <div
-                          key={amenity.id}
-                          className="flex items-center space-x-3 p-3 border rounded-lg hover-elevate"
-                          data-testid={`checkbox-amenity-${amenity.id}`}
-                        >
-                          <Checkbox
-                            checked={selectedAmenities[amenity.id] || false}
-                            onCheckedChange={(checked) => 
-                              setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !!checked }))
-                            }
-                          />
-                          <label 
-                            className="flex-1 cursor-pointer"
-                            onClick={() => setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }))}
+                      {AMENITIES.map((amenity) => {
+                        const IconComponent = amenity.icon;
+                        return (
+                          <div
+                            key={amenity.id}
+                            className="flex items-center space-x-3 p-3 border rounded-lg hover-elevate"
+                            data-testid={`checkbox-amenity-${amenity.id}`}
                           >
-                            <span className="text-sm font-medium">{amenity.label}</span>
-                          </label>
-                        </div>
-                      ))}
+                            <Checkbox
+                              checked={selectedAmenities[amenity.id] || false}
+                              onCheckedChange={(checked) => 
+                                setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !!checked }))
+                              }
+                            />
+                            <label 
+                              className="flex items-center gap-2 flex-1 cursor-pointer"
+                              onClick={() => setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }))}
+                            >
+                              <IconComponent className="w-4 h-4 text-primary" />
+                              <span className="text-sm font-medium">{amenity.label}</span>
+                            </label>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
