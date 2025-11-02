@@ -35,6 +35,7 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
 - **LGD Master Data Import Tool**: Admin interface for importing official Local Government Directory data via CSV.
 - **Admin User Creation System**: Dialog-based interface for administrators to create new users with various roles.
 - **Tabbed User Management Interface**: Enhanced admin user management with tabbed categorization for "Staff Users" and "Property Owners", including comprehensive edit functionality.
+- **Production-Grade Document Management System**: Independent document module with versioned storage, comprehensive audit logging, soft-delete support, and role-based authorization preventing cross-tenant access.
 
 ### System Design Choices
 
@@ -47,6 +48,21 @@ The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui 
 - **Role-Specific APIs**: Backend endpoints filter data based on user role and district assignment.
 - **Frontend Route Guards**: `ProtectedRoute` component validates user roles and redirects unauthorized access.
 - **Official 2025 Policy Compliance**: Fully implements the **Himachal Pradesh Home Stay Rules, 2025**, covering room specifications, tiered fee structure (GST Included), discount system, GSTIN requirements, certificate validity, and a 60-day processing timeline.
+
+## Recent Updates (November 2025)
+
+### Production-Grade Document Management System (November 2025)
+Implemented comprehensive document management with security-first architecture:
+- **Relational Document Storage**: Dedicated `documents` table with versioning, metadata, and referential integrity
+- **Document Versioning**: Never hard-deletes documents; creates new versions on resubmission with status tracking (active/superseded/archived/deleted)
+- **Comprehensive Audit Logging**: Tracks all document operations (view/upload/delete) with user, role, IP address, timestamp, and user agent for compliance
+- **Multi-Provider Storage**: Configurable support for MinIO (customer DC), Replit Object Storage (development), or local storage (fallback)
+- **Role-Based Authorization**: All document endpoints enforce tenant boundaries - property owners access only their applications, district officers their district, admins all
+- **Authorization Helper**: `canAccessApplication()` function prevents cross-tenant data leakage
+- **RESTful API**: Independent document routes (`/api/documents/*`) with GET/POST/DELETE operations
+- **Data Migration**: Successfully migrated 10 existing JSONB documents to relational table structure
+- **Customer DC Deployment**: Complete documentation for PostgreSQL with WAL archiving, MinIO setup, automated backups, and security hardening
+- **File Organization**: Separate storage paths for PDFs (`/documents/*`) and photos (`/images/*`) for better management
 
 ## Recent Updates (November 2025)
 
