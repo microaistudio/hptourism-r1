@@ -63,6 +63,9 @@ router.post('/initiate', async (req, res) => {
     const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
 
     // Calculate actual amount (convert to integer rupees, no decimals)
+    if (!application.totalFee) {
+      return res.status(400).json({ error: 'Total fee not calculated for this application' });
+    }
     const actualAmount = Math.round(parseFloat(application.totalFee.toString()));
 
     // Check if test payment mode is enabled
@@ -451,6 +454,10 @@ router.post('/test-callback-url', async (req, res) => {
     }
 
     const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
+    
+    if (!application.totalFee) {
+      return res.status(400).json({ error: 'Total fee not calculated for this application' });
+    }
     const totalAmount = Math.round(parseFloat(application.totalFee.toString()));
 
     const now = new Date();

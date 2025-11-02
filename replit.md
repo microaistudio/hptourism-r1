@@ -2,72 +2,39 @@
 
 ## Overview
 
-The HP Tourism Digital Ecosystem is a digital transformation platform for modernizing tourism registration and management in Himachal Pradesh. It functions as a public tourism discovery portal and an administrative system for operators, specifically implementing the "Himachal Pradesh Homestay Rules 2025" with a three-tier categorization (Diamond, Gold, Silver). The platform's primary goal is to significantly reduce application processing times through automation and streamlined user experiences. Key features include a Public Tourism Discovery Platform, a Smart Compliance Hub for property owners, an Analytics Dashboard for government officers, an Admin User Management System, and a Workflow Monitoring Dashboard for real-time application tracking and intelligent alerting. This project aims to provide a robust, scalable, and user-friendly solution, enhancing both visitor experience and administrative efficiency in the state's tourism sector.
+The HP Tourism Digital Ecosystem is a digital transformation platform designed to modernize tourism registration and management in Himachal Pradesh. It serves as both a public tourism discovery portal and an administrative system for operators, specifically implementing the "Himachal Pradesh Homestay Rules 2025" with a three-tier categorization (Diamond, Gold, Silver). The platform aims to automate processes and streamline user experiences to significantly reduce application processing times. Key capabilities include a Public Tourism Discovery Platform, a Smart Compliance Hub for property owners, an Analytics Dashboard for government officers, an Admin User Management System, and a Workflow Monitoring Dashboard for real-time application tracking and intelligent alerting. The project's ambition is to provide a robust, scalable, and user-friendly solution, enhancing both visitor experience and administrative efficiency within the state's tourism sector.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Updates (November 2025)
-
-### Single-Page View & Edit for Sent-Back Applications  
-- **Unified Interface**: Replaced separate update page (`/applications/:id/update`) with integrated edit mode on existing detail page (`/applications/:id`), providing seamless single-page experience for viewing and editing sent-back applications
-- **In-Place Edit Mode**: When application status is `reverted_to_applicant` or `reverted_by_dtdo`, an "Edit" button appears in the documents card header; clicking toggles to edit mode showing ObjectUploader components for all document types
-- **View-First UX**: Property owners see complete submitted application summary (property details, owner info, amenities, fee breakdown) before editing, eliminating blind re-entry of 70+ form fields
-- **Feedback Visibility**: DA (`clarificationRequested`) and DTDO (`dtdoRemarks`) feedback displayed as alerts at top of page for clear visibility of required corrections
-- **Selective Document Updates**: Edit mode shows file uploaders for Property Photos, Revenue Papers, Affidavit Section 29, Undertaking Form-C, Register for Verification, and Bill Book; existing documents preserved with IDs to prevent duplication
-- **Smart State Management**: React hooks (useEffect, useMutation) properly ordered before early returns to prevent rendering errors; documents hydrated in useEffect to avoid infinite loops; ObjectUploader components receive all required props (label, uploadedFiles, onFilesChange, bucketPath, allowedTypes, maxFiles)
-- **Cancel/Resubmit Actions**: Cancel button exits edit mode without changes; Resubmit button updates documents and changes status back to 'submitted', preserving all other application data
-- **Route Cleanup**: Removed obsolete `/applications/:id/update` route and update.tsx page; all update functionality consolidated into detail.tsx
-- **Verified via E2E testing**: Confirmed reverted applications display correctly, Edit button appears, edit mode toggles properly, and Cancel/Resubmit flows work as expected
-
-### Workflow Revert System Fix
-- **Fixed critical workflow visibility bug**: Applications reverted by DA (`reverted_to_applicant`) or DTDO (`reverted_by_dtdo`) now properly appear in owner's dashboard "Pending Review" and "Sent Back" sections
-- **Dual-revert status support**: Owner dashboard distinguishes between DA reverts (badge: "Reverted by DA", shows `clarificationRequested`) and DTDO reverts (badge: "Reverted by DTDO", shows `dtdoRemarks`)
-- **Updated all touch points**: Dashboard filters, stats, status badges, action buttons, and backend PATCH endpoint now handle both `reverted_to_applicant` and `reverted_by_dtdo` statuses consistently
-- **Verified via e2e testing**: Confirmed both DA and DTDO reverted applications appear in owner dashboard, can be updated via in-place editing, and resubmit correctly with status changing back to 'submitted'
-
-### Payment Status & Analytics Access Updates
-- **Fixed payment status recognition**: Dashboard now recognizes both `payment_pending` and `verified_for_payment` statuses (DTDO-approved applications awaiting payment)
-- **Payment alerts & buttons**: "Payment Required" alert and "Make Payment" buttons now appear for applications in either payment status
-- **Expanded Analytics & Workflow access**: Analytics Dashboard and Workflow Monitoring pages now accessible to DA (Dealing Assistant) and DTDO in addition to District Officers, State Officers, and Admins
-- **Navigation updates**: Added Analytics and Workflow Monitor menu items to DA sidebar navigation for better discoverability
-
 ## System Architecture
 
 ### UI/UX Decisions
 
-The platform features a clean, professional design aligned with HP Government branding, utilizing a consistent teal-green accent. It incorporates an accessible hero carousel compliant with WCAG standards and offers an 8-theme system with accessible color contrasts. The design prioritizes clear workflows, adherence to government portal standards, and a mobile-first approach with intuitive user interfaces for all roles.
+The platform employs a clean, professional design consistent with HP Government branding, featuring a teal-green accent. It includes an accessible hero carousel compliant with WCAG standards and offers an 8-theme system with accessible color contrasts. The design prioritizes clear workflows, adherence to government portal standards, and a mobile-first approach with intuitive user interfaces across all user roles.
 
 ### Technical Implementations
 
-The frontend is built with React 18+, TypeScript, and Vite, leveraging Shadcn/ui (Radix UI) for components, Tailwind CSS for mobile-first styling, TanStack Query for server state management, React Hook Form with Zod for robust form handling, and Wouter for efficient routing. The backend uses Node.js and Express.js in TypeScript, following a RESTful API design. Session management is handled by Express sessions with PostgreSQL storage, and role-based navigation and route guards enforce access control.
-
-### Security and Authentication
-
-- **Public Registration Security**: Public registration endpoint (`/api/auth/register`) strictly enforces property owner role creation only. The role parameter is forced to "property_owner" before schema validation, preventing role escalation attacks even through direct API calls.
-- **Password Security**: Single-layer bcrypt hashing (10 salt rounds) applied in route handlers before storage. DbStorage layer accepts pre-hashed passwords to prevent double-hashing bugs. All password comparisons use bcrypt.compare() for secure authentication.
-- **Admin-Only User Creation**: All government officials (Dealing Assistant, District Tourism Officer (DTDO), District Officer, State Officer, Admin) must be created exclusively through the admin interface (`/api/admin/users`) by existing admins or super_admins. This endpoint is protected by role-based middleware and uses direct database insertion with bcrypt password hashing.
-- **Defense in Depth**: Both frontend (hardcoded role) and backend (forced role) enforce property owner registration, ensuring security even if frontend is bypassed.
+The frontend is built with React 18+, TypeScript, and Vite, utilizing Shadcn/ui (Radix UI) for components, Tailwind CSS for mobile-first styling, TanStack Query for server state management, React Hook Form with Zod for robust form handling, and Wouter for efficient routing. The backend uses Node.js and Express.js in TypeScript, following a RESTful API design. Session management is handled by Express sessions with PostgreSQL storage, and role-based navigation and route guards enforce access control. Security measures include forced role parameters during public registration to prevent escalation, bcrypt password hashing, and admin-only creation for government official accounts.
 
 ### Feature Specifications
 
-- **Public Tourism Discovery Platform**: Enables browsing and filtering of approved homestays.
-- **Smart Compliance Hub**: Facilitates homestay registration, application submission, and status tracking for property owners, including a draft save & resume functionality.
-- **ANNEXURE-I Compliant Registration Form**: A comprehensive multi-step form implementing HP Homestay Rules 2025, covering property details, owner information, room details & category, distances & public areas, ANNEXURE-II documents, and amenities & summary, with district-based distance auto-population, location-based fee calculation, and conditional GSTIN validation.
+- **Public Tourism Discovery Platform**: Allows browsing and filtering of approved homestays.
+- **Smart Compliance Hub**: Facilitates homestay registration, application submission, and status tracking for property owners, including draft save & resume functionality.
+- **ANNEXURE-I Compliant Registration Form**: A multi-step form implementing HP Homestay Rules 2025, covering property details, owner information, room details & category, distances & public areas, ANNEXURE-II documents, and amenities & summary, with district-based distance auto-population, location-based fee calculation, and conditional GSTIN validation.
 - **Analytics Dashboard**: Provides government officers with insights into application trends, status distributions, and processing times.
-- **Workflow Monitoring Dashboard**: Offers a real-time, visual pipeline of applications through six stages, with SLA tracking and bottleneck detection.
-- **Multiple Payment Gateways**: Integrated payment system with HimKosh (HP CTP), Razorpay, CCAvenue, PayU, and UPI QR Code options, including a `Test Payment Mode` for development.
-- **Production-Level Role-Based Access Control (RBAC)**: Comprehensive RBAC with distinct roles (Property Owner, District Officer, State Officer, Admin, `super_admin`).
-- **Dealing Assistant (DA) Workflow**: Includes a DA Dashboard with district-specific application queues, an enhanced document scrutiny interface, verification checklists, and secure API routes for managing application review, forwarding, and inspection order management with ANNEXURE-III compliant report submission.
-- **ANNEXURE-III Inspection Checklist System**: A comprehensive field inspection reporting system implementing official HP Homestay Rules 2025, with dual-section compliance tracking (18 mandatory, 18 desirable points), real-time compliance monitoring, and structured data storage.
-- **District Tourism Development Officer (DTDO) Workflow**: Complete workflow including DTDO Dashboard, application review interface with accept/reject/revert options, inspection scheduling system, and post-inspection report review workflow (Approve, Reject, Raise Objections) implementing `PRD_2.0.md` state machine.
-- **Admin Database Reset with Granular Preservation**: Flexible database reset for testing, allowing preservation of specific data types (Admin accounts, DDO codes, LGD Master Data, user roles) with detailed statistics.
-- **LGD Master Data Integration**: Comprehensive Local Government Directory tables for Himachal Pradesh's 5-tier administrative hierarchy (Districts → Tehsils/Sub-Divisions → Development Blocks → Gram Panchayats / Urban Bodies), including "Other" custom fields for specifying unlisted locations.
-- **Database Console (Admin Tool)**: Interactive SQL console for development with query execution, pre-made templates, table browser, and results formatting (development-only).
-- **LGD Master Data Import Tool**: Admin interface for importing official Local Government Directory data via CSV, with separate workflows for Villages/Hierarchy and Urban Bodies, including CSV parsing, validation, hierarchical data population, and import statistics.
-- **Admin User Creation System**: Dialog-based interface for administrators to create new users with various roles (Property Owner, Dealing Assistant, District Tourism Officer, District Officer, State Officer, Admin) directly from the admin interface, with bcrypt password hashing, role-based validation, and conditional district assignment.
-- **Tabbed User Management Interface**: Enhanced admin user management with tabbed categorization separating "Staff Users" (DA, DTDO, District Officer, State Officer, Admin) from "Property Owners" for improved organization. Includes comprehensive edit functionality allowing admins to update user profiles (Full Name, Email, District, Password) through an intuitive dialog interface. Backend supports PATCH /api/admin/users/:id with proper null handling and password hashing for secure updates.
+- **Workflow Monitoring Dashboard**: Offers a real-time, visual pipeline of applications through six stages, with SLA tracking.
+- **Multiple Payment Gateways**: Integrated payment system supporting HimKosh, Razorpay, CCAvenue, PayU, and UPI QR Code.
+- **Production-Level Role-Based Access Control (RBAC)**: Comprehensive RBAC with distinct roles (Property Owner, Dealing Assistant, District Tourism Officer, District Officer, State Officer, Admin, `super_admin`).
+- **Dealing Assistant (DA) Workflow**: Includes a DA Dashboard with district-specific application queues, document scrutiny interface, verification checklists, and secure API routes for managing application review, forwarding, and inspection order management with ANNEXURE-III compliant report submission.
+- **ANNEXURE-III Inspection Checklist System**: A comprehensive field inspection reporting system implementing official HP Homestay Rules 2025.
+- **District Tourism Development Officer (DTDO) Workflow**: Complete workflow including DTDO Dashboard, application review interface with accept/reject/revert options, inspection scheduling system, and post-inspection report review workflow.
+- **Admin Database Reset with Granular Preservation**: Flexible database reset for testing, allowing preservation of specific data types.
+- **LGD Master Data Integration**: Comprehensive Local Government Directory tables for Himachal Pradesh's 5-tier administrative hierarchy.
+- **LGD Master Data Import Tool**: Admin interface for importing official Local Government Directory data via CSV.
+- **Admin User Creation System**: Dialog-based interface for administrators to create new users with various roles.
+- **Tabbed User Management Interface**: Enhanced admin user management with tabbed categorization for "Staff Users" and "Property Owners", including comprehensive edit functionality.
 
 ### System Design Choices
 
@@ -75,20 +42,11 @@ The frontend is built with React 18+, TypeScript, and Vite, leveraging Shadcn/ui
 - **Serverless-Ready Database**: Utilizes Neon PostgreSQL and Drizzle ORM for type-safe and scalable data storage.
 - **Component-First UI**: Leverages Shadcn/ui for rapid and consistent UI development.
 - **Shared Schema Pattern**: Ensures type safety and prevents schema drift across frontend and backend.
-- **Session-Based Authentication**: Implements PostgreSQL-backed sessions for authentication, with future plans for Mobile OTP and LDAP/Active Directory integration.
+- **Session-Based Authentication**: Implements PostgreSQL-backed sessions for authentication.
 - **Query Cache Management**: TanStack Query cache is automatically invalidated on logout.
 - **Role-Specific APIs**: Backend endpoints filter data based on user role and district assignment.
 - **Frontend Route Guards**: `ProtectedRoute` component validates user roles and redirects unauthorized access.
-
-### Official 2025 Policy Compliance
-
-The platform implements the **Himachal Pradesh Home Stay Rules, 2025** (Official Gazette Notification TSM-F(10)-10/2003-VI, dated June 25, 2025). Key policy requirements include:
-- **Room Specification**: Mandatory collection of room breakdown (Single, Double, Family suites) with capacity limits (max 6 rooms OR 12 single beds equivalent) and specific room size requirements.
-- **Fee Structure (GST Included)**: Tiered fee structure (Diamond, Gold, Silver) based on night rates and location (MC, TCP, GP).
-- **Discount System**: 10% for 3-year lump sum, 5% for female property owners, 50% for Pangi sub-division; discounts stack in a specific order.
-- **GSTIN Requirements**: Mandatory for Diamond & Gold, exempt for Silver.
-- **Certificate Validity**: User selects 1 or 3 years; renewal fee equals registration fee.
-- **Processing Timeline**: 60-day processing window with automatic approval if not processed.
+- **Official 2025 Policy Compliance**: Fully implements the **Himachal Pradesh Home Stay Rules, 2025**, covering room specifications, tiered fee structure (GST Included), discount system, GSTIN requirements, certificate validity, and a 60-day processing timeline.
 
 ## External Dependencies
 
@@ -97,4 +55,4 @@ The platform implements the **Himachal Pradesh Home Stay Rules, 2025** (Official
 - **Styling and Theming**: `tailwindcss`, `class-variance-authority`, `clsx`, `tailwind-merge`
 - **Date Handling**: `date-fns`
 - **Database**: `@neondatabase/serverless`, `drizzle-orm`, `drizzle-kit`
-- **Payment Processing**: `qrcode`, HimKosh CTP, Razorpay, CCAvenue, PayU.
+- **Payment Processing**: `qrcode`, HimKosh CTP, Razorpay, CCAvenue, PayU

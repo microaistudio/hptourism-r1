@@ -112,7 +112,7 @@ export default function PaymentGatewaySelect() {
               <p className="text-sm text-muted-foreground">Application Number</p>
               <p className="font-semibold">{application.applicationNumber}</p>
               <p className="text-sm text-muted-foreground mt-2">Amount to Pay</p>
-              <p className="text-2xl font-bold text-primary">₹{parseFloat(application.totalFee).toLocaleString('en-IN')}</p>
+              <p className="text-2xl font-bold text-primary">₹{parseFloat(application.totalFee || '0').toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
