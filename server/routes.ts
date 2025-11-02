@@ -855,8 +855,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      // Can only update if sent back for corrections
-      if (application.status !== 'sent_back_for_corrections') {
+      // Can only update if sent back for corrections or reverted to applicant by DA or DTDO
+      if (application.status !== 'sent_back_for_corrections' && application.status !== 'reverted_to_applicant' && application.status !== 'reverted_by_dtdo') {
         return res.status(400).json({ message: "Application can only be updated when sent back for corrections" });
       }
       
