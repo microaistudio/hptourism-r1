@@ -89,13 +89,13 @@ export default function HimKoshPaymentPage() {
     );
   }
 
-  if (!application || application.status !== "payment_pending") {
+  if (!application || (application.status !== "payment_pending" && application.status !== "verified_for_payment")) {
     return (
       <div className="container mx-auto p-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            This application is not in payment pending status or does not exist.
+            This application is not ready for payment or does not exist.
           </AlertDescription>
         </Alert>
         <Button onClick={() => setLocation("/dashboard")} className="mt-4" data-testid="button-back-dashboard">
@@ -114,8 +114,9 @@ export default function HimKoshPaymentPage() {
   const totalFee = parseFloat(application.totalFee);
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="mb-6">
         <Button variant="ghost" onClick={() => setLocation("/dashboard")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Dashboard
@@ -292,6 +293,7 @@ export default function HimKoshPaymentPage() {
             your certificate will be automatically generated and available for download.
           </AlertDescription>
         </Alert>
+        </div>
       </div>
     </div>
   );

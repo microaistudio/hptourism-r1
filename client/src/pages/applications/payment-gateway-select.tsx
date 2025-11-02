@@ -87,8 +87,8 @@ export default function PaymentGatewaySelect() {
   ];
 
   return (
-    <div className="bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="bg-background min-h-screen">
+      <div className="container mx-auto px-4 py-8 max-w-6xl h-full">
         {/* Header */}
         <div className="mb-8">
           <Button

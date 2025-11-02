@@ -132,14 +132,14 @@ export default function PaymentPage() {
     );
   }
 
-  if (application.status !== "payment_pending") {
+  if (application.status !== "payment_pending" && application.status !== "verified_for_payment") {
     return (
       <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Payment Not Required</CardTitle>
             <CardDescription>
-              This application is not in payment pending status.
+              This application is not ready for payment.
             </CardDescription>
           </CardHeader>
           <CardContent>
