@@ -292,6 +292,36 @@ export default function NewApplication() {
     queryKey: ["/api/auth/me"],
   });
 
+  // ONE-APPLICATION-PER-OWNER: Check if user already has an active application
+  const { data: activeCheck } = useQuery<{ 
+    hasActiveApplication: boolean; 
+    activeApplication: HomestayApplication | null;
+  }>({
+    queryKey: ["/api/applications/active-check"],
+    enabled: !!userData?.user && userData.user.role === 'property_owner',
+  });
+
+  // Redirect if user already has an active application (unless resuming that specific draft)
+  useEffect(() => {
+    if (activeCheck?.hasActiveApplication && activeCheck.activeApplication) {
+      const existingAppId = activeCheck.activeApplication.id;
+      
+      // Allow resuming the same application
+      if (draftIdFromUrl && draftIdFromUrl === existingAppId.toString()) {
+        return; // Allow editing this specific draft
+      }
+      
+      // Redirect to existing application with helpful message
+      toast({
+        title: "Existing Application Found",
+        description: `You already have an application in progress (${activeCheck.activeApplication.status}). Opening that application...`,
+        variant: "default",
+      });
+      
+      setLocation(`/applications/${existingAppId}`);
+    }
+  }, [activeCheck, draftIdFromUrl, setLocation, toast]);
+
   // Fetch user profile for auto-population
   const { data: userProfile } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
