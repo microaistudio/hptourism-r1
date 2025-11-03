@@ -21,7 +21,7 @@ export const himkoshConfig = {
   merchantCode: process.env.HIMKOSH_MERCHANT_CODE || '', // e.g., 'HIMKOSH228'
   deptId: process.env.HIMKOSH_DEPT_ID || '', // 3-digit dept code
   serviceCode: process.env.HIMKOSH_SERVICE_CODE || '', // 3-char service code (e.g., 'TSM')
-  ddo: process.env.HIMKOSH_DDO || '', // DDO code (e.g., 'SML00-532')
+  ddo: process.env.HIMKOSH_DDO_CODE || process.env.HIMKOSH_DDO || '', // DDO code (e.g., 'CTO00-068') - supports both variable names
 
   // Head of Account Codes (Budget heads)
   heads: {
