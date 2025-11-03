@@ -503,11 +503,11 @@ export default function ApplicationDetail() {
                     </div>
                     <Button 
                       className="w-full" 
-                      onClick={() => setLocation(`/applications/${app.id}/payment-gateway`)}
+                      onClick={() => setLocation(`/applications/${app.id}/payment-himkosh`)}
                       data-testid="button-proceed-payment"
                     >
                       <CreditCard className="w-4 h-4 mr-2" />
-                      Choose Payment Method
+                      Pay with HimKosh
                     </Button>
                   </div>
                 </CardContent>
