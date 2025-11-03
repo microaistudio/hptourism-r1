@@ -42,22 +42,11 @@ router.post('/initiate', async (req, res) => {
 
     const config = getHimKoshConfig();
 
-    // Look up DDO code based on application's district
-    let ddoCode = config.ddo; // Default/fallback DDO
-    if (application.district) {
-      const [ddoMapping] = await db
-        .select()
-        .from(ddoCodes)
-        .where(eq(ddoCodes.district, application.district))
-        .limit(1);
-      
-      if (ddoMapping) {
-        ddoCode = ddoMapping.ddoCode;
-        console.log(`[himkosh] Using district-specific DDO: ${ddoCode} for district: ${application.district}`);
-      } else {
-        console.log(`[himkosh] No DDO mapping found for district: ${application.district}, using fallback: ${config.ddo}`);
-      }
-    }
+    // CRITICAL: Always use DDO from config (tied to merchant credentials)
+    // District-specific DDO mapping is not used because HimKosh validates
+    // that the DDO matches the merchant/department registration
+    const ddoCode = config.ddo;
+    console.log(`[himkosh] Using DDO from credentials: ${ddoCode}`);
 
     // Generate unique transaction reference
     const appRefNo = `HPT${Date.now()}${nanoid(6)}`.substring(0, 20);
