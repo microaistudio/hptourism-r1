@@ -30,72 +30,83 @@ export class HimKoshCrypto {
   }
 
   /**
-   * Load encryption key and IV from file
-   * Supports both text (base64) and binary formats
+   * Load encryption key and IV from environment variables or file
+   * Priority: Environment variables > File
    */
   private async loadKey(): Promise<{ key: Buffer; iv: Buffer; algorithm: string }> {
     if (this.key && this.iv && this.algorithm) {
       return { key: this.key, iv: this.iv, algorithm: this.algorithm };
     }
 
-    try {
-      const raw = await fs.readFile(this.keyFilePath);
-      
-      // Try to parse as text format first (two base64 lines)
-      const text = raw.toString('utf8').trim();
-      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-      
-      if (lines.length >= 2 && this.isBase64(lines[0]) && this.isBase64(lines[1])) {
-        // Format 1: Text format with base64-encoded key and IV
-        const keyLine = lines[0].trim();
-        const ivLine = lines[1].trim();
+    // PRIORITY 1: Load from environment variables (hex format)
+    const envKey = process.env.HIMKOSH_ENCRYPTION_KEY;
+    const envIv = process.env.HIMKOSH_ENCRYPTION_IV;
+    
+    if (envKey && envIv) {
+      this.key = Buffer.from(envKey, 'hex');
+      this.iv = Buffer.from(envIv, 'hex');
+      console.log('[himkosh-crypto] Loaded key from environment variables (hex format)');
+    } else {
+      // PRIORITY 2: Load from file
+      try {
+        const raw = await fs.readFile(this.keyFilePath);
         
-        this.key = Buffer.from(keyLine, 'base64');
-        this.iv = Buffer.from(ivLine, 'base64');
+        // Try to parse as text format first (two base64 lines)
+        const text = raw.toString('utf8').trim();
+        const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
         
-        console.log('[himkosh-crypto] Loaded key from text format (base64)');
-      } else {
-        // Format 2: Binary format - raw bytes
-        // CRITICAL: Key = IV = first 16 bytes (CTP behavior)
-        // Second 16 bytes are IGNORED
-        
-        if (raw.length >= 16) {
-          // Use first 16 bytes for BOTH key and IV
-          this.key = raw.subarray(0, 16);
-          this.iv = raw.subarray(0, 16); // SAME as key!
-          console.log('[himkosh-crypto] Loaded key from binary format (Key=IV=first 16 bytes, remaining bytes ignored)');
+        if (lines.length >= 2 && this.isBase64(lines[0]) && this.isBase64(lines[1])) {
+          // Format 1: Text format with base64-encoded key and IV
+          const keyLine = lines[0].trim();
+          const ivLine = lines[1].trim();
+          
+          this.key = Buffer.from(keyLine, 'base64');
+          this.iv = Buffer.from(ivLine, 'base64');
+          
+          console.log('[himkosh-crypto] Loaded key from text format (base64)');
         } else {
-          throw new Error(`Unsupported key file size: ${raw.length} bytes. Expected at least 16 bytes.`);
+          // Format 2: Binary format - raw bytes
+          // CRITICAL: Key = IV = first 16 bytes (CTP behavior)
+          // Second 16 bytes are IGNORED
+          
+          if (raw.length >= 16) {
+            // Use first 16 bytes for BOTH key and IV
+            this.key = raw.subarray(0, 16);
+            this.iv = raw.subarray(0, 16); // SAME as key!
+            console.log('[himkosh-crypto] Loaded key from binary format (Key=IV=first 16 bytes, remaining bytes ignored)');
+          } else {
+            throw new Error(`Unsupported key file size: ${raw.length} bytes. Expected at least 16 bytes.`);
+          }
         }
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(`Key file not found at: ${this.keyFilePath} and no environment variables set`);
       }
-
-      if (!this.key || !this.iv || this.key.length === 0 || this.iv.length === 0) {
-        throw new Error('Invalid key file format - key or IV is empty');
-      }
-
-      if (![16, 24, 32].includes(this.key.length)) {
-        throw new Error(`Invalid key size: ${this.key.length} bytes. Must be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes.`);
-      }
-
-      if (this.iv.length !== 16) {
-        throw new Error(`Invalid IV size: ${this.iv.length} bytes. Must be 16 bytes (AES block size).`);
-      }
-
-      // Determine algorithm based on key length
-      this.algorithm = 
-        this.key.length === 16 ? 'aes-128-cbc' : 
-        this.key.length === 24 ? 'aes-192-cbc' : 
-        'aes-256-cbc';
-
-      console.log(`[himkosh-crypto] ✅ Loaded ${this.algorithm.toUpperCase()} - Key: ${this.key.length} bytes, IV: ${this.iv.length} bytes`);
-      
-      return { key: this.key, iv: this.iv, algorithm: this.algorithm };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error(`Key file not found at: ${this.keyFilePath}`);
     }
+
+    if (!this.key || !this.iv || this.key.length === 0 || this.iv.length === 0) {
+      throw new Error('Invalid key file format - key or IV is empty');
+    }
+
+    if (![16, 24, 32].includes(this.key.length)) {
+      throw new Error(`Invalid key size: ${this.key.length} bytes. Must be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes.`);
+    }
+
+    if (this.iv.length !== 16) {
+      throw new Error(`Invalid IV size: ${this.iv.length} bytes. Must be 16 bytes (AES block size).`);
+    }
+
+    // Determine algorithm based on key length
+    this.algorithm = 
+      this.key.length === 16 ? 'aes-128-cbc' : 
+      this.key.length === 24 ? 'aes-192-cbc' : 
+      'aes-256-cbc';
+
+    console.log(`[himkosh-crypto] ✅ Loaded ${this.algorithm.toUpperCase()} - Key: ${this.key.length} bytes, IV: ${this.iv.length} bytes`);
+    
+    return { key: this.key, iv: this.iv, algorithm: this.algorithm };
   }
 
   /**
