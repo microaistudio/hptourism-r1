@@ -187,7 +187,7 @@ export default function Dashboard() {
               <Button 
                 onClick={() => {
                   const paymentApp = applications.find(a => a.status === 'payment_pending' || a.status === 'verified_for_payment');
-                  if (paymentApp) setLocation(`/applications/${paymentApp.id}/payment-gateway`);
+                  if (paymentApp) setLocation(`/applications/${paymentApp.id}/payment-himkosh`);
                 }}
                 data-testid="button-make-payment"
               >
@@ -488,7 +488,7 @@ export default function Dashboard() {
                         size="sm" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLocation(`/applications/${app.id}/payment-gateway`);
+                          setLocation(`/applications/${app.id}/payment-himkosh`);
                         }}
                         data-testid={`button-payment-${app.id}`}
                       >
