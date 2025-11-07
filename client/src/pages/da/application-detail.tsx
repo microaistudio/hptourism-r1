@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { buildObjectViewUrl, cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,6 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { HomestayApplication, Document } from "@shared/schema";
+import { LOCATION_TYPE_LABELS, type LocationType } from "@shared/lgd-data";
 
 interface ApplicationData {
   application: HomestayApplication;
@@ -278,6 +280,62 @@ export default function DAApplicationDetail() {
 
   const { application, owner, documents } = data;
 
+  const locationTypeLabel = formatLocationTypeLabel(application.locationType as LocationType | undefined);
+  const projectTypeLabel = formatProjectTypeLabel(application.projectType);
+  const ownershipLabel = formatOwnershipLabel(application.propertyOwnership);
+  const propertyAreaLabel = formatArea(application.propertyArea);
+  const certificateValidityLabel = formatCertificateValidity(application.certificateValidityYears);
+  const formattedAddress = formatMultilineAddress(application.address);
+  const tehsilLabel = application.tehsilOther || application.tehsil;
+  const blockLabel = application.blockOther || application.block;
+  const gramPanchayatLabel = application.gramPanchayatOther || application.gramPanchayat;
+  const urbanBodyLabel = application.urbanBodyOther || application.urbanBody;
+  const wardLabel = application.ward;
+  const telephoneValue = application.telephone || owner?.mobile || undefined;
+
+  const singleRooms = application.singleBedRooms ?? 0;
+  const doubleRooms = application.doubleBedRooms ?? 0;
+  const familySuites = application.familySuites ?? 0;
+  const singleBedsPerRoom = application.singleBedBeds ?? (singleRooms > 0 ? 1 : 0);
+  const doubleBedsPerRoom = application.doubleBedBeds ?? (doubleRooms > 0 ? 2 : 0);
+  const suiteBedsPerRoom = application.familySuiteBeds ?? (familySuites > 0 ? 4 : 0);
+  const calculatedTotalRooms = application.totalRooms ?? singleRooms + doubleRooms + familySuites;
+  const totalBeds =
+    singleRooms * singleBedsPerRoom +
+    doubleRooms * doubleBedsPerRoom +
+    familySuites * suiteBedsPerRoom;
+  const attachedWashrooms = application.attachedWashrooms ?? 0;
+  const attachedWashroomsDisplay = calculatedTotalRooms
+    ? `${attachedWashrooms} of ${calculatedTotalRooms}`
+    : formatCount(attachedWashrooms);
+
+  const amenities = normalizeAmenities(application.amenities as unknown);
+  const amenitiesSelected = Object.values(amenities).filter(Boolean).length;
+  const amenitiesTotal = Object.keys(amenities).length || 0;
+  const safetyStatus =
+    amenities.cctv && amenities.fireSafety ? "CCTV & Fire Safety confirmed" : "Pending owner confirmation";
+
+  const distanceSummary = buildDistanceSummary({
+    airport: application.distanceAirport,
+    railway: application.distanceRailway,
+    city: application.distanceCityCenter,
+    bus: application.distanceBusStand,
+    shopping: application.distanceShopping,
+  });
+
+  const baseFeeValue = formatCurrency(application.baseFee);
+  const perRoomFeeValue = formatCurrency(application.perRoomFee);
+  const gstAmountValue = formatCurrency(application.gstAmount);
+  const totalFeeValue = formatCurrency(application.totalFee);
+  const femaleDiscountValue = formatCurrency(application.femaleOwnerDiscount);
+  const pangiDiscountValue = formatCurrency(application.pangiDiscount);
+  const validityDiscountValue = formatCurrency(application.validityDiscount);
+  const totalDiscountValue = formatCurrency(application.totalDiscount);
+  const highestRateValue = formatCurrency(application.highestRoomRate ?? application.proposedRoomRate);
+  const singleRoomRateValue = formatCurrency(application.singleBedRoomRate);
+  const doubleRoomRateValue = formatCurrency(application.doubleBedRoomRate);
+  const suiteRateValue = formatCurrency(application.familySuiteRate);
+
   // Calculate verification progress - count any non-pending status as complete (verified, rejected, needs_correction)
   const totalDocs = documents.length;
   const completedDocs = Object.values(verifications).filter(v => v.status !== 'pending').length;
@@ -420,7 +478,7 @@ export default function DAApplicationDetail() {
                   Save Progress
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="warning"
                   onClick={() => setSendBackDialogOpen(true)}
                   data-testid="button-send-back"
                 >
@@ -494,7 +552,10 @@ export default function DAApplicationDetail() {
                     <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900 min-h-[400px] flex items-center justify-center">
                       {selectedDocument.mimeType.startsWith('image/') ? (
                         <img
-                          src={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`}
+                          src={buildObjectViewUrl(selectedDocument.filePath, {
+                            mimeType: selectedDocument.mimeType,
+                            fileName: selectedDocument.fileName,
+                          })}
                           alt={selectedDocument.fileName}
                           className="w-full h-auto max-h-[600px] object-contain"
                           data-testid="img-document-preview"
@@ -506,7 +567,10 @@ export default function DAApplicationDetail() {
                         />
                       ) : selectedDocument.mimeType === 'application/pdf' ? (
                         <iframe
-                          src={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`}
+                          src={buildObjectViewUrl(selectedDocument.filePath, {
+                            mimeType: selectedDocument.mimeType,
+                            fileName: selectedDocument.fileName,
+                          })}
                           className="w-full h-[600px]"
                           title={selectedDocument.fileName}
                           data-testid="iframe-document-preview"
@@ -518,7 +582,13 @@ export default function DAApplicationDetail() {
                             Preview not available for this file type
                           </p>
                           <Button variant="outline" size="sm" asChild data-testid="button-download-document">
-                            <a href={`/api/object-storage/view?path=${encodeURIComponent(selectedDocument.filePath)}`} download>
+                            <a
+                              href={buildObjectViewUrl(selectedDocument.filePath, {
+                                mimeType: selectedDocument.mimeType,
+                                fileName: selectedDocument.fileName,
+                              })}
+                              download
+                            >
                               <Download className="w-4 h-4 mr-2" />
                               Download File
                             </a>
@@ -624,9 +694,31 @@ export default function DAApplicationDetail() {
                         open={expandedNotes[doc.id]}
                         onOpenChange={() => toggleNotes(doc.id)}
                       >
-                        <Card className={`border-2 transition-colors ${
-                          selectedDocument?.id === doc.id ? 'border-primary' : 'border-border'
-                        }`}>
+                      {(() => {
+                        const documentStatus = verifications[doc.id]?.status || 'pending';
+                        const isSelected = selectedDocument?.id === doc.id;
+                        const statusAccent = (() => {
+                          switch (documentStatus) {
+                            case 'needs_correction':
+                              return 'border-orange-400 bg-orange-50 dark:border-orange-500 dark:bg-orange-900/20';
+                            case 'rejected':
+                              return 'border-red-400 bg-red-50 dark:border-red-500 dark:bg-red-900/20';
+                            case 'verified':
+                              return 'border-green-400 bg-green-50 dark:border-green-500 dark:bg-green-900/20';
+                            default:
+                              return '';
+                          }
+                        })();
+                        return (
+                          <Card
+                            className={cn(
+                              "border-2 transition-colors",
+                              statusAccent,
+                              isSelected
+                                ? "border-primary ring-2 ring-primary/20 dark:ring-primary/30"
+                                : "border-border"
+                            )}
+                          >
                           <CardHeader className="p-4 space-y-3">
                             <div className="flex items-start gap-3">
                               {/* Checkbox */}
@@ -755,6 +847,8 @@ export default function DAApplicationDetail() {
                             </CardContent>
                           </CollapsibleContent>
                         </Card>
+                        );
+                      })()}
                       </Collapsible>
                     ))}
                   </div>
@@ -766,7 +860,7 @@ export default function DAApplicationDetail() {
 
         {/* Details Tab - Property & Owner Information */}
         <TabsContent value="details" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {/* Property Details */}
             <Card>
               <CardHeader>
@@ -774,12 +868,12 @@ export default function DAApplicationDetail() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <DetailRow label="Property Name" value={application.propertyName} />
-                <DetailRow label="Category" value={application.category?.toUpperCase() || "N/A"} />
-                <DetailRow label="Location Type" value={application.locationType?.toUpperCase() || "N/A"} />
-                <DetailRow label="Address" value={application.address} />
-                <DetailRow label="District" value={application.district} />
-                <DetailRow label="Pincode" value={application.pincode} />
-                <DetailRow label="Telephone" value={application.telephone || "N/A"} />
+                <DetailRow label="Category" value={application.category?.toUpperCase()} />
+                <DetailRow label="Location Type" value={locationTypeLabel} />
+                <DetailRow label="Project Type" value={projectTypeLabel} />
+                <DetailRow label="Property Ownership" value={ownershipLabel} />
+                <DetailRow label="Property Area" value={propertyAreaLabel} />
+                <DetailRow label="Certificate Validity" value={certificateValidityLabel} />
               </CardContent>
             </Card>
 
@@ -789,36 +883,92 @@ export default function DAApplicationDetail() {
                 <CardTitle>Owner Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <DetailRow label="Full Name" value={owner?.fullName || "N/A"} />
-                <DetailRow label="Mobile" value={owner?.mobile || "N/A"} />
-                <DetailRow label="Email" value={owner?.email || "Not Provided"} />
+                <DetailRow label="Full Name" value={owner?.fullName || application.ownerName} />
+                <DetailRow label="Mobile" value={owner?.mobile || application.ownerMobile} />
+                <DetailRow label="Email" value={owner?.email || application.ownerEmail || undefined} />
+                <DetailRow label="Gender" value={formatTitleCase(application.ownerGender)} />
+                <DetailRow label="Aadhaar" value={application.ownerAadhaar} />
+              </CardContent>
+            </Card>
+
+            {/* Address & LGD Hierarchy */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Address & LGD Hierarchy</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DetailRow label="Address" value={formattedAddress} />
+                <DetailRow label="District" value={application.district} />
+                <DetailRow label="Tehsil" value={tehsilLabel} />
+                <DetailRow label="Block / Sub-Division" value={blockLabel} />
+                <DetailRow label="Gram Panchayat" value={gramPanchayatLabel} />
+                <DetailRow label="Urban Body" value={urbanBodyLabel} />
+                <DetailRow label="Ward" value={wardLabel} />
+                <DetailRow label="Pincode" value={application.pincode} />
+                <DetailRow label="Telephone" value={telephoneValue} />
               </CardContent>
             </Card>
 
             {/* Room Details */}
             <Card>
               <CardHeader>
-                <CardTitle>Room Details</CardTitle>
+                <CardTitle>Room & Capacity</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <DetailRow label="Single Bed Rooms" value={application.singleBedRooms?.toString() || "0"} />
-                <DetailRow label="Double Bed Rooms" value={application.doubleBedRooms?.toString() || "0"} />
-                <DetailRow label="Total Rooms" value={application.totalRooms?.toString() || "0"} />
-                <DetailRow label="Proposed Room Rate (₹)" value={application.proposedRoomRate?.toString() || "N/A"} />
-                <DetailRow label="GSTIN" value={application.gstin || "Not Provided"} />
+                <DetailRow label="Single Rooms (beds)" value={`${singleRooms} rooms / ${singleBedsPerRoom} beds`} />
+                <DetailRow label="Double Rooms (beds)" value={`${doubleRooms} rooms / ${doubleBedsPerRoom} beds`} />
+                <DetailRow label="Family Suites (beds)" value={`${familySuites} suites / ${suiteBedsPerRoom} beds`} />
+                <DetailRow label="Total Rooms" value={calculatedTotalRooms.toString()} />
+                <DetailRow label="Total Beds" value={totalBeds.toString()} />
+                <DetailRow label="Attached Washrooms" value={attachedWashroomsDisplay} />
+                <DetailRow label="Single Room Rate" value={singleRoomRateValue} />
+                <DetailRow label="Double Room Rate" value={doubleRoomRateValue} />
+                <DetailRow label="Suite Rate" value={suiteRateValue} />
+                <DetailRow label="Highest Proposed Rate" value={highestRateValue} />
+                <DetailRow label="GSTIN" value={application.gstin} />
               </CardContent>
             </Card>
 
             {/* Fees */}
             <Card>
               <CardHeader>
-                <CardTitle>Fees</CardTitle>
+                <CardTitle>Fees & Discounts</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <DetailRow label="Base Fee (₹)" value={application.baseFee?.toString() || "N/A"} />
-                <DetailRow label="Per Room Fee (₹)" value={application.perRoomFee?.toString() || "N/A"} />
-                <DetailRow label="GST (₹)" value={application.gstAmount?.toString() || "N/A"} />
-                <DetailRow label="Total Fee (₹)" value={application.totalFee?.toString() || "N/A"} />
+                <DetailRow label="Base Fee" value={baseFeeValue} />
+                <DetailRow label="Per Room Fee" value={perRoomFeeValue} />
+                <DetailRow label="GST Amount" value={gstAmountValue} />
+                <DetailRow label="Female Owner Discount" value={femaleDiscountValue} />
+                <DetailRow label="Pangi Sub-division Discount" value={pangiDiscountValue} />
+                <DetailRow label="Validity Discount" value={validityDiscountValue} />
+                <DetailRow label="Total Discount" value={totalDiscountValue} />
+                <DetailRow label="Total Payable" value={totalFeeValue} />
+              </CardContent>
+            </Card>
+
+            {/* Facilities & Safety */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Facilities & Safety</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DetailRow label="Mandatory Safety" value={safetyStatus} />
+                <DetailRow
+                  label="Amenities Submitted"
+                  value={
+                    amenitiesTotal
+                      ? `${amenitiesSelected} of ${amenitiesTotal} selected`
+                      : amenitiesSelected
+                        ? `${amenitiesSelected} selected`
+                        : undefined
+                  }
+                />
+                <DetailRow label="Parking Facilities" value={application.parkingArea || undefined} />
+                <DetailRow label="Eco-friendly Facilities" value={application.ecoFriendlyFacilities || undefined} />
+                <DetailRow label="Differently Abled Facilities" value={application.differentlyAbledFacilities || undefined} />
+                <DetailRow label="Fire Safety Notes" value={application.fireEquipmentDetails || undefined} />
+                <DetailRow label="Nearest Hospital" value={application.nearestHospital || undefined} />
+                <DetailRow label="Distance Summary" value={distanceSummary} />
               </CardContent>
             </Card>
           </div>
@@ -890,7 +1040,7 @@ export default function DAApplicationDetail() {
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              variant="warning"
               onClick={() => sendBackMutation.mutate()}
               disabled={sendBackMutation.isPending || !reason.trim()}
               data-testid="button-confirm-send-back"
@@ -941,9 +1091,133 @@ export default function DAApplicationDetail() {
 
 function DetailRow({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-muted-foreground">{label}:</span>
-      <span className="font-medium">{value || "N/A"}</span>
+    <div className="flex gap-4 text-sm">
+      <span className="text-muted-foreground shrink-0">{label}:</span>
+      <span className="font-medium text-right flex-1 break-words whitespace-pre-line">
+        {value || "N/A"}
+      </span>
     </div>
   );
+}
+
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
+
+function toNumber(value?: string | number | null): number | undefined {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  const numeric = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function formatCurrency(value?: string | number | null): string | undefined {
+  const numeric = toNumber(value);
+  return numeric !== undefined ? currencyFormatter.format(numeric) : undefined;
+}
+
+function formatCount(value?: string | number | null): string | undefined {
+  const numeric = toNumber(value);
+  return numeric !== undefined ? numeric.toString() : undefined;
+}
+
+function formatLocationTypeLabel(value?: LocationType | string): string | undefined {
+  if (!value) return undefined;
+  if (LOCATION_TYPE_LABELS[value as LocationType]) {
+    return LOCATION_TYPE_LABELS[value as LocationType];
+  }
+  return typeof value === "string" ? value.toUpperCase() : undefined;
+}
+
+function formatProjectTypeLabel(value?: string | null): string | undefined {
+  switch (value) {
+    case "new_rooms":
+      return "Adding rooms to existing property";
+    case "new_project":
+      return "New homestay property";
+    default:
+      return value || undefined;
+  }
+}
+
+function formatOwnershipLabel(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  if (value === "leased") return "Lease Deed";
+  if (value === "owned") return "Owned";
+  return value;
+}
+
+function formatArea(value?: string | number | null): string | undefined {
+  const numeric = toNumber(value);
+  return numeric !== undefined ? `${numeric.toLocaleString()} sq ft` : undefined;
+}
+
+function formatCertificateValidity(value?: number | null): string | undefined {
+  if (!value) return undefined;
+  return `${value} year${value > 1 ? "s" : ""}`;
+}
+
+function formatMultilineAddress(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  return normalized.replace(/\n+/g, ", ");
+}
+
+function formatTitleCase(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function normalizeAmenities(raw: unknown): Record<string, boolean> {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return parsed as Record<string, boolean>;
+      }
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === "object") {
+    return raw as Record<string, boolean>;
+  }
+  return {};
+}
+
+function buildDistanceSummary(distances: {
+  airport?: number | string | null;
+  railway?: number | string | null;
+  city?: number | string | null;
+  bus?: number | string | null;
+  shopping?: number | string | null;
+}): string | undefined {
+  const parts: string[] = [];
+
+  const airport = formatDistance(distances.airport);
+  if (airport) parts.push(`Airport ${airport}`);
+
+  const railway = formatDistance(distances.railway);
+  if (railway) parts.push(`Railway ${railway}`);
+
+  const city = formatDistance(distances.city);
+  if (city) parts.push(`City Center ${city}`);
+
+  const shopping = formatDistance(distances.shopping);
+  if (shopping) parts.push(`Shopping ${shopping}`);
+
+  const bus = formatDistance(distances.bus);
+  if (bus) parts.push(`Bus Stand ${bus}`);
+
+  return parts.length ? parts.join(" • ") : undefined;
+}
+
+function formatDistance(value?: number | string | null): string | undefined {
+  const numeric = toNumber(value);
+  return numeric !== undefined ? `${numeric} km` : undefined;
 }

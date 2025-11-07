@@ -23,6 +23,7 @@ import heroImage1 from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 import heroImage2 from "@assets/stock_images/beautiful_scenic_him_3e373e25.jpg";
 import heroImage3 from "@assets/stock_images/beautiful_scenic_him_799557d0.jpg";
 import heroImage4 from "@assets/stock_images/beautiful_scenic_him_10b034ba.jpg";
+import { CATEGORY_REQUIREMENTS, MAX_ROOMS_ALLOWED, MAX_BEDS_ALLOWED } from "@shared/fee-calculator";
 
 // Fallback stats if API fails
 const FALLBACK_STATS = {
@@ -348,26 +349,18 @@ export default function HomePage() {
                   <CardTitle className="text-2xl">Diamond</CardTitle>
                 </div>
                 <CardDescription className="text-base">
-                  Premium homestays with exceptional amenities and services
+                  Tariff-based premium category for properties charging above ₹10,000/night.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-blue-600" />
-                    AC in all rooms
+                    Tariff: {CATEGORY_REQUIREMENTS.diamond.tariffLabel}
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-blue-600" />
-                    WiFi throughout
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600" />
-                    Restaurant facility
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600" />
-                    Premium location
+                    Capacity: Up to {MAX_ROOMS_ALLOWED} rooms / {MAX_BEDS_ALLOWED} beds
                   </li>
                 </ul>
               </CardContent>
@@ -389,26 +382,18 @@ export default function HomePage() {
                   <CardTitle className="text-2xl">Gold</CardTitle>
                 </div>
                 <CardDescription className="text-base">
-                  Quality homestays with essential modern amenities
+                  Tariff-based category for properties between ₹3,000 and ₹10,000/night.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-amber-600" />
-                    AC in select rooms
+                    Tariff: {CATEGORY_REQUIREMENTS.gold.tariffLabel}
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-amber-600" />
-                    WiFi available
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-amber-600" />
-                    Hot water 24/7
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-amber-600" />
-                    Good location
+                    Capacity: Up to {MAX_ROOMS_ALLOWED} rooms / {MAX_BEDS_ALLOWED} beds
                   </li>
                 </ul>
               </CardContent>
@@ -430,26 +415,18 @@ export default function HomePage() {
                   <CardTitle className="text-2xl">Silver</CardTitle>
                 </div>
                 <CardDescription className="text-base">
-                  Comfortable homestays with basic amenities
+                  Budget-friendly stays with tariffs below ₹3,000/night.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-gray-600" />
-                    Clean & comfortable
+                    Tariff: {CATEGORY_REQUIREMENTS.silver.tariffLabel}
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-gray-600" />
-                    Essential amenities
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-gray-600" />
-                    Safe location
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-gray-600" />
-                    Affordable pricing
+                    Capacity: Up to {MAX_ROOMS_ALLOWED} rooms / {MAX_BEDS_ALLOWED} beds
                   </li>
                 </ul>
               </CardContent>

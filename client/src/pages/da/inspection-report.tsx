@@ -77,7 +77,7 @@ const inspectionReportSchema = z.object({
   fireSafetyCompliant: z.boolean().optional(),
   structuralSafety: z.boolean().optional(),
   overallSatisfactory: z.boolean(),
-  recommendation: z.enum(['approve', 'approve_with_conditions', 'raise_objections', 'reject']),
+  recommendation: z.enum(['approve', 'raise_objections']),
   detailedFindings: z.string().min(20, "Detailed findings must be at least 20 characters"),
   daRemarks: z.string().optional(),
 });
@@ -210,7 +210,7 @@ export default function DAInspectionReport() {
       fireSafetyCompliant: false,
       structuralSafety: false,
       overallSatisfactory: false,
-      recommendation: 'approve',
+    recommendation: 'approve',
       detailedFindings: '',
       daRemarks: '',
     },
@@ -818,34 +818,12 @@ export default function DAInspectionReport() {
                         </div>
 
                         <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover-elevate">
-                          <RadioGroupItem value="approve_with_conditions" id="approve_with_conditions" />
-                          <FormLabel htmlFor="approve_with_conditions" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
-                            <AlertCircle className="w-5 h-5 text-yellow-600" />
-                            <div>
-                              <div className="font-medium">Approve with Conditions</div>
-                              <div className="text-xs text-muted-foreground">Minor issues to address</div>
-                            </div>
-                          </FormLabel>
-                        </div>
-
-                        <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover-elevate">
                           <RadioGroupItem value="raise_objections" id="raise_objections" />
                           <FormLabel htmlFor="raise_objections" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
                             <AlertCircle className="w-5 h-5 text-orange-600" />
                             <div>
                               <div className="font-medium">Raise Objections</div>
                               <div className="text-xs text-muted-foreground">Issues need resolution</div>
-                            </div>
-                          </FormLabel>
-                        </div>
-
-                        <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover-elevate">
-                          <RadioGroupItem value="reject" id="reject" />
-                          <FormLabel htmlFor="reject" className="flex items-center gap-2 font-normal cursor-pointer flex-1">
-                            <XCircle className="w-5 h-5 text-red-600" />
-                            <div>
-                              <div className="font-medium">Reject</div>
-                              <div className="text-xs text-muted-foreground">Does not meet standards</div>
                             </div>
                           </FormLabel>
                         </div>

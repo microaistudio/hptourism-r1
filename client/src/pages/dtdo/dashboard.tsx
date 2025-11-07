@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import {
   Loader2,
   ClipboardCheck,
   AlertCircle,
+  RefreshCw,
+  Layers,
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -26,20 +28,29 @@ interface ApplicationWithOwner extends HomestayApplication {
 
 export default function DTDODashboard() {
   const [activeTab, setActiveTab] = useState("forwarded");
+  const queryClient = useQueryClient();
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/dtdo/applications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  };
   
   const { data: applications, isLoading } = useQuery<ApplicationWithOwner[]>({
     queryKey: ["/api/dtdo/applications"],
   });
 
+  const allApplications = applications ?? [];
+
   const { data: user } = useQuery<{ user: { id: string; fullName: string; role: string; district?: string } }>({
     queryKey: ["/api/auth/me"],
   });
+  const currentUser = user?.user;
 
   // Group applications by status
-  const forwardedByDA = applications?.filter(app => app.status === 'forwarded_to_dtdo') || [];
-  const underReview = applications?.filter(app => app.status === 'dtdo_review') || [];
-  const inspectionPending = applications?.filter(app => app.status === 'inspection_scheduled') || [];
-  const inspectionCompleted = applications?.filter(app => app.status === 'inspection_under_review') || [];
+  const forwardedByDA = allApplications.filter(app => app.status === 'forwarded_to_dtdo');
+  const underReview = allApplications.filter(app => app.status === 'dtdo_review');
+  const inspectionPending = allApplications.filter(app => app.status === 'inspection_scheduled');
+  const inspectionCompleted = allApplications.filter(app => app.status === 'inspection_under_review');
+  const totalApplications = allApplications.length;
 
   if (isLoading) {
     return (
@@ -52,6 +63,15 @@ export default function DTDODashboard() {
   }
 
   const stats = [
+    {
+      title: "Total Applications",
+      value: totalApplications,
+      description: "All statuses in your district",
+      icon: Layers,
+      color: "text-slate-600 dark:text-slate-300",
+      bgColor: "bg-slate-50 dark:bg-slate-900/40",
+      tabValue: "all",
+    },
     {
       title: "Forwarded by DA",
       value: forwardedByDA.length,
@@ -137,8 +157,10 @@ export default function DTDODashboard() {
               <th className="text-left p-4 font-medium">Property</th>
               <th className="text-left p-4 font-medium">Owner</th>
               <th className="text-left p-4 font-medium">Category</th>
+              <th className="text-left p-4 font-medium">Location</th>
               <th className="text-left p-4 font-medium">Status</th>
               <th className="text-left p-4 font-medium">Submitted</th>
+              <th className="text-left p-4 font-medium">Updated</th>
               <th className="text-right p-4 font-medium">Actions</th>
             </tr>
           </thead>
@@ -150,8 +172,11 @@ export default function DTDODashboard() {
                 </td>
               </tr>
             ) : (
-              applications.map((app) => (
-                <tr key={app.id} className="border-b hover-elevate">
+              applications.map((app) => {
+                const status = app.status ?? "";
+                const submittedAtDate = app.submittedAt ? new Date(app.submittedAt) : null;
+                return (
+                  <tr key={app.id} className="border-b hover-elevate">
                   <td className="p-4">
                     <div className="font-medium">{app.applicationNumber}</div>
                     {app.daName && (
@@ -169,13 +194,20 @@ export default function DTDODashboard() {
                     <div className="text-sm text-muted-foreground">{app.ownerMobile}</div>
                   </td>
                   <td className="p-4">{getCategoryBadge(app.category)}</td>
-                  <td className="p-4">{getStatusBadge(app.status)}</td>
                   <td className="p-4">
-                    {app.submittedAt ? format(new Date(app.submittedAt), "MMM dd, yyyy") : "N/A"}
+                    <div>{app.tehsil || app.block || "Not Provided"}</div>
+                    <div className="text-xs text-muted-foreground">{app.district}</div>
+                  </td>
+                  <td className="p-4">{getStatusBadge(status)}</td>
+                  <td className="p-4">
+                    {submittedAtDate ? format(submittedAtDate, "MMM dd, yyyy") : "N/A"}
+                  </td>
+                  <td className="p-4">
+                    {app.updatedAt ? format(new Date(app.updatedAt), "MMM dd, yyyy") : "N/A"}
                   </td>
                   <td className="p-4 text-right">
                     <Link href={
-                      app.status === 'inspection_under_review' 
+                      status === 'inspection_under_review' 
                         ? `/dtdo/inspection-review/${app.id}` 
                         : `/dtdo/applications/${app.id}`
                     }>
@@ -184,8 +216,9 @@ export default function DTDODashboard() {
                       </Button>
                     </Link>
                   </td>
-                </tr>
-              ))
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -196,29 +229,40 @@ export default function DTDODashboard() {
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">DTDO Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          {user?.district ? `District: ${user.district}` : "Review and process homestay applications"}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">DTDO Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            {currentUser?.district ? `District: ${currentUser.district}` : "Review and process homestay applications"}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
+          data-testid="button-dtdo-refresh"
+          className="w-fit"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {stats.map((stat) => (
           <Card
             key={stat.title}
-            className={`hover-elevate cursor-pointer ${activeTab === stat.tabValue ? 'ring-2 ring-primary' : ''}`}
+            className={`hover-elevate cursor-pointer transition-transform ${activeTab === stat.tabValue ? 'ring-2 ring-primary' : ''}`}
             onClick={() => setActiveTab(stat.tabValue)}
             data-testid={`card-stat-${stat.tabValue}`}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide">{stat.title}</CardTitle>
               <stat.icon className={`h-4 w-4 ${stat.color}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+              <div className="text-xl font-semibold">{stat.value}</div>
+              <p className="text-xs text-muted-foreground mt-1 leading-tight">{stat.description}</p>
             </CardContent>
           </Card>
         ))}
@@ -234,7 +278,10 @@ export default function DTDODashboard() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="all" data-testid="tab-all">
+                All ({allApplications.length})
+              </TabsTrigger>
               <TabsTrigger value="forwarded" data-testid="tab-forwarded">
                 Forwarded ({forwardedByDA.length})
               </TabsTrigger>
@@ -248,6 +295,10 @@ export default function DTDODashboard() {
                 Reports ({inspectionCompleted.length})
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="all" className="mt-4">
+              <ApplicationTable applications={allApplications} />
+            </TabsContent>
 
             <TabsContent value="forwarded" className="mt-4">
               <ApplicationTable applications={forwardedByDA} />

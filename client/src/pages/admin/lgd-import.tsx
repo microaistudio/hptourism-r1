@@ -34,10 +34,14 @@ export default function LGDImport() {
         dataType: "villages",
       });
 
-      setImportResults(response);
+      const data = await response.json() as {
+        inserted: { districts: number; tehsils: number; gramPanchayats: number };
+      };
+
+      setImportResults(data);
       toast({
         title: "Import Successful",
-        description: `Imported ${response.inserted.districts} districts, ${response.inserted.tehsils} tehsils, ${response.inserted.gramPanchayats} gram panchayats`,
+        description: `Imported ${data.inserted.districts} districts, ${data.inserted.tehsils} tehsils, ${data.inserted.gramPanchayats} gram panchayats`,
       });
     } catch (error: any) {
       toast({
@@ -69,10 +73,14 @@ export default function LGDImport() {
         dataType: "urbanBodies",
       });
 
-      setImportResults(response);
+      const data = await response.json() as {
+        inserted: { urbanBodies: number };
+      };
+
+      setImportResults(data);
       toast({
         title: "Import Successful",
-        description: `Imported ${response.inserted.urbanBodies} urban bodies`,
+        description: `Imported ${data.inserted.urbanBodies} urban bodies`,
       });
     } catch (error: any) {
       toast({

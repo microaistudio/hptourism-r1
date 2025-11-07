@@ -131,7 +131,7 @@ export default function PaymentVerificationPage() {
                     {pendingPayments.map(({ application, payment }) => {
                       if (!payment) return null;
                       
-                      const totalFee = parseFloat(application.totalFee);
+                      const totalFee = Number(application.totalFee ?? 0);
                       const hasTxnId = payment.gatewayTransactionId && payment.gatewayTransactionId.length > 0;
                       
                       return (
@@ -165,7 +165,7 @@ export default function PaymentVerificationPage() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  onClick={() => handleCopyTxnId(payment.gatewayTransactionId!)}
+                                  onClick={() => handleCopyTxnId(payment.gatewayTransactionId ?? "")}
                                   className="h-6 w-6"
                                   data-testid={`button-copy-txn-${application.id}`}
                                 >

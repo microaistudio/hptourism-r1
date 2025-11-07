@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,12 +17,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Database, Trash2, RefreshCw, Terminal, Play, Table2, FileCode } from "lucide-react";
+import { AlertTriangle, Database, Trash2, RefreshCw, Terminal, Play, Table2, FileCode, Loader2, ShieldCheck } from "lucide-react";
+import {
+  DEFAULT_UPLOAD_POLICY,
+  type UploadPolicy,
+} from "@shared/uploadPolicy";
+import {
+  DEFAULT_CATEGORY_ENFORCEMENT,
+  ENFORCE_CATEGORY_SETTING_KEY,
+  type CategoryEnforcementSetting,
+  normalizeCategoryEnforcementSetting,
+} from "@shared/appSettings";
 
 // Pre-made SQL query templates
 const QUERY_TEMPLATES = {
@@ -51,6 +63,98 @@ export default function AdminConsole() {
   const [sqlQuery, setSqlQuery] = useState("");
   const [queryResult, setQueryResult] = useState<any>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+
+  const {
+    data: uploadPolicyData,
+    isFetching: isFetchingUploadPolicy,
+    refetch: refetchUploadPolicy,
+  } = useQuery<UploadPolicy>({
+    queryKey: ["/api/settings/upload-policy"],
+  });
+  const {
+    data: categoryEnforcementData,
+    isFetching: isFetchingCategoryEnforcement,
+    refetch: refetchCategoryEnforcement,
+  } = useQuery<CategoryEnforcementSetting>({
+    queryKey: ["/api/admin/settings", ENFORCE_CATEGORY_SETTING_KEY],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/settings/${ENFORCE_CATEGORY_SETTING_KEY}`, {
+        credentials: "include",
+      });
+
+      if (res.status === 404) {
+        return DEFAULT_CATEGORY_ENFORCEMENT;
+      }
+
+      if (!res.ok) {
+        const text = (await res.text()) || res.statusText;
+        throw new Error(text);
+      }
+
+      const json = await res.json();
+      return normalizeCategoryEnforcementSetting(json.settingValue);
+    },
+  });
+  const [documentExtensions, setDocumentExtensions] = useState("");
+  const [documentMimeTypes, setDocumentMimeTypes] = useState("");
+  const [documentMaxSize, setDocumentMaxSize] = useState("");
+  const [photoExtensions, setPhotoExtensions] = useState("");
+  const [photoMimeTypes, setPhotoMimeTypes] = useState("");
+  const [photoMaxSize, setPhotoMaxSize] = useState("");
+  const [totalAppSize, setTotalAppSize] = useState("");
+  const [categoryEnforcement, setCategoryEnforcement] = useState(DEFAULT_CATEGORY_ENFORCEMENT.enforce);
+
+  useEffect(() => {
+    const policy = uploadPolicyData ?? DEFAULT_UPLOAD_POLICY;
+    setDocumentExtensions(policy.documents.allowedExtensions.join(", "));
+    setDocumentMimeTypes(policy.documents.allowedMimeTypes.join(", "));
+    setDocumentMaxSize(policy.documents.maxFileSizeMB.toString());
+    setPhotoExtensions(policy.photos.allowedExtensions.join(", "));
+    setPhotoMimeTypes(policy.photos.allowedMimeTypes.join(", "));
+    setPhotoMaxSize(policy.photos.maxFileSizeMB.toString());
+    setTotalAppSize(policy.totalPerApplicationMB.toString());
+  }, [uploadPolicyData]);
+
+  useEffect(() => {
+    if (categoryEnforcementData) {
+      setCategoryEnforcement(categoryEnforcementData.enforce);
+    }
+  }, [categoryEnforcementData]);
+
+  const parseList = (value: string) =>
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const parseExtensions = (value: string) =>
+    Array.from(
+      new Set(
+        parseList(value)
+          .map((ext) => {
+            const normalized = ext.toLowerCase().replace(/^\.+/, "");
+            return normalized ? `.${normalized}` : "";
+          })
+          .filter(Boolean),
+      ),
+    );
+
+  const parseMimeTypes = (value: string) =>
+    Array.from(
+      new Set(
+        parseList(value)
+          .map((mime) => mime.toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+
+  const parsePositiveNumber = (value: string, field: string) => {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) {
+      throw new Error(`${field} must be a positive number`);
+    }
+    return Math.round(num * 100) / 100;
+  };
 
   // Fetch tables list
   const { data: tablesData } = useQuery<{ tables: { table_name: string; size: string }[] }>({
@@ -139,6 +243,109 @@ export default function AdminConsole() {
     },
   });
 
+  const updateUploadPolicyMutation = useMutation({
+    mutationFn: async () => {
+      const documentsMax = parsePositiveNumber(documentMaxSize, "Document max size");
+      const photosMax = parsePositiveNumber(photoMaxSize, "Photo max size");
+      const totalMax = parsePositiveNumber(totalAppSize, "Total per application");
+      if (totalMax < Math.max(documentsMax, photosMax)) {
+        throw new Error("Total per application must be greater than individual file limits");
+      }
+
+      const documentsAllowedExtensions = parseExtensions(documentExtensions);
+      const documentsAllowedMimeTypes = parseMimeTypes(documentMimeTypes);
+      const photosAllowedExtensions = parseExtensions(photoExtensions);
+      const photosAllowedMimeTypes = parseMimeTypes(photoMimeTypes);
+
+      const payload: UploadPolicy = {
+        documents: {
+          allowedExtensions:
+            documentsAllowedExtensions.length > 0
+              ? documentsAllowedExtensions
+              : DEFAULT_UPLOAD_POLICY.documents.allowedExtensions,
+          allowedMimeTypes:
+            documentsAllowedMimeTypes.length > 0
+              ? documentsAllowedMimeTypes
+              : DEFAULT_UPLOAD_POLICY.documents.allowedMimeTypes,
+          maxFileSizeMB: documentsMax,
+        },
+        photos: {
+          allowedExtensions:
+            photosAllowedExtensions.length > 0
+              ? photosAllowedExtensions
+              : DEFAULT_UPLOAD_POLICY.photos.allowedExtensions,
+          allowedMimeTypes:
+            photosAllowedMimeTypes.length > 0
+              ? photosAllowedMimeTypes
+              : DEFAULT_UPLOAD_POLICY.photos.allowedMimeTypes,
+          maxFileSizeMB: photosMax,
+        },
+        totalPerApplicationMB: totalMax,
+      };
+
+      const response = await apiRequest("PUT", "/api/admin/settings/upload_policy", {
+        settingValue: payload,
+        description: "File upload policy configuration",
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Upload policy updated",
+        description: "New limits will apply immediately to all uploads.",
+      });
+      refetchUploadPolicy();
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/upload-policy"] });
+    },
+    onError: (error: any) => {
+      if (error instanceof Error) {
+        toast({
+          title: "Failed to update policy",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to update policy",
+          description: "An unexpected error occurred while saving the policy.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const updateCategoryEnforcementMutation = useMutation({
+    mutationFn: async (enforce: boolean) => {
+      await apiRequest("PUT", `/api/admin/settings/${ENFORCE_CATEGORY_SETTING_KEY}`, {
+        settingValue: { enforce },
+        description: "Controls whether owners must match the recommended homestay category before proceeding",
+      });
+    },
+    onMutate: async (enforce) => {
+      const previous = categoryEnforcement;
+      setCategoryEnforcement(enforce);
+      return { previous };
+    },
+    onSuccess: (_data, enforce) => {
+      toast({
+        title: "Category enforcement updated",
+        description: enforce
+          ? "Owners must now align with the recommended category before they can continue."
+          : "Owners can now override the recommended category when needed.",
+      });
+      refetchCategoryEnforcement();
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/category-enforcement"] });
+    },
+    onError: (error: any, _enforce, context) => {
+      setCategoryEnforcement(context?.previous ?? DEFAULT_CATEGORY_ENFORCEMENT.enforce);
+      toast({
+        title: "Failed to update category enforcement",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
@@ -149,6 +356,188 @@ export default function AdminConsole() {
       </div>
 
       <div className="grid gap-6">
+        {/* File Upload Policy */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileCode className="w-5 h-5 text-primary" />
+              <CardTitle>File Upload Policy</CardTitle>
+            </div>
+            <CardDescription>
+              Control allowed file formats and size limits for homestay application uploads.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              These limits apply immediately after saving. Leave a field blank to fall back to the recommended defaults.
+            </p>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="document-extensions">Document extensions</Label>
+                <Input
+                  id="document-extensions"
+                  placeholder=".pdf"
+                  value={documentExtensions}
+                  onChange={(event) => setDocumentExtensions(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma separated (example: <code>.pdf</code>)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="document-mime">Document MIME types</Label>
+                <Input
+                  id="document-mime"
+                  placeholder="application/pdf"
+                  value={documentMimeTypes}
+                  onChange={(event) => setDocumentMimeTypes(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma separated (example: <code>application/pdf</code>)
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="photo-extensions">Photo extensions</Label>
+                <Input
+                  id="photo-extensions"
+                  placeholder=".jpg, .png"
+                  value={photoExtensions}
+                  onChange={(event) => setPhotoExtensions(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma separated (example: <code>.jpg, .jpeg, .png</code>)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="photo-mime">Photo MIME types</Label>
+                <Input
+                  id="photo-mime"
+                  placeholder="image/jpeg, image/png"
+                  value={photoMimeTypes}
+                  onChange={(event) => setPhotoMimeTypes(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma separated (example: <code>image/jpeg, image/png</code>)
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="document-max-size">Document max size (MB)</Label>
+                <Input
+                  id="document-max-size"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={documentMaxSize}
+                  onChange={(event) => setDocumentMaxSize(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="photo-max-size">Photo max size (MB)</Label>
+                <Input
+                  id="photo-max-size"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={photoMaxSize}
+                  onChange={(event) => setPhotoMaxSize(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="total-app-size">Total per application (MB)</Label>
+                <Input
+                  id="total-app-size"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={totalAppSize}
+                  onChange={(event) => setTotalAppSize(event.target.value)}
+                  disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Current totals enforce {totalAppSize || DEFAULT_UPLOAD_POLICY.totalPerApplicationMB} MB maximum per application.
+              </span>
+              <Badge variant="outline">
+                {isFetchingUploadPolicy ? "Loading policy..." : "Active"}
+              </Badge>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => updateUploadPolicyMutation.mutate()}
+                disabled={isFetchingUploadPolicy || updateUploadPolicyMutation.isPending}
+              >
+                {updateUploadPolicyMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Upload Policy"
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Category Enforcement */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              <CardTitle>Category Enforcement</CardTitle>
+            </div>
+            <CardDescription>
+              Decide whether owners must match the recommended homestay category before moving past Room Details.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  When enforced, the application blocks progress until the room tariff range matches the required category.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Disable enforcement if you want to allow manual overrides during pilot testing or data migrations.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {categoryEnforcement ? "Enforced" : "Advisory"}
+                </span>
+                <Switch
+                  checked={categoryEnforcement}
+                  onCheckedChange={(value) => updateCategoryEnforcementMutation.mutate(value)}
+                  disabled={isFetchingCategoryEnforcement || updateCategoryEnforcementMutation.isPending}
+                  data-testid="switch-category-enforcement"
+                />
+              </div>
+            </div>
+            {(isFetchingCategoryEnforcement || updateCategoryEnforcementMutation.isPending) && (
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {isFetchingCategoryEnforcement ? "Loading current setting..." : "Saving setting..."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Database Management Section */}
         <Card>
           <CardHeader>

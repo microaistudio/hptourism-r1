@@ -2,6 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 18mm 18mm 18mm;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff !important;
+  }
+
+  aside,
+  nav,
+  header,
+  footer,
+  .print-hidden,
+  .print-screen-only,
+  .sidebar,
+  .sidebar + div > header,
+  .sidebar + div > nav {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .application-print-sheet {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  .print-section,
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 /* LIGHT MODE - Clean HP Tourism Design with Pine Green (With Hero Image) */
 :root {
   --button-outline: rgba(0,0,0, .10);

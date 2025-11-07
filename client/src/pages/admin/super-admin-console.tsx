@@ -60,6 +60,7 @@ interface SystemStats {
   };
   environment: string;
   resetEnabled: boolean;
+  superConsoleOverride?: boolean;
 }
 
 type ResetOperation =
@@ -110,10 +111,11 @@ export default function SuperAdminConsole() {
       confirmationText: string;
       reason: string;
     }) => {
-      return apiRequest("POST", `/api/admin/reset/${operation}`, {
+      const response = await apiRequest("POST", `/api/admin/reset/${operation}`, {
         confirmationText,
         reason,
-      }) as Promise<{ success: boolean; message: string; deletedCounts?: any }>;
+      });
+      return response.json() as Promise<{ success: boolean; message: string; deletedCounts?: any }>;
     },
     onSuccess: (data) => {
       toast({
@@ -139,7 +141,8 @@ export default function SuperAdminConsole() {
       count?: number;
       scenario?: string;
     }) => {
-      return apiRequest("POST", `/api/admin/seed/${type}`, { count, scenario }) as Promise<{ success: boolean; message: string }>;
+      const response = await apiRequest("POST", `/api/admin/seed/${type}`, { count, scenario });
+      return response.json() as Promise<{ success: boolean; message: string }>;
     },
     onSuccess: (data) => {
       toast({
@@ -160,12 +163,13 @@ export default function SuperAdminConsole() {
   // Toggle test payment mode mutation
   const toggleTestModeMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      return apiRequest("POST", "/api/admin/settings/payment/test-mode/toggle", { enabled }) as Promise<any>;
+      await apiRequest("POST", "/api/admin/settings/payment/test-mode/toggle", { enabled });
+      return enabled;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, enabled) => {
       toast({
-        title: variables ? "Test payment mode enabled" : "Test payment mode disabled",
-        description: variables 
+        title: enabled ? "Test payment mode enabled" : "Test payment mode disabled",
+        description: enabled
           ? "🧪 Payment requests will send ₹1 to gateway (for testing)"
           : "Payment requests will send actual calculated amounts",
       });
@@ -279,6 +283,29 @@ export default function SuperAdminConsole() {
     },
   ];
 
+  const toggleSuperConsoleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await apiRequest("POST", "/api/admin/settings/super-console/toggle", { enabled });
+      return enabled;
+    },
+    onSuccess: (enabled) => {
+      toast({
+        title: enabled ? "Super console enabled" : "Super console disabled",
+        description: enabled
+          ? "The Super Admin Console has been enabled for this environment."
+          : "The Super Admin Console override has been removed.",
+      });
+      refetchStats();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to toggle super console",
+        description: error?.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (statsLoading) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
@@ -310,11 +337,29 @@ export default function SuperAdminConsole() {
             <p className="mt-4 text-sm text-orange-700 dark:text-orange-300">
               Current environment: <Badge>{stats?.environment || "unknown"}</Badge>
             </p>
+            <div className="mt-6">
+              <Button
+                onClick={() => toggleSuperConsoleMutation.mutate(true)}
+                disabled={toggleSuperConsoleMutation.isPending}
+              >
+                {toggleSuperConsoleMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enabling...
+                  </>
+                ) : (
+                  "Enable Super Admin Console"
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  const environmentLabel = stats?.superConsoleOverride
+    ? `${(stats.environment || '').toUpperCase()} (OVERRIDE)`
+    : stats?.environment?.toUpperCase();
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -324,8 +369,26 @@ export default function SuperAdminConsole() {
           <Zap className="w-8 h-8 text-primary" />
           <h1 className="text-3xl font-bold">Super Admin Console</h1>
           <Badge variant="destructive" className="ml-2">
-            {stats?.environment?.toUpperCase()}
+            {environmentLabel}
           </Badge>
+          {stats?.superConsoleOverride && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-4"
+              onClick={() => toggleSuperConsoleMutation.mutate(false)}
+              disabled={toggleSuperConsoleMutation.isPending}
+            >
+              {toggleSuperConsoleMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Disabling...
+                </>
+              ) : (
+                "Disable Override"
+              )}
+            </Button>
+          )}
         </div>
         <p className="text-muted-foreground">
           System maintenance, reset operations, and test data generation

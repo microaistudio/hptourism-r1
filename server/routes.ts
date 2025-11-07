@@ -35,12 +35,29 @@ import {
   lgdGramPanchayats,
   lgdUrbanBodies
 } from "@shared/schema";
+import {
+  DEFAULT_UPLOAD_POLICY,
+  UPLOAD_POLICY_SETTING_KEY,
+  type UploadPolicy,
+  normalizeUploadPolicy,
+} from "@shared/uploadPolicy";
+import {
+  DEFAULT_CATEGORY_ENFORCEMENT,
+  ENFORCE_CATEGORY_SETTING_KEY,
+  normalizeCategoryEnforcementSetting,
+} from "@shared/appSettings";
+import express from "express";
+import { randomUUID } from "crypto";
+import path from "path";
+import fs from "fs";
+import fsPromises from "fs/promises";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { eq, desc, ne, notInArray, and, sql } from "drizzle-orm";
+import { eq, desc, ne, notInArray, and, sql, gte, lte, leftJoin } from "drizzle-orm";
 import { startScraperScheduler } from "./scraper";
-import { ObjectStorageService } from "./objectStorage";
+import { ObjectStorageService, OBJECT_STORAGE_MODE, LOCAL_OBJECT_DIR, LOCAL_MAX_UPLOAD_BYTES } from "./objectStorage";
 import himkoshRoutes from "./himkosh/routes";
+import { MAX_ROOMS_ALLOWED, MAX_BEDS_ALLOWED } from "@shared/fee-calculator";
 
 // Extend express-session types
 declare module 'express-session' {
@@ -73,6 +90,388 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+const normalizeStringField = (value: unknown, fallback = "") => {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const preprocessNumericInput = (val: unknown) => {
+  if (typeof val === "number") {
+    return Number.isNaN(val) ? undefined : val;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed || trimmed.toLowerCase() === "nan") {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? undefined : trimmed;
+  }
+  return val;
+};
+
+const coerceNumberField = (value: unknown, fallback = 0) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+};
+
+const decimalToString = (value?: number | null) =>
+  value === undefined || value === null ? null : String(value);
+
+const removeUndefined = <T extends Record<string, any>>(obj: T): T =>
+  Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined),
+  ) as T;
+
+const normalizeDocumentsForPersistence = (
+  docs: Array<{
+    id?: string;
+    documentType?: string;
+    type?: string;
+    fileName?: string;
+    name?: string;
+    filePath?: string;
+    fileUrl?: string;
+    url?: string;
+    fileSize?: number | string;
+    mimeType?: string;
+    uploadedAt?: string;
+    required?: boolean;
+  }> | undefined,
+) => {
+  if (!Array.isArray(docs)) {
+    return undefined;
+  }
+
+  const normalized = docs
+    .map((doc, index) => {
+      const documentType = doc.documentType || doc.type || "supporting_document";
+      const fileName = doc.fileName || doc.name || `Document ${index + 1}`;
+      const filePath = doc.filePath || doc.fileUrl || doc.url;
+
+      if (!filePath || typeof filePath !== "string") {
+        return null;
+      }
+
+      let fileSize = doc.fileSize;
+      if (typeof fileSize === "string") {
+        const parsed = Number(fileSize);
+        fileSize = Number.isFinite(parsed) ? parsed : undefined;
+      }
+
+      const resolvedSize =
+        typeof fileSize === "number" && Number.isFinite(fileSize) ? fileSize : 0;
+
+      return {
+        id: doc.id && typeof doc.id === "string" ? doc.id : randomUUID(),
+        documentType,
+        fileName,
+        filePath,
+        fileSize: resolvedSize,
+        mimeType: doc.mimeType && typeof doc.mimeType === "string" && doc.mimeType.length > 0
+          ? doc.mimeType
+          : "application/octet-stream",
+        name: fileName,
+        type: documentType,
+        url: filePath,
+        uploadedAt: doc.uploadedAt,
+        required: typeof doc.required === "boolean" ? doc.required : undefined,
+      };
+    })
+    .filter((doc): doc is NonNullable<typeof doc> => Boolean(doc));
+
+  return normalized;
+};
+
+const resolveTehsilFields = (
+  rawTehsil: unknown,
+  rawTehsilOther: unknown,
+) => {
+  const tehsilString =
+    typeof rawTehsil === "string" ? rawTehsil.trim() : "";
+  const tehsilOtherString =
+    typeof rawTehsilOther === "string" ? rawTehsilOther.trim() : "";
+
+  const isPlaceholder =
+    tehsilString.length === 0 ||
+    tehsilString.toLowerCase() === "not provided" ||
+    tehsilString === "__other" ||
+    tehsilString === "__manual";
+
+  const resolvedTehsil =
+    !isPlaceholder && tehsilString.length > 0
+      ? tehsilString
+      : tehsilOtherString.length > 0
+        ? tehsilOtherString
+        : "Not Provided";
+
+  const resolvedTehsilOther =
+    tehsilOtherString.length > 0 ? tehsilOtherString : null;
+
+  return {
+    tehsil: resolvedTehsil,
+    tehsilOther: resolvedTehsilOther,
+  };
+};
+
+const BYTES_PER_MB = 1024 * 1024;
+const isValidMimeType = (candidate: string) =>
+  /^[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+$/.test(candidate);
+const sanitizeDownloadFilename = (name: string) =>
+  name.replace(/[^a-zA-Z0-9.\-\_\s]/g, "_");
+type UploadCategoryKey = "documents" | "photos";
+type NormalizedDocumentRecord = Exclude<
+  ReturnType<typeof normalizeDocumentsForPersistence>,
+  undefined
+>[number];
+
+const resolveUploadCategory = (
+  rawCategory: unknown,
+  fileTypeHint?: string | null,
+  mimeTypeHint?: string | null,
+): UploadCategoryKey => {
+  if (typeof rawCategory === "string" && rawCategory.length > 0) {
+    const normalized = rawCategory.toLowerCase();
+    if (normalized.includes("photo") || normalized === "images" || normalized === "image") {
+      return "photos";
+    }
+    if (normalized.includes("doc") || normalized === "documents" || normalized === "document") {
+      return "documents";
+    }
+  }
+
+  if (typeof fileTypeHint === "string" && fileTypeHint.toLowerCase().includes("photo")) {
+    return "photos";
+  }
+  if (typeof mimeTypeHint === "string" && mimeTypeHint.toLowerCase().startsWith("image/")) {
+    return "photos";
+  }
+
+  return "documents";
+};
+
+const resolveDocumentCategory = (doc: NormalizedDocumentRecord): UploadCategoryKey => {
+  const type = doc.documentType?.toLowerCase?.() || doc.type?.toLowerCase?.() || "";
+  if (type.includes("photo") || type.includes("image")) {
+    return "photos";
+  }
+  const mime = doc.mimeType?.toLowerCase?.() || "";
+  if (mime.startsWith("image/")) {
+    return "photos";
+  }
+  return "documents";
+};
+
+const normalizeMime = (mime?: string | null) => {
+  if (!mime || typeof mime !== "string") return "";
+  return mime.split(";")[0].trim().toLowerCase();
+};
+
+const getExtension = (input?: string | null) => {
+  if (!input || typeof input !== "string") return "";
+  const lastDot = input.lastIndexOf(".");
+  if (lastDot === -1 || lastDot === input.length - 1) {
+    return "";
+  }
+  return input.slice(lastDot).toLowerCase();
+};
+
+const formatBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const idx = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  const value = bytes / Math.pow(1024, idx);
+  return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[idx]}`;
+};
+
+const validateDocumentsAgainstPolicy = (
+  docs: NormalizedDocumentRecord[] | undefined,
+  policy: UploadPolicy,
+): string | null => {
+  if (!docs || docs.length === 0) {
+    return null;
+  }
+
+  let totalBytes = 0;
+
+  for (const doc of docs) {
+    const category = resolveDocumentCategory(doc);
+    const categoryPolicy = policy[category];
+    const maxBytes = categoryPolicy.maxFileSizeMB * BYTES_PER_MB;
+    const sizeBytes =
+      typeof doc.fileSize === "number" && Number.isFinite(doc.fileSize)
+        ? doc.fileSize
+        : 0;
+
+    if (sizeBytes > maxBytes) {
+      return `${doc.fileName} exceeds the ${categoryPolicy.maxFileSizeMB} MB limit`;
+    }
+
+    const normalizedMime = normalizeMime(doc.mimeType);
+    const mimeAllowed =
+      categoryPolicy.allowedMimeTypes.length === 0 ||
+      !normalizedMime ||
+      normalizedMime === "application/octet-stream" ||
+      normalizedMime === "binary/octet-stream" ||
+      categoryPolicy.allowedMimeTypes.includes(normalizedMime) ||
+      (normalizedMime === "image/jpg" &&
+        categoryPolicy.allowedMimeTypes.includes("image/jpeg"));
+    if (!mimeAllowed) {
+      return `${doc.fileName} has an unsupported file type (${normalizedMime}). Allowed types: ${categoryPolicy.allowedMimeTypes.join(", ")}`;
+    }
+
+    const extension =
+      getExtension(doc.fileName) || getExtension(doc.filePath) || getExtension(doc.url);
+    if (
+      categoryPolicy.allowedExtensions.length > 0 &&
+      (!extension || !categoryPolicy.allowedExtensions.includes(extension))
+    ) {
+      return `${doc.fileName} must use one of the following extensions: ${categoryPolicy.allowedExtensions.join(", ")}`;
+    }
+
+    totalBytes += sizeBytes;
+  }
+
+  const maxTotalBytes = policy.totalPerApplicationMB * BYTES_PER_MB;
+  if (totalBytes > maxTotalBytes) {
+    return `Total document size ${formatBytes(totalBytes)} exceeds ${policy.totalPerApplicationMB} MB limit per application`;
+  }
+
+  return null;
+};
+
+const sanitizeDraftForPersistence = (
+  validatedData: any,
+  draftOwner: User | null | undefined,
+) => {
+  const normalizedDocuments = normalizeDocumentsForPersistence(
+    validatedData.documents,
+  );
+  const { tehsil: resolvedTehsil, tehsilOther: resolvedTehsilOther } =
+    resolveTehsilFields(validatedData.tehsil, validatedData.tehsilOther);
+  const fallbackOwner = draftOwner ?? null;
+  const fallbackOwnerName = normalizeStringField(
+    fallbackOwner?.fullName,
+    "Draft Owner",
+  );
+  const fallbackOwnerMobile = normalizeStringField(
+    fallbackOwner?.mobile,
+    "0000000000",
+  );
+  const fallbackOwnerEmail = normalizeStringField(
+    fallbackOwner?.email,
+    "",
+  );
+
+  return {
+    ...validatedData,
+    propertyName: normalizeStringField(
+      validatedData.propertyName,
+      "Draft Homestay",
+    ),
+    category: validatedData.category || "silver",
+    locationType: validatedData.locationType || "gp",
+    district: normalizeStringField(validatedData.district),
+    tehsil: resolvedTehsil,
+    tehsilOther: resolvedTehsilOther,
+    block: normalizeStringField(validatedData.block),
+    blockOther: normalizeStringField(validatedData.blockOther),
+    gramPanchayat: normalizeStringField(validatedData.gramPanchayat),
+    gramPanchayatOther: normalizeStringField(validatedData.gramPanchayatOther),
+    urbanBody: normalizeStringField(validatedData.urbanBody),
+    urbanBodyOther: normalizeStringField(validatedData.urbanBodyOther),
+    ward: normalizeStringField(validatedData.ward),
+    address: normalizeStringField(validatedData.address),
+    pincode: normalizeStringField(validatedData.pincode),
+    telephone: normalizeStringField(validatedData.telephone),
+    ownerName: normalizeStringField(
+      validatedData.ownerName,
+      fallbackOwnerName,
+    ),
+    ownerGender: validatedData.ownerGender || "other",
+    ownerMobile: normalizeStringField(
+      validatedData.ownerMobile,
+      fallbackOwnerMobile,
+    ),
+    ownerEmail: normalizeStringField(
+      validatedData.ownerEmail,
+      fallbackOwnerEmail,
+    ),
+    ownerAadhaar: normalizeStringField(
+      validatedData.ownerAadhaar,
+      "000000000000",
+    ),
+    propertyOwnership:
+      validatedData.propertyOwnership === "leased" ? "leased" : "owned",
+    projectType: validatedData.projectType || "new_project",
+    propertyArea: coerceNumberField(validatedData.propertyArea),
+    singleBedRooms: coerceNumberField(validatedData.singleBedRooms),
+    singleBedBeds: coerceNumberField(validatedData.singleBedBeds, 1),
+    singleBedRoomSize: coerceNumberField(validatedData.singleBedRoomSize),
+    singleBedRoomRate: coerceNumberField(validatedData.singleBedRoomRate),
+    doubleBedRooms: coerceNumberField(validatedData.doubleBedRooms),
+    doubleBedBeds: coerceNumberField(validatedData.doubleBedBeds, 2),
+    doubleBedRoomSize: coerceNumberField(validatedData.doubleBedRoomSize),
+    doubleBedRoomRate: coerceNumberField(validatedData.doubleBedRoomRate),
+    familySuites: coerceNumberField(validatedData.familySuites),
+    familySuiteBeds: coerceNumberField(validatedData.familySuiteBeds, 4),
+    familySuiteSize: coerceNumberField(validatedData.familySuiteSize),
+    familySuiteRate: coerceNumberField(validatedData.familySuiteRate),
+    attachedWashrooms: coerceNumberField(validatedData.attachedWashrooms),
+    gstin: normalizeStringField(validatedData.gstin),
+    selectedCategory:
+      validatedData.selectedCategory || validatedData.category || "silver",
+    averageRoomRate: coerceNumberField(validatedData.averageRoomRate),
+    highestRoomRate: coerceNumberField(validatedData.highestRoomRate),
+    lowestRoomRate: coerceNumberField(validatedData.lowestRoomRate),
+    certificateValidityYears:
+      validatedData.certificateValidityYears ?? 1,
+    isPangiSubDivision: validatedData.isPangiSubDivision ?? false,
+    distanceAirport: coerceNumberField(validatedData.distanceAirport),
+    distanceRailway: coerceNumberField(validatedData.distanceRailway),
+    distanceCityCenter: coerceNumberField(validatedData.distanceCityCenter),
+    distanceShopping: coerceNumberField(validatedData.distanceShopping),
+    distanceBusStand: coerceNumberField(validatedData.distanceBusStand),
+    lobbyArea: coerceNumberField(validatedData.lobbyArea),
+    diningArea: coerceNumberField(validatedData.diningArea),
+    parkingArea: normalizeStringField(validatedData.parkingArea),
+    ecoFriendlyFacilities: normalizeStringField(
+      validatedData.ecoFriendlyFacilities,
+    ),
+    differentlyAbledFacilities: normalizeStringField(
+      validatedData.differentlyAbledFacilities,
+    ),
+    fireEquipmentDetails: normalizeStringField(
+      validatedData.fireEquipmentDetails,
+    ),
+    nearestHospital: normalizeStringField(validatedData.nearestHospital),
+    baseFee: coerceNumberField(validatedData.baseFee),
+    totalBeforeDiscounts: coerceNumberField(validatedData.totalBeforeDiscounts),
+    validityDiscount: coerceNumberField(validatedData.validityDiscount),
+    femaleOwnerDiscount: coerceNumberField(validatedData.femaleOwnerDiscount),
+    pangiDiscount: coerceNumberField(validatedData.pangiDiscount),
+    totalDiscount: coerceNumberField(validatedData.totalDiscount),
+    totalFee: coerceNumberField(validatedData.totalFee),
+    perRoomFee: coerceNumberField(validatedData.perRoomFee),
+    gstAmount: coerceNumberField(validatedData.gstAmount),
+    documents: normalizedDocuments ?? [],
+    currentPage: validatedData.currentPage ?? 1,
+    status: "draft" as const,
+  };
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // PostgreSQL session store for production
   const PgSession = connectPgSimple(session);
@@ -95,6 +494,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
       },
     })
   );
+
+  const getUploadPolicy = async (): Promise<UploadPolicy> => {
+    try {
+      const [setting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, UPLOAD_POLICY_SETTING_KEY))
+        .limit(1);
+
+      if (!setting) {
+        return DEFAULT_UPLOAD_POLICY;
+      }
+
+      return normalizeUploadPolicy(setting.settingValue);
+    } catch (error) {
+      console.error("[upload-policy] Failed to fetch policy, falling back to defaults:", error);
+      return DEFAULT_UPLOAD_POLICY;
+    }
+  };
+
+  const getCategoryEnforcementSetting = async () => {
+    try {
+      const [setting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, ENFORCE_CATEGORY_SETTING_KEY))
+        .limit(1);
+
+      if (!setting) {
+        return DEFAULT_CATEGORY_ENFORCEMENT;
+      }
+
+      return normalizeCategoryEnforcementSetting(setting.settingValue);
+    } catch (error) {
+      console.error("[category-enforcement] Failed to fetch setting, falling back to defaults:", error);
+      return DEFAULT_CATEGORY_ENFORCEMENT;
+    }
+  };
+
+  if (OBJECT_STORAGE_MODE === "local") {
+    const uploadLimitMb = Math.max(1, Math.ceil(LOCAL_MAX_UPLOAD_BYTES / (1024 * 1024)));
+    const rawUploadMiddleware = express.raw({ type: "*/*", limit: `${uploadLimitMb}mb` });
+
+    app.put(
+      "/api/local-object/upload/:objectId",
+      requireAuth,
+      rawUploadMiddleware,
+      async (req, res) => {
+        try {
+          if (!Buffer.isBuffer(req.body)) {
+            return res.status(400).json({ message: "Upload payload missing" });
+          }
+
+          const policy = await getUploadPolicy();
+          const objectId = req.params.objectId;
+          const fileType = (req.query.type as string) || "document";
+          const categoryHint = req.query.category as string | undefined;
+          const providedMime =
+            (req.query.mime as string | undefined) || req.get("Content-Type") || undefined;
+          const providedName = req.query.name as string | undefined;
+          const category = resolveUploadCategory(
+            categoryHint,
+            fileType,
+            providedMime || null,
+          );
+          const categoryPolicy = policy[category];
+          const fileBuffer = req.body as Buffer;
+          const sizeBytes = fileBuffer.length;
+          const maxBytes = categoryPolicy.maxFileSizeMB * BYTES_PER_MB;
+
+          if (sizeBytes > maxBytes) {
+            return res.status(400).json({
+              message: `File exceeds the ${categoryPolicy.maxFileSizeMB} MB limit`,
+            });
+          }
+
+          const normalizedMime = normalizeMime(providedMime);
+          if (
+            categoryPolicy.allowedMimeTypes.length > 0 &&
+            normalizedMime &&
+            !categoryPolicy.allowedMimeTypes.includes(normalizedMime)
+          ) {
+            return res.status(400).json({
+              message: `Unsupported file type "${normalizedMime}". Allowed types: ${categoryPolicy.allowedMimeTypes.join(", ")}`,
+            });
+          }
+
+          const extension =
+            getExtension(providedName) ||
+            getExtension(req.query.extension as string | undefined) ||
+            "";
+          if (
+            categoryPolicy.allowedExtensions.length > 0 &&
+            (!extension ||
+              !categoryPolicy.allowedExtensions.includes(extension.toLowerCase()))
+          ) {
+            return res.status(400).json({
+              message: `Unsupported file extension. Allowed extensions: ${categoryPolicy.allowedExtensions.join(", ")}`,
+            });
+          }
+
+          const safeType = fileType.replace(/[^a-zA-Z0-9_-]/g, "");
+          const targetDir = path.join(LOCAL_OBJECT_DIR, `${safeType}s`);
+          await fsPromises.mkdir(targetDir, { recursive: true });
+          const targetPath = path.join(targetDir, objectId);
+          await fsPromises.writeFile(targetPath, fileBuffer);
+
+          res.status(200).json({ success: true });
+        } catch (error) {
+          console.error("Local upload error", error);
+          res.status(500).json({ message: "Failed to store uploaded file" });
+        }
+      }
+    );
+
+    app.get(
+      "/api/local-object/download/:objectId",
+      requireAuth,
+      async (req, res) => {
+        try {
+          const objectId = req.params.objectId;
+          const fileType = (req.query.type as string) || "document";
+          const safeType = fileType.replace(/[^a-zA-Z0-9_-]/g, "");
+          const filePath = path.join(LOCAL_OBJECT_DIR, `${safeType}s`, objectId);
+
+          await fsPromises.access(filePath, fs.constants.R_OK);
+
+          const mimeOverride =
+            typeof req.query.mime === "string" && isValidMimeType(req.query.mime)
+              ? req.query.mime
+              : undefined;
+          const filenameOverride =
+            typeof req.query.filename === "string" && req.query.filename.trim().length > 0
+              ? sanitizeDownloadFilename(req.query.filename.trim())
+              : undefined;
+
+          console.log("[object-download] query", req.query, {
+            mimeOverride,
+            filenameOverride,
+            fileType,
+            objectId,
+          });
+
+          res.setHeader("Content-Type", mimeOverride || "application/octet-stream");
+          res.setHeader(
+            "Content-Disposition",
+            `inline; filename="${filenameOverride || objectId}"`
+          );
+
+          const stream = fs.createReadStream(filePath);
+          stream.on("error", (err) => {
+            console.error("Stream error", err);
+            res.destroy(err);
+          });
+          stream.pipe(res);
+        } catch (error) {
+          console.error("Local download error", error);
+          res.status(404).json({ message: "File not found" });
+        }
+      }
+    );
+  }
 
   // Auth Routes
   
@@ -225,7 +786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
       
       if (!profile) {
-        return res.status(404).json({ message: "Profile not found" });
+        return res.json(null);
       }
       
       res.json(profile);
@@ -295,6 +856,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/upload-url", requireAuth, async (req, res) => {
     try {
       const fileType = (req.query.fileType as string) || "document";
+      const fileName = (req.query.fileName as string) || "";
+      const fileSizeRaw = req.query.fileSize as string | undefined;
+      const mimeType = (req.query.mimeType as string | undefined) || undefined;
+      const categoryHint = req.query.category as string | undefined;
+      const policy = await getUploadPolicy();
+      const category = resolveUploadCategory(
+        categoryHint,
+        fileType,
+        mimeType || null,
+      );
+      const categoryPolicy = policy[category];
+
+      const sizeBytes = Number(fileSizeRaw);
+      if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+        return res.status(400).json({
+          message: "File size is required for validation",
+        });
+      }
+
+      const maxBytes = categoryPolicy.maxFileSizeMB * BYTES_PER_MB;
+      if (sizeBytes > maxBytes) {
+        return res.status(400).json({
+          message: `File exceeds the ${categoryPolicy.maxFileSizeMB} MB limit`,
+        });
+      }
+
+      const normalizedMime = normalizeMime(mimeType);
+      if (
+        categoryPolicy.allowedMimeTypes.length > 0 &&
+        normalizedMime &&
+        !categoryPolicy.allowedMimeTypes.includes(normalizedMime)
+      ) {
+        return res.status(400).json({
+          message: `Unsupported file type "${normalizedMime}". Allowed types: ${categoryPolicy.allowedMimeTypes.join(", ")}`,
+        });
+      }
+
+      const extension = getExtension(fileName);
+      if (
+        categoryPolicy.allowedExtensions.length > 0 &&
+        (!extension || !categoryPolicy.allowedExtensions.includes(extension))
+      ) {
+        return res.status(400).json({
+          message: `Unsupported file extension. Allowed extensions: ${categoryPolicy.allowedExtensions.join(", ")}`,
+        });
+      }
+
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getUploadURL(fileType);
       const filePath = objectStorageService.normalizeObjectPath(uploadURL);
@@ -313,14 +921,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "File path is required" });
       }
       
+      const mimeOverride =
+        typeof req.query.mime === "string" && isValidMimeType(req.query.mime)
+          ? req.query.mime
+          : undefined;
+      const filenameOverride =
+        typeof req.query.filename === "string" && req.query.filename.trim().length > 0
+          ? sanitizeDownloadFilename(req.query.filename.trim())
+          : undefined;
+
+      if (OBJECT_STORAGE_MODE === "local") {
+        const localUrl = new URL(`http://placeholder${filePath}`);
+        const objectId = localUrl.pathname.split("/").pop();
+        if (!objectId) {
+          return res.status(400).json({ message: "Invalid file path" });
+        }
+        const fileTypeParam = localUrl.searchParams.get("type") || "document";
+        const safeType = fileTypeParam.replace(/[^a-zA-Z0-9_-]/g, "");
+        const diskPath = path.join(LOCAL_OBJECT_DIR, `${safeType}s`, objectId);
+
+        try {
+          await fsPromises.access(diskPath, fs.constants.R_OK);
+        } catch {
+          return res.status(404).json({ message: "File not found" });
+        }
+
+        const stream = fs.createReadStream(diskPath);
+        stream.on("error", (err) => {
+          console.error("[object-storage:view] stream error", err);
+          res.destroy(err);
+        });
+
+        res.setHeader("Content-Type", mimeOverride || "application/octet-stream");
+        res.setHeader(
+          "Content-Disposition",
+          `inline; filename="${filenameOverride || objectId}"`
+        );
+
+        stream.pipe(res);
+        return;
+      }
+
       const objectStorageService = new ObjectStorageService();
-      const viewURL = await objectStorageService.getViewURL(filePath);
-      
-      // Redirect to the signed URL
+      const viewURL = await objectStorageService.getViewURL(filePath, {
+        mimeType: mimeOverride,
+        fileName: filenameOverride,
+        forceInline: true,
+      });
+
+      // Redirect to the signed URL (GCS / external storage)
       res.redirect(viewURL);
     } catch (error) {
       console.error("Error getting view URL:", error);
       res.status(500).json({ message: "Failed to get view URL" });
+    }
+  });
+
+  app.get("/api/settings/upload-policy", requireAuth, async (_req, res) => {
+    try {
+      const policy = await getUploadPolicy();
+      res.json(policy);
+    } catch (error) {
+      console.error("[upload-policy] Failed to fetch policy:", error);
+      res.status(500).json({ message: "Failed to fetch upload policy" });
+    }
+  });
+
+  app.get("/api/settings/category-enforcement", requireAuth, async (_req, res) => {
+    try {
+      const setting = await getCategoryEnforcementSetting();
+      res.json(setting);
+    } catch (error) {
+      console.error("[category-enforcement] Failed to fetch setting:", error);
+      res.status(500).json({ message: "Failed to fetch category enforcement setting" });
     }
   });
   
@@ -338,7 +1011,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pincode: z.string().optional(),
         locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
         telephone: z.string().optional(),
-        fax: z.string().optional(),
         ownerName: z.string().optional(),
         ownerMobile: z.string().optional(),
         ownerEmail: z.string().optional(),
@@ -350,10 +1022,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectType: z.enum(['new_rooms', 'new_project']).optional(),
         propertyArea: z.coerce.number().optional(),
         singleBedRooms: z.coerce.number().optional(),
+        singleBedBeds: z.coerce.number().optional(),
         singleBedRoomSize: z.coerce.number().optional(),
         doubleBedRooms: z.coerce.number().optional(),
+        doubleBedBeds: z.coerce.number().optional(),
         doubleBedRoomSize: z.coerce.number().optional(),
         familySuites: z.coerce.number().optional(),
+        familySuiteBeds: z.coerce.number().optional(),
         familySuiteSize: z.coerce.number().optional(),
         attachedWashrooms: z.coerce.number().optional(),
         gstin: z.string().optional(),
@@ -371,16 +1046,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nearestHospital: z.string().optional(),
         amenities: z.any().optional(),
         // 2025 Fee Structure - handle NaN for incomplete drafts
-        baseFee: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        totalBeforeDiscounts: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        validityDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        femaleOwnerDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        pangiDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        totalDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        totalFee: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
+        baseFee: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        totalBeforeDiscounts: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        validityDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        femaleOwnerDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        pangiDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        totalDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        totalFee: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
         // Legacy fields
-        perRoomFee: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        gstAmount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
+        perRoomFee: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        gstAmount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
         // 2025 Fields
         certificateValidityYears: z.coerce.number().optional(),
         isPangiSubDivision: z.boolean().optional(),
@@ -388,27 +1063,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude: z.string().optional(),
         longitude: z.string().optional(),
         currentPage: z.coerce.number().optional(), // Track which page user was on
-        documents: z.array(z.object({
-          filePath: z.string(),
-          fileName: z.string(),
-          fileSize: z.number(),
-          mimeType: z.string(),
-          documentType: z.string(),
-        })).optional(),
-      });
+        documents: z.array(z.any()).optional(),
+      }).passthrough();
       
-      const validatedData = draftSchema.parse(req.body);
-      
-      // Calculate totalRooms if room data exists
-      const totalRooms = (validatedData.singleBedRooms || 0) + 
-                        (validatedData.doubleBedRooms || 0) + 
-                        (validatedData.familySuites || 0);
+      // Guardrail: only one active application per owner (HP Tourism Rules 2025)
+      const existingApps = await storage.getApplicationsByUser(userId);
+      if (existingApps.length > 0) {
+        const existing = existingApps[0];
+        if (existing.status === "draft") {
+          return res.json({
+            application: existing,
+            message: "Existing draft loaded",
+          });
+        }
+        return res.status(409).json({
+          message: "Only one homestay application is permitted per owner account (HP Tourism Rules 2025). Please continue the existing application.",
+          existingApplicationId: existing.id,
+          status: existing.status,
+        });
+      }
 
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const validatedData = draftSchema.parse(req.body);
+      const sanitizedDraft = sanitizeDraftForPersistence(validatedData, user);
+      const policy = await getUploadPolicy();
+      const draftDocsError = validateDocumentsAgainstPolicy(
+        sanitizedDraft.documents as NormalizedDocumentRecord[] | undefined,
+        policy,
+      );
+      if (draftDocsError) {
+        return res.status(400).json({ message: draftDocsError });
+      }
+      
       // Create draft application
       const application = await storage.createApplication({
-        ...validatedData,
+        ...sanitizedDraft,
         userId,
-        totalRooms: totalRooms || 0,
         status: 'draft', // Explicitly set as draft
       } as any);
 
@@ -427,7 +1121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = req.session.userId!;
-      
+
       // Check if application exists and belongs to user
       const existing = await storage.getApplication(id);
       if (!existing) {
@@ -439,7 +1133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing.status !== 'draft') {
         return res.status(400).json({ message: "Can only update draft applications" });
       }
-      
+
       // Same minimal validation as create draft
       const draftSchema = z.object({
         propertyName: z.string().optional(),
@@ -449,7 +1143,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pincode: z.string().optional(),
         locationType: z.enum(['mc', 'tcp', 'gp']).optional(),
         telephone: z.string().optional(),
-        fax: z.string().optional(),
         ownerName: z.string().optional(),
         ownerMobile: z.string().optional(),
         ownerEmail: z.string().optional(),
@@ -461,10 +1154,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectType: z.enum(['new_rooms', 'new_project']).optional(),
         propertyArea: z.coerce.number().optional(),
         singleBedRooms: z.coerce.number().optional(),
+        singleBedBeds: z.coerce.number().optional(),
         singleBedRoomSize: z.coerce.number().optional(),
         doubleBedRooms: z.coerce.number().optional(),
+        doubleBedBeds: z.coerce.number().optional(),
         doubleBedRoomSize: z.coerce.number().optional(),
         familySuites: z.coerce.number().optional(),
+        familySuiteBeds: z.coerce.number().optional(),
         familySuiteSize: z.coerce.number().optional(),
         attachedWashrooms: z.coerce.number().optional(),
         gstin: z.string().optional(),
@@ -482,16 +1178,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nearestHospital: z.string().optional(),
         amenities: z.any().optional(),
         // 2025 Fee Structure - handle NaN for incomplete drafts
-        baseFee: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        totalBeforeDiscounts: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        validityDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        femaleOwnerDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        pangiDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        totalDiscount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        totalFee: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
+        baseFee: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        totalBeforeDiscounts: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        validityDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        femaleOwnerDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        pangiDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        totalDiscount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        totalFee: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
         // Legacy fields
-        perRoomFee: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
-        gstAmount: z.preprocess((val) => (typeof val === 'number' && isNaN(val)) ? undefined : val, z.coerce.number().optional()),
+        perRoomFee: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
+        gstAmount: z.preprocess(preprocessNumericInput, z.coerce.number().optional()),
         // 2025 Fields
         certificateValidityYears: z.coerce.number().optional(),
         isPangiSubDivision: z.boolean().optional(),
@@ -499,25 +1195,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         latitude: z.string().optional(),
         longitude: z.string().optional(),
         currentPage: z.coerce.number().optional(), // Track which page user was on
-        documents: z.array(z.object({
-          filePath: z.string(),
-          fileName: z.string(),
-          fileSize: z.number(),
-          mimeType: z.string(),
-          documentType: z.string(),
-        })).optional(),
-      });
+        documents: z.array(z.any()).optional(),
+      }).passthrough();
       
       const validatedData = draftSchema.parse(req.body);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      const sanitizedDraft = sanitizeDraftForPersistence(validatedData, user);
+      const policy = await getUploadPolicy();
+      const draftDocsError = validateDocumentsAgainstPolicy(
+        sanitizedDraft.documents as NormalizedDocumentRecord[] | undefined,
+        policy,
+      );
+      if (draftDocsError) {
+        return res.status(400).json({ message: draftDocsError });
+      }
       
       // Calculate totalRooms if room data exists
-      const totalRooms = (validatedData.singleBedRooms || 0) + 
-                        (validatedData.doubleBedRooms || 0) + 
-                        (validatedData.familySuites || 0);
+      const totalRooms = (sanitizedDraft.singleBedRooms || 0) + 
+                        (sanitizedDraft.doubleBedRooms || 0) + 
+                        (sanitizedDraft.familySuites || 0);
 
       // Update draft application
       const updated = await storage.updateApplication(id, {
-        ...validatedData,
+        ...sanitizedDraft,
         totalRooms: totalRooms || existing.totalRooms,
       } as any);
 
@@ -548,13 +1251,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pincode: z.string(),
         locationType: z.enum(['mc', 'tcp', 'gp']),
         telephone: z.string().optional(),
-        fax: z.string().optional(),
+        block: z.string().optional(),
+        blockOther: z.string().optional(),
+        gramPanchayat: z.string().optional(),
+        gramPanchayatOther: z.string().optional(),
+        urbanBody: z.string().optional(),
+        urbanBodyOther: z.string().optional(),
+        ward: z.string().optional(),
         
         // Owner info
         ownerName: z.string(),
         ownerMobile: z.string(),
         ownerEmail: z.string().optional(),
         ownerAadhaar: z.string(),
+        propertyOwnership: z.enum(['owned', 'leased']).optional(),
         
         // Room & category details
         proposedRoomRate: z.coerce.number(),
@@ -564,10 +1274,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectType: z.enum(['new_rooms', 'new_project']),
         propertyArea: z.coerce.number(),
         singleBedRooms: z.coerce.number().optional(),
+        singleBedBeds: z.coerce.number().optional(),
         singleBedRoomSize: z.coerce.number().optional(),
         doubleBedRooms: z.coerce.number().optional(),
+        doubleBedBeds: z.coerce.number().optional(),
         doubleBedRoomSize: z.coerce.number().optional(),
         familySuites: z.coerce.number().optional(),
+        familySuiteBeds: z.coerce.number().optional(),
         familySuiteSize: z.coerce.number().optional(),
         attachedWashrooms: z.coerce.number(),
         gstin: z.string().optional(),
@@ -609,20 +1322,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         certificateValidityYears: z.coerce.number().optional(),
         isPangiSubDivision: z.boolean().optional(),
         ownerGender: z.enum(['male', 'female', 'other']).optional(),
-        tehsil: z.string().optional(),
+        tehsil: z.string().optional().nullable(),
+        tehsilOther: z.string().optional(),
         
         // Coordinates (optional)
         latitude: z.string().optional(),
         longitude: z.string().optional(),
         
         // ANNEXURE-II documents with metadata
-        documents: z.array(z.object({
-          filePath: z.string(),
-          fileName: z.string(),
-          fileSize: z.number(),
-          mimeType: z.string(),
-          documentType: z.string(),
-        })).optional(),
+        documents: z.array(
+          z.preprocess(
+            (value) => {
+              if (!value || typeof value !== 'object') {
+                return value;
+              }
+              const doc = { ...(value as Record<string, unknown>) };
+              doc.filePath =
+                typeof doc.filePath === 'string' && doc.filePath.length > 0
+                  ? doc.filePath
+                  : typeof doc.fileUrl === 'string' && doc.fileUrl.length > 0
+                    ? doc.fileUrl
+                    : typeof doc.url === 'string' && doc.url.length > 0
+                      ? doc.url
+                      : `missing://${randomUUID()}`;
+              doc.documentType =
+                typeof doc.documentType === 'string' && doc.documentType.length > 0
+                  ? doc.documentType
+                  : typeof doc.type === 'string' && doc.type.length > 0
+                    ? doc.type
+                    : 'supporting_document';
+              doc.fileName =
+                typeof doc.fileName === 'string' && doc.fileName.length > 0
+                  ? doc.fileName
+                  : typeof doc.name === 'string' && doc.name.length > 0
+                    ? doc.name
+                    : `${doc.documentType}.pdf`;
+              if (doc.fileSize === undefined && typeof doc.size !== 'undefined') {
+                doc.fileSize = doc.size;
+              }
+              if (typeof doc.fileSize !== 'number' || !Number.isFinite(doc.fileSize)) {
+                doc.fileSize = 0;
+              }
+              doc.mimeType =
+                typeof doc.mimeType === 'string' && doc.mimeType.length > 0
+                  ? doc.mimeType
+                  : typeof doc.type === 'string' && doc.type.length > 0
+                    ? doc.type
+                    : 'application/octet-stream';
+              return doc;
+            },
+            z.object({
+              filePath: z.string().min(1, "Document file path is required"),
+              fileName: z.string().min(1, "Document file name is required"),
+              fileSize: z.coerce.number().nonnegative().optional(),
+              mimeType: z.string().optional(),
+              documentType: z.string(),
+            })
+          )
+        ).optional(),
       });
       
       // Validate and extract only whitelisted fields
@@ -632,6 +1389,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalRooms = (validatedData.singleBedRooms || 0) + 
                         (validatedData.doubleBedRooms || 0) + 
                         (validatedData.familySuites || 0);
+      if (totalRooms <= 0) {
+        return res.status(400).json({
+          message: "Please configure at least one room before submitting the application.",
+        });
+      }
+      const singleBedsPerRoom = validatedData.singleBedBeds ?? ((validatedData.singleBedRooms || 0) > 0 ? 1 : 0);
+      const doubleBedsPerRoom = validatedData.doubleBedBeds ?? ((validatedData.doubleBedRooms || 0) > 0 ? 2 : 0);
+      const suiteBedsPerRoom = validatedData.familySuiteBeds ?? ((validatedData.familySuites || 0) > 0 ? 4 : 0);
+      const totalBeds =
+        (validatedData.singleBedRooms || 0) * singleBedsPerRoom +
+        (validatedData.doubleBedRooms || 0) * doubleBedsPerRoom +
+        (validatedData.familySuites || 0) * suiteBedsPerRoom;
+      if (totalRooms > MAX_ROOMS_ALLOWED) {
+        return res.status(400).json({
+          message: `HP Homestay Rules 2025 permit a maximum of ${MAX_ROOMS_ALLOWED} rooms.`,
+        });
+      }
+      if (totalBeds > MAX_BEDS_ALLOWED) {
+        return res.status(400).json({
+          message: `Total beds cannot exceed ${MAX_BEDS_ALLOWED} across all room types. Please adjust the bed counts.`,
+        });
+      }
+      if (totalRooms > 0 && (validatedData.attachedWashrooms || 0) < totalRooms) {
+        return res.status(400).json({
+          message: "Every room must have its own washroom. Increase attached washrooms to at least the total number of rooms.",
+        });
+      }
 
       // 2025 Compliance: Validate per-room-type rates (HP Homestay Rules 2025 - Form-A Certificate Requirement)
       // For FINAL SUBMISSION, per-room-type rates are MANDATORY for all room types with count > 0
@@ -652,27 +1436,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Build payload with ONLY allowed fields (ANNEXURE-I compliant)
-      // Pass trusted flag to allow server-controlled status override
-      const application = await storage.createApplication({
-        // Basic property info
+      const existingApps = await storage.getApplicationsByUser(userId);
+      const existingApp = existingApps[0];
+
+      if (existingApp && existingApp.status !== 'draft') {
+        return res.status(409).json({
+          message: `You already have an application (${existingApp.applicationNumber}) in status "${existingApp.status}". Amendments are required instead of creating a new application.`,
+          existingApplicationId: existingApp.id,
+          status: existingApp.status,
+        });
+      }
+
+      const rawTehsilInput = validatedData.tehsil;
+      const rawTehsilOtherInput = validatedData.tehsilOther;
+      const {
+        tehsil: resolvedTehsilValue,
+        tehsilOther: resolvedTehsilOther,
+      } = resolveTehsilFields(rawTehsilInput, rawTehsilOtherInput);
+
+      console.log('[applications:create] incoming address', {
+        district: validatedData.district,
+        tehsil: validatedData.tehsil,
+        tehsilOther: validatedData.tehsilOther,
+        resolvedTehsilValue,
+        resolvedTehsilOther,
+        block: validatedData.block,
+        gramPanchayat: validatedData.gramPanchayat,
+        urbanBody: validatedData.urbanBody,
+      });
+
+      console.log('[applications:create] tehsil normalization', {
+        district: validatedData.district,
+        tehsilValueRaw: typeof rawTehsilInput === 'string' ? rawTehsilInput : null,
+        tehsilOtherValueRaw: typeof rawTehsilOtherInput === 'string' ? rawTehsilOtherInput : null,
+        resolvedTehsilValue,
+        resolvedTehsilOther,
+      });
+
+      const applicationPayload: any = removeUndefined({
         propertyName: validatedData.propertyName,
         category: validatedData.category,
         totalRooms,
         address: validatedData.address,
         district: validatedData.district,
+        block: validatedData.block || null,
+        blockOther: validatedData.blockOther || null,
+        gramPanchayat: validatedData.gramPanchayat || null,
+        gramPanchayatOther: validatedData.gramPanchayatOther || null,
+        urbanBody: validatedData.urbanBody || null,
+        urbanBodyOther: validatedData.urbanBodyOther || null,
+        ward: validatedData.ward || null,
         pincode: validatedData.pincode,
         locationType: validatedData.locationType,
-        telephone: validatedData.telephone,
-        fax: validatedData.fax,
-        
-        // Owner info
+        telephone: validatedData.telephone || null,
+        tehsil: resolvedTehsilValue,
+        tehsilOther: resolvedTehsilOther || null,
         ownerName: validatedData.ownerName,
+        propertyOwnership: validatedData.propertyOwnership || null,
         ownerMobile: validatedData.ownerMobile,
-        ownerEmail: validatedData.ownerEmail,
+        ownerEmail: validatedData.ownerEmail || null,
         ownerAadhaar: validatedData.ownerAadhaar,
-        
-        // Room & category details
         proposedRoomRate: validatedData.proposedRoomRate,
         singleBedRoomRate: validatedData.singleBedRoomRate,
         doubleBedRoomRate: validatedData.doubleBedRoomRate,
@@ -680,65 +1503,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectType: validatedData.projectType,
         propertyArea: validatedData.propertyArea,
         singleBedRooms: validatedData.singleBedRooms,
+        singleBedBeds: validatedData.singleBedBeds,
         singleBedRoomSize: validatedData.singleBedRoomSize,
         doubleBedRooms: validatedData.doubleBedRooms,
+        doubleBedBeds: validatedData.doubleBedBeds,
         doubleBedRoomSize: validatedData.doubleBedRoomSize,
         familySuites: validatedData.familySuites,
+        familySuiteBeds: validatedData.familySuiteBeds,
         familySuiteSize: validatedData.familySuiteSize,
         attachedWashrooms: validatedData.attachedWashrooms,
-        gstin: validatedData.gstin,
-        
-        // Distances
+        gstin: validatedData.gstin || null,
         distanceAirport: validatedData.distanceAirport,
         distanceRailway: validatedData.distanceRailway,
         distanceCityCenter: validatedData.distanceCityCenter,
         distanceShopping: validatedData.distanceShopping,
         distanceBusStand: validatedData.distanceBusStand,
-        
-        // Public areas
         lobbyArea: validatedData.lobbyArea,
         diningArea: validatedData.diningArea,
-        parkingArea: validatedData.parkingArea,
-        
-        // Additional facilities
-        ecoFriendlyFacilities: validatedData.ecoFriendlyFacilities,
-        differentlyAbledFacilities: validatedData.differentlyAbledFacilities,
-        fireEquipmentDetails: validatedData.fireEquipmentDetails,
-        nearestHospital: validatedData.nearestHospital,
-        
-        // Amenities
+        parkingArea: validatedData.parkingArea || null,
+        ecoFriendlyFacilities: validatedData.ecoFriendlyFacilities || null,
+        differentlyAbledFacilities: validatedData.differentlyAbledFacilities || null,
+        fireEquipmentDetails: validatedData.fireEquipmentDetails || null,
+        nearestHospital: validatedData.nearestHospital || null,
         amenities: validatedData.amenities,
-        
-        // 2025 Fee Structure (from frontend, convert to strings for DB)
-        baseFee: String(validatedData.baseFee),
-        totalBeforeDiscounts: validatedData.totalBeforeDiscounts ? String(validatedData.totalBeforeDiscounts) : undefined,
-        validityDiscount: validatedData.validityDiscount ? String(validatedData.validityDiscount) : undefined,
-        femaleOwnerDiscount: validatedData.femaleOwnerDiscount ? String(validatedData.femaleOwnerDiscount) : undefined,
-        pangiDiscount: validatedData.pangiDiscount ? String(validatedData.pangiDiscount) : undefined,
-        totalDiscount: validatedData.totalDiscount ? String(validatedData.totalDiscount) : undefined,
-        totalFee: String(validatedData.totalFee),
-        // Legacy fields
-        perRoomFee: validatedData.perRoomFee ? String(validatedData.perRoomFee) : undefined,
-        gstAmount: validatedData.gstAmount ? String(validatedData.gstAmount) : undefined,
-        
-        // 2025 Fields
+        baseFee: typeof validatedData.baseFee === 'string' ? Number(validatedData.baseFee) : validatedData.baseFee,
+        totalBeforeDiscounts: typeof validatedData.totalBeforeDiscounts === 'string' ? Number(validatedData.totalBeforeDiscounts) : validatedData.totalBeforeDiscounts ?? null,
+        validityDiscount: typeof validatedData.validityDiscount === 'string' ? Number(validatedData.validityDiscount) : validatedData.validityDiscount ?? null,
+        femaleOwnerDiscount: typeof validatedData.femaleOwnerDiscount === 'string' ? Number(validatedData.femaleOwnerDiscount) : validatedData.femaleOwnerDiscount ?? null,
+        pangiDiscount: typeof validatedData.pangiDiscount === 'string' ? Number(validatedData.pangiDiscount) : validatedData.pangiDiscount ?? null,
+        totalDiscount: typeof validatedData.totalDiscount === 'string' ? Number(validatedData.totalDiscount) : validatedData.totalDiscount ?? null,
+        totalFee: typeof validatedData.totalFee === 'string' ? Number(validatedData.totalFee) : validatedData.totalFee,
+        perRoomFee: typeof validatedData.perRoomFee === 'string' ? Number(validatedData.perRoomFee) : validatedData.perRoomFee ?? null,
+        gstAmount: typeof validatedData.gstAmount === 'string' ? Number(validatedData.gstAmount) : validatedData.gstAmount ?? null,
         certificateValidityYears: validatedData.certificateValidityYears,
-        isPangiSubDivision: validatedData.isPangiSubDivision,
-        ownerGender: validatedData.ownerGender,
-        tehsil: validatedData.tehsil,
-        
-        // Coordinates (optional)
-        latitude: validatedData.latitude,
-        longitude: validatedData.longitude,
-        
+        isPangiSubDivision: validatedData.isPangiSubDivision ?? false,
+        ownerGender: validatedData.ownerGender || null,
+        latitude: validatedData.latitude || null,
+        longitude: validatedData.longitude || null,
         userId,
-        status: 'submitted',
+      });
+
+      const normalizedDocuments = normalizeDocumentsForPersistence(validatedData.documents);
+      const submissionPolicy = await getUploadPolicy();
+      const submissionDocsError = validateDocumentsAgainstPolicy(
+        normalizedDocuments as NormalizedDocumentRecord[] | undefined,
+        submissionPolicy,
+      );
+      if (submissionDocsError) {
+        return res.status(400).json({ message: submissionDocsError });
+      }
+      if (normalizedDocuments) {
+        applicationPayload.documents = normalizedDocuments;
+      }
+
+      let application;
+      const submissionMeta = {
+        status: 'submitted' as const,
         submittedAt: new Date(),
-      }, { trusted: true });
-      
-      // Save documents with actual metadata if provided
-      if (validatedData.documents && validatedData.documents.length > 0) {
-        for (const doc of validatedData.documents) {
+      };
+
+      if (existingApp) {
+        application = await storage.updateApplication(
+          existingApp.id,
+          removeUndefined({
+            ...applicationPayload,
+            ...submissionMeta,
+          }) as any,
+        );
+
+        if (!application) {
+          throw new Error("Failed to update existing application");
+        }
+      } else {
+        application = await storage.createApplication(
+          {
+            ...applicationPayload,
+            ...submissionMeta,
+          } as any,
+          { trusted: true },
+        );
+      }
+
+      if (normalizedDocuments && normalizedDocuments.length > 0) {
+        await storage.deleteDocumentsByApplication(application.id);
+        for (const doc of normalizedDocuments) {
           await storage.createDocument({
             applicationId: application.id,
             documentType: doc.documentType,
@@ -817,6 +1665,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/applications/search", requireRole('dealing_assistant', 'district_tourism_officer', 'district_officer', 'state_officer', 'admin'), async (req, res) => {
+    try {
+      const {
+        applicationNumber,
+        ownerMobile,
+        ownerAadhaar,
+        month,
+        year,
+        fromDate,
+        toDate,
+      } = (req.body ?? {}) as Record<string, string | undefined>;
+
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const searchConditions: any[] = [];
+
+      if (typeof applicationNumber === "string" && applicationNumber.trim()) {
+        searchConditions.push(eq(homestayApplications.applicationNumber, applicationNumber.trim()));
+      }
+
+      if (typeof ownerMobile === "string" && ownerMobile.trim()) {
+        searchConditions.push(eq(homestayApplications.ownerMobile, ownerMobile.trim()));
+      }
+
+      if (typeof ownerAadhaar === "string" && ownerAadhaar.trim()) {
+        searchConditions.push(eq(homestayApplications.ownerAadhaar, ownerAadhaar.trim()));
+      }
+
+      let rangeStart: Date | undefined;
+      let rangeEnd: Date | undefined;
+
+      if (fromDate || toDate) {
+        if (fromDate) {
+          const parsed = new Date(fromDate);
+          if (!Number.isNaN(parsed.getTime())) {
+            rangeStart = parsed;
+          }
+        }
+        if (toDate) {
+          const parsed = new Date(toDate);
+          if (!Number.isNaN(parsed.getTime())) {
+            parsed.setHours(23, 59, 59, 999);
+            rangeEnd = parsed;
+          }
+        }
+      } else if (month && year) {
+        const monthNum = Number(month);
+        const yearNum = Number(year);
+        if (
+          Number.isInteger(monthNum) &&
+          Number.isInteger(yearNum) &&
+          monthNum >= 1 &&
+          monthNum <= 12
+        ) {
+          rangeStart = new Date(yearNum, monthNum - 1, 1);
+          rangeEnd = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+        }
+      }
+
+      if (rangeStart) {
+        searchConditions.push(gte(homestayApplications.createdAt, rangeStart));
+      }
+      if (rangeEnd) {
+        searchConditions.push(lte(homestayApplications.createdAt, rangeEnd));
+      }
+
+      if (searchConditions.length === 0) {
+        return res.status(400).json({
+          message: "Provide at least one search filter (application number, phone, Aadhaar, or date range).",
+        });
+      }
+
+      const filters = [...searchConditions];
+
+      if (
+        user.role === 'district_officer' ||
+        user.role === 'district_tourism_officer' ||
+        user.role === 'dealing_assistant'
+      ) {
+        if (!user.district) {
+          return res.status(400).json({ message: "Your profile is missing district information." });
+        }
+        filters.push(eq(homestayApplications.district, user.district));
+      }
+
+      const whereClause =
+        filters.length === 1 ? filters[0] : and(...filters);
+
+      const results = await db
+        .select()
+        .from(homestayApplications)
+        .where(whereClause)
+        .orderBy(desc(homestayApplications.createdAt))
+        .limit(200);
+
+      res.json({ results });
+    } catch (error) {
+      console.error('[application-search] Error searching applications:', error);
+      res.status(500).json({ message: "Failed to search applications" });
+    }
+  });
+
   // Get single application
   app.get("/api/applications/:id", requireAuth, async (req, res) => {
     try {
@@ -827,9 +1782,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check permissions
       const userId = req.session.userId!;
-      const user = await storage.getUser(userId);
+      const currentUser = await storage.getUser(userId);
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
       
-      if (user?.role === 'property_owner' && application.userId !== userId) {
+      if (currentUser.role === 'property_owner' && application.userId !== userId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -872,7 +1830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // LGD Hierarchical Address
         district: z.string().min(2, "District is required").optional(),
         districtOther: z.string().optional().or(z.literal('')),
-        tehsil: z.string().min(2, "Tehsil is required").optional(),
+        tehsil: z.string().optional(),
         tehsilOther: z.string().optional().or(z.literal('')),
         block: z.string().optional().or(z.literal('')),
         blockOther: z.string().optional().or(z.literal('')),
@@ -886,7 +1844,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: z.string().min(10, "Address must be at least 10 characters").optional(),
         pincode: z.string().regex(/^[1-9]\d{5}$/, "Invalid pincode").optional(),
         telephone: z.string().optional().or(z.literal('')),
-        fax: z.string().optional().or(z.literal('')),
         latitude: z.string().optional().or(z.literal('')),
         longitude: z.string().optional().or(z.literal('')),
         
@@ -904,12 +1861,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Per Room Type Details (2025 Rules)
         singleBedRooms: z.coerce.number().int().min(0).optional(),
+        singleBedBeds: z.coerce.number().int().min(0).optional(),
         singleBedRoomSize: z.coerce.number().min(0).optional(),
         singleBedRoomRate: z.coerce.number().min(100, "Rate must be at least ₹100").optional(),
         doubleBedRooms: z.coerce.number().int().min(0).optional(),
+        doubleBedBeds: z.coerce.number().int().min(0).optional(),
         doubleBedRoomSize: z.coerce.number().min(0).optional(),
         doubleBedRoomRate: z.coerce.number().min(100, "Rate must be at least ₹100").optional(),
         familySuites: z.coerce.number().int().min(0).max(3).optional(),
+        familySuiteBeds: z.coerce.number().int().min(0).optional(),
         familySuiteSize: z.coerce.number().min(0).optional(),
         familySuiteRate: z.coerce.number().min(100, "Rate must be at least ₹100").optional(),
         
@@ -975,10 +1935,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Documents (validated JSONB structure)
         documents: z.array(z.object({
-          id: z.string(),
-          name: z.string(),
-          type: z.string(),
-          url: z.string(),
+          id: z.string().optional(),
+          name: z.string().optional(),
+          type: z.string().optional(),
+          url: z.string().optional(),
+          fileName: z.string().optional(),
+          filePath: z.string().optional(),
+          fileUrl: z.string().optional(),
+          documentType: z.string().optional(),
+          fileSize: z.preprocess((value) => {
+            if (typeof value === "string" && value.trim() !== "") {
+              const parsed = Number(value);
+              return Number.isNaN(parsed) ? value : parsed;
+            }
+            return value;
+          }, z.number().optional()),
+          mimeType: z.string().optional(),
           uploadedAt: z.string().optional(),
           required: z.boolean().optional(),
         })).optional(),
@@ -997,13 +1969,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // NOTE: Clearing clarificationRequested and dtdoRemarks removes officer feedback
       // from the application record. If audit trail is required, consider logging
       // these to an application_actions table before clearing.
+      const decimalFields = [
+        'propertyArea',
+        'singleBedRoomSize',
+        'singleBedRoomRate',
+        'doubleBedRoomSize',
+        'doubleBedRoomRate',
+        'familySuiteSize',
+        'familySuiteRate',
+        'distanceAirport',
+        'distanceRailway',
+        'distanceCityCenter',
+        'distanceShopping',
+        'distanceBusStand',
+        'lobbyArea',
+        'diningArea',
+        'averageRoomRate',
+        'highestRoomRate',
+        'lowestRoomRate',
+        'totalBeforeDiscounts',
+        'validityDiscount',
+        'femaleOwnerDiscount',
+        'pangiDiscount',
+        'totalDiscount',
+        'totalFee',
+        'perRoomFee',
+        'gstAmount',
+      ] as const;
+
+      const normalizedUpdate: Record<string, unknown> = { ...validatedData };
+      const normalizedDocuments = normalizeDocumentsForPersistence(validatedData.documents);
+      const updatePolicy = await getUploadPolicy();
+      const updateDocsError = validateDocumentsAgainstPolicy(
+        normalizedDocuments as NormalizedDocumentRecord[] | undefined,
+        updatePolicy,
+      );
+      if (updateDocsError) {
+        return res.status(400).json({ message: updateDocsError });
+      }
+      if (normalizedDocuments) {
+        normalizedUpdate.documents = normalizedDocuments;
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(normalizedUpdate, "tehsil") ||
+        Object.prototype.hasOwnProperty.call(normalizedUpdate, "tehsilOther")
+      ) {
+        const { tehsil, tehsilOther } = resolveTehsilFields(
+          normalizedUpdate.tehsil,
+          normalizedUpdate.tehsilOther,
+        );
+        normalizedUpdate.tehsil = tehsil;
+        if (
+          Object.prototype.hasOwnProperty.call(normalizedUpdate, "tehsilOther")
+        ) {
+          normalizedUpdate.tehsilOther = tehsilOther;
+        }
+      }
+      for (const field of decimalFields) {
+        const value = normalizedUpdate[field as keyof typeof normalizedUpdate];
+        if (typeof value === 'number') {
+          normalizedUpdate[field as string] = value.toString();
+        }
+      }
+
+      // Keep totalRooms in sync whenever room counts change during corrections
+      const singleRooms =
+        typeof normalizedUpdate.singleBedRooms === "number"
+          ? normalizedUpdate.singleBedRooms
+          : application.singleBedRooms ?? 0;
+      const doubleRooms =
+        typeof normalizedUpdate.doubleBedRooms === "number"
+          ? normalizedUpdate.doubleBedRooms
+          : application.doubleBedRooms ?? 0;
+      const familySuites =
+        typeof normalizedUpdate.familySuites === "number"
+          ? normalizedUpdate.familySuites
+          : application.familySuites ?? 0;
+      const singleBeds =
+        typeof normalizedUpdate.singleBedBeds === "number"
+          ? normalizedUpdate.singleBedBeds
+          : application.singleBedBeds ?? ((singleRooms || 0) > 0 ? 1 : 0);
+      const doubleBeds =
+        typeof normalizedUpdate.doubleBedBeds === "number"
+          ? normalizedUpdate.doubleBedBeds
+          : application.doubleBedBeds ?? ((doubleRooms || 0) > 0 ? 2 : 0);
+      const suiteBeds =
+        typeof normalizedUpdate.familySuiteBeds === "number"
+          ? normalizedUpdate.familySuiteBeds
+          : application.familySuiteBeds ?? ((familySuites || 0) > 0 ? 4 : 0);
+      const totalRooms = Number(singleRooms || 0) + Number(doubleRooms || 0) + Number(familySuites || 0);
+      const totalBeds =
+        Number(singleRooms || 0) * Number(singleBeds || 0) +
+        Number(doubleRooms || 0) * Number(doubleBeds || 0) +
+        Number(familySuites || 0) * Number(suiteBeds || 0);
+      if (totalRooms > MAX_ROOMS_ALLOWED) {
+        return res.status(400).json({
+          message: `HP Homestay Rules 2025 permit a maximum of ${MAX_ROOMS_ALLOWED} rooms.`,
+        });
+      }
+      if (totalBeds > MAX_BEDS_ALLOWED) {
+        return res.status(400).json({
+          message: `Total beds cannot exceed ${MAX_BEDS_ALLOWED} across all room types.`,
+        });
+      }
+      const updatedAttachedWashrooms =
+        typeof normalizedUpdate.attachedWashrooms === "number"
+          ? normalizedUpdate.attachedWashrooms
+          : application.attachedWashrooms ?? 0;
+      if (totalRooms > 0 && Number(updatedAttachedWashrooms || 0) < totalRooms) {
+        return res.status(400).json({
+          message: "Every room must have its own washroom. Increase attached washrooms to at least the total number of rooms.",
+        });
+      }
+      normalizedUpdate.totalRooms = totalRooms;
+
       const updatedApplication = await storage.updateApplication(id, {
-        ...validatedData,
+        ...normalizedUpdate,
         status: 'submitted',
         submittedAt: new Date(),
         clarificationRequested: null, // Clear DA feedback after resubmission
         dtdoRemarks: null, // Clear DTDO feedback after resubmission
-      });
+      } as Partial<HomestayApplication>);
+
+      if (normalizedDocuments) {
+        await storage.deleteDocumentsByApplication(id);
+        for (const doc of normalizedDocuments) {
+          await storage.createDocument({
+            applicationId: id,
+            documentType: doc.documentType,
+            fileName: doc.fileName,
+            filePath: doc.filePath,
+            fileSize: doc.fileSize,
+            mimeType: doc.mimeType,
+          });
+        }
+      }
       
       res.json({ application: updatedApplication });
     } catch (error) {
@@ -1266,7 +2366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateUser(userId, {
         fullName: fullName.trim(),
         email: email?.trim() || null,
-        mobile: mobile.trim(),
+        mobile: mobile ? mobile.trim() : undefined,
       });
 
       res.json({ user: updated, message: "Profile updated successfully" });
@@ -1297,7 +2397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify current password
-      const isValid = await bcrypt.compare(currentPassword, user.password);
+      const isValid = await bcrypt.compare(currentPassword, user.password || "");
       if (!isValid) {
         return res.status(401).json({ message: "Current password is incorrect" });
       }
@@ -1325,21 +2425,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "DA must be assigned to a district" });
       }
 
-      // Get all applications from this DA's district with relevant statuses
+      // Get all applications from this DA's district ordered by most recent
       const allApplications = await db
         .select()
         .from(homestayApplications)
-        .where(eq(homestayApplications.district, user.district));
-
-      // Filter for DA-relevant statuses: submitted, under_scrutiny, forwarded_to_dtdo, reverted_to_applicant
-      const daRelevantStatuses = ['submitted', 'under_scrutiny', 'forwarded_to_dtdo', 'reverted_to_applicant'];
-      const relevantApplications = allApplications.filter(app => 
-        daRelevantStatuses.includes(app.status)
-      );
+        .where(eq(homestayApplications.district, user.district))
+        .orderBy(desc(homestayApplications.createdAt));
 
       // Enrich with owner information
       const applicationsWithOwner = await Promise.all(
-        relevantApplications.map(async (app) => {
+        allApplications.map(async (app) => {
           const owner = await storage.getUser(app.userId);
           return {
             ...app,
@@ -1359,32 +2454,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get single application details for DA
   app.get("/api/da/applications/:id", requireRole('dealing_assistant'), async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUser(userId);
-      
-      const application = await storage.getApplication(req.params.id);
-      if (!application) {
+      const userRecord = await storage.getUser(req.session.userId!);
+      const detail = await fetchApplicationWithOwner(req.params.id);
+
+      if (!detail?.application) {
         return res.status(404).json({ message: "Application not found" });
       }
 
-      // Verify application is from DA's district
-      if (user?.district && application.district !== user.district) {
-        return res.status(403).json({ message: "You can only access applications from your district" });
-      }
-
-      // Get owner information
-      const owner = await storage.getUser(application.userId);
-      
-      // Get documents
       const documents = await storage.getDocumentsByApplication(req.params.id);
 
       res.json({
-        application,
-        owner: owner ? {
-          fullName: owner.fullName,
-          mobile: owner.mobile,
-          email: owner.email,
-        } : null,
+        application: detail.application,
+        owner: detail.owner,
         documents,
       });
     } catch (error) {
@@ -1458,7 +2539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only applications under scrutiny can be forwarded" });
       }
 
-      await storage.updateApplication(req.params.id, { status: 'forwarded_to_dtdo' });
+      await storage.updateApplication(req.params.id, { status: 'forwarded_to_dtdo' } as Partial<HomestayApplication>);
       
       // TODO: Add timeline entry with remarks when timeline system is implemented
       
@@ -1487,7 +2568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Only applications under scrutiny can be sent back" });
       }
 
-      await storage.updateApplication(req.params.id, { status: 'reverted_to_applicant' });
+      await storage.updateApplication(req.params.id, { status: 'reverted_to_applicant' } as Partial<HomestayApplication>);
       
       // TODO: Add timeline entry with reason when timeline system is implemented
       // TODO: Send notification to applicant
@@ -1513,31 +2594,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "DTDO must be assigned to a district" });
       }
 
-      // Get all applications from this DTDO's district with relevant statuses
+      // Get all applications from this DTDO's district ordered by most recent
       const allApplications = await db
         .select()
         .from(homestayApplications)
-        .where(eq(homestayApplications.district, user.district));
-
-      // Filter for DTDO-relevant statuses
-      const dtdoRelevantStatuses = [
-        'forwarded_to_dtdo',
-        'dtdo_review',
-        'inspection_scheduled',
-        'inspection_under_review'
-      ];
-      const relevantApplications = allApplications.filter(app => 
-        dtdoRelevantStatuses.includes(app.status)
-      );
+        .where(eq(homestayApplications.district, user.district))
+        .orderBy(desc(homestayApplications.createdAt));
 
       // Enrich with owner and DA information
       const applicationsWithDetails = await Promise.all(
-        relevantApplications.map(async (app) => {
+        allApplications.map(async (app) => {
           const owner = await storage.getUser(app.userId);
           
           // Get DA name if the application was forwarded by DA
           let daName = undefined;
-          if (app.daRemarks || app.daId) {
+          const daRemarks = (app as unknown as { daRemarks?: string }).daRemarks;
+          if (daRemarks || app.daId) {
             const da = app.daId ? await storage.getUser(app.daId) : null;
             daName = da?.fullName || 'Unknown DA';
           }
@@ -1607,6 +2679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dtdo/applications/:id/accept", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
     try {
       const { remarks } = req.body;
+      const trimmedRemarks = typeof remarks === "string" ? remarks.trim() : "";
+      if (!trimmedRemarks) {
+        return res.status(400).json({ message: "Remarks are required when scheduling an inspection." });
+      }
       const userId = req.session.userId!;
       const user = await storage.getUser(userId);
 
@@ -1629,7 +2705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Will only move to inspection_scheduled after successful inspection scheduling
       await storage.updateApplication(req.params.id, {
         status: 'dtdo_review',
-        dtdoRemarks: remarks || null,
+        dtdoRemarks: trimmedRemarks,
         dtdoId: userId,
         dtdoReviewDate: new Date(),
       });
@@ -2338,59 +3414,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get analytics dashboard data
   app.get("/api/analytics/dashboard", requireRole("dealing_assistant", "district_tourism_officer", "district_officer", "state_officer", "admin"), async (req, res) => {
     try {
+      const userId = req.session.userId!;
+      const currentUser = await storage.getUser(userId);
+
       const allApplications = await storage.getAllApplications();
       const allUsers = await storage.getAllUsers();
-      
-      // Calculate overview stats
-      const total = allApplications.length;
-      const byStatus = {
-        pending: allApplications.filter(a => a.status === 'pending').length,
-        district_review: allApplications.filter(a => a.status === 'district_review').length,
-        state_review: allApplications.filter(a => a.status === 'state_review').length,
-        approved: allApplications.filter(a => a.status === 'approved').length,
-        rejected: allApplications.filter(a => a.status === 'rejected').length,
+
+      const normalizeStatus = (status: string | null | undefined) =>
+        (status ?? "").trim().toLowerCase();
+
+      const shouldScopeByDistrict =
+        currentUser &&
+        ["dealing_assistant", "district_tourism_officer", "district_officer"].includes(currentUser.role) &&
+        typeof currentUser.district === "string" &&
+        currentUser.district.length > 0;
+
+      const scopedApplications = shouldScopeByDistrict
+        ? allApplications.filter((app) => app.district === currentUser!.district)
+        : allApplications;
+
+      const scopedOwners = shouldScopeByDistrict
+        ? allUsers.filter((user) => user.role === "property_owner" && user.district === currentUser!.district)
+        : allUsers.filter((user) => user.role === "property_owner");
+
+      const byStatusNew = {
+        submitted: scopedApplications.filter((app) => normalizeStatus(app.status) === "submitted").length,
+        under_scrutiny: scopedApplications.filter((app) => normalizeStatus(app.status) === "under_scrutiny").length,
+        forwarded_to_dtdo: scopedApplications.filter((app) => normalizeStatus(app.status) === "forwarded_to_dtdo").length,
+        dtdo_review: scopedApplications.filter((app) => normalizeStatus(app.status) === "dtdo_review").length,
+        inspection_scheduled: scopedApplications.filter((app) => normalizeStatus(app.status) === "inspection_scheduled").length,
+        inspection_under_review: scopedApplications.filter((app) => normalizeStatus(app.status) === "inspection_under_review").length,
+        reverted_to_applicant: scopedApplications.filter((app) => normalizeStatus(app.status) === "reverted_to_applicant").length,
+        approved: scopedApplications.filter((app) => normalizeStatus(app.status) === "approved").length,
+        rejected: scopedApplications.filter((app) => normalizeStatus(app.status) === "rejected").length,
+        draft: scopedApplications.filter((app) => normalizeStatus(app.status) === "draft").length,
+      } as const;
+
+      const byStatusLegacy = {
+        pending: byStatusNew.submitted,
+        district_review: byStatusNew.under_scrutiny,
+        state_review: byStatusNew.dtdo_review,
+        approved: byStatusNew.approved,
+        rejected: byStatusNew.rejected,
       };
-      
-      // Calculate category distribution
+
+      const byStatus = { ...byStatusNew, ...byStatusLegacy };
+
+      const total = scopedApplications.length;
+      const newApplications = byStatus.submitted;
+
       const byCategory = {
-        diamond: allApplications.filter(a => a.category === 'diamond').length,
-        gold: allApplications.filter(a => a.category === 'gold').length,
-        silver: allApplications.filter(a => a.category === 'silver').length,
+        diamond: scopedApplications.filter((a) => a.category === 'diamond').length,
+        gold: scopedApplications.filter((a) => a.category === 'gold').length,
+        silver: scopedApplications.filter((a) => a.category === 'silver').length,
       };
-      
-      // Calculate district distribution
+
       const districtCounts: Record<string, number> = {};
-      allApplications.forEach(app => {
+      scopedApplications.forEach(app => {
         districtCounts[app.district] = (districtCounts[app.district] || 0) + 1;
       });
-      
-      // Calculate average processing time for approved applications
-      const approvedApps = allApplications.filter(a => a.status === 'approved' && a.submittedAt && a.stateReviewDate);
+
+      const approvedApps = scopedApplications.filter(a => a.status === 'approved' && a.submittedAt && a.stateReviewDate);
       const processingTimes = approvedApps.map(app => {
         const submitted = new Date(app.submittedAt!).getTime();
         const approved = new Date(app.stateReviewDate!).getTime();
-        return Math.floor((approved - submitted) / (1000 * 60 * 60 * 24)); // days
+        return Math.floor((approved - submitted) / (1000 * 60 * 60 * 24));
       });
       const avgProcessingTime = processingTimes.length > 0
         ? Math.round(processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length)
         : 0;
-      
-      // Recent applications (last 10)
-      const recentApplications = [...allApplications]
+
+      const recentApplications = [...scopedApplications]
         .sort((a, b) => {
           const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
           const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
           return dateB - dateA;
         })
         .slice(0, 10);
-      
+
       res.json({
         overview: {
           total,
+          newApplications,
           byStatus,
           byCategory,
           avgProcessingTime,
-          totalOwners: allUsers.filter(u => u.role === 'property_owner').length,
+          totalOwners: scopedOwners.length,
         },
         districts: districtCounts,
         recentApplications,
@@ -2495,7 +3604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         certificateExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         submittedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
         approvedAt: new Date(),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 2. Pine Valley Homestay - Gold - State Review
       await storage.createApplication({
@@ -2533,7 +3642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         districtReviewDate: new Date(),
         districtNotes: "Good property, forwarded to state level",
         submittedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 3. Cedar Wood Cottage - Silver - District Review
       await storage.createApplication({
@@ -2566,7 +3675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "district_review",
         currentStage: "district",
         submittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 4. Himalayan Heritage Home - Gold - Approved
       await storage.createApplication({
@@ -2612,7 +3721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         certificateExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         submittedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         approvedAt: new Date(),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 5. Snowfall Cottage - Silver - Submitted
       await storage.createApplication({
@@ -2646,7 +3755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "submitted",
         currentStage: "district",
         submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 6. Devdar Manor - Diamond - Approved
       await storage.createApplication({
@@ -2694,7 +3803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         certificateExpiryDate: new Date(Date.now() + 360 * 24 * 60 * 60 * 1000),
         submittedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
         approvedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 7. Maple Tree Homestay - Gold - Approved
       await storage.createApplication({
@@ -2740,7 +3849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         certificateExpiryDate: new Date(Date.now() + 358 * 24 * 60 * 60 * 1000),
         submittedAt: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000),
         approvedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 8. Oak Ridge Villa - Silver - Approved
       await storage.createApplication({
@@ -2784,7 +3893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         certificateExpiryDate: new Date(Date.now() + 359 * 24 * 60 * 60 * 1000),
         submittedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
         approvedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 9. Riverside Haven - Gold - District Review
       await storage.createApplication({
@@ -2820,7 +3929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "district_review",
         currentStage: "district",
         submittedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       // 10. Alpine Chalet - Diamond - State Review
       await storage.createApplication({
@@ -2861,7 +3970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         districtReviewDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
         districtNotes: "Luxury property with all modern amenities. Forwarded to state",
         submittedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-      }, { trusted: true });
+      } as any, { trusted: true });
 
       res.json({
         success: true,
@@ -2960,7 +4069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stateReviewDate: new Date(),
           stateNotes: "Approved for tourism operations.",
           certificateNumber: "HP-HM-2025-001",
-        }, { trusted: true });
+        } as any, { trusted: true });
 
         const app2 = await storage.createApplication({
           userId: owner.id,
@@ -2993,7 +4102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stateReviewDate: new Date(),
           stateNotes: "Approved for tourism operations.",
           certificateNumber: "HP-HM-2025-002",
-        }, { trusted: true });
+        } as any, { trusted: true });
 
         res.json({
           message: "Sample data created",
@@ -3032,6 +4141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.body;
       
       // Fetch target user first to check their role
+      const currentUser = await storage.getUser(req.session.userId!);
       const targetUser = await storage.getUser(id);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
@@ -3111,17 +4221,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Prevent admins from changing their own role or deactivating themselves
-      if (id === req.user?.id) {
-        if (role && role !== req.user.role) {
+      if (currentUser && id === currentUser.id) {
+        if (role && role !== currentUser.role) {
           return res.status(400).json({ message: "Cannot change your own role" });
         }
         if (isActive === false) {
           return res.status(400).json({ message: "Cannot deactivate your own account" });
         }
       }
-      
+
       // Prevent any admin from changing another admin's role or deactivating them
-      if (targetUser.role === 'admin' && id !== req.user?.id) {
+      if (targetUser.role === 'admin' && (!currentUser || id !== currentUser.id)) {
         if (role && role !== targetUser.role) {
           return res.status(403).json({ message: "Cannot change another admin's role" });
         }
@@ -3149,7 +4259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { isActive } = req.body;
       
       // Prevent admins from deactivating themselves
-      if (id === req.user?.id && isActive === false) {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (currentUser && id === currentUser.id && isActive === false) {
         return res.status(400).json({ message: "Cannot deactivate your own account" });
       }
       
@@ -3159,7 +4270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      if (user.role === 'admin' && !isActive && user.id !== req.user?.id) {
+      if (user.role === 'admin' && !isActive && (!currentUser || user.id !== currentUser.id)) {
         return res.status(400).json({ message: "Cannot deactivate other admin users" });
       }
       
@@ -3481,7 +4592,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Count by status
       const statusCounts = allApplications.reduce((acc, app) => {
-        acc[app.status] = (acc[app.status] || 0) + 1;
+        const statusKey = app.status ?? 'unknown';
+        acc[statusKey] = (acc[statusKey] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
@@ -3501,8 +4613,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get payments
       const allPayments = await db.select().from(payments);
-      const completedPayments = allPayments.filter(p => p.status === 'completed');
-      const totalAmount = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const completedPayments = allPayments.filter(p => p.paymentStatus === 'completed');
+      const totalAmount = completedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
       res.json({
         applications: {
@@ -3541,7 +4653,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/stats", requireRole('super_admin'), async (req, res) => {
     try {
       const environment = process.env.NODE_ENV || 'development';
-      const resetEnabled = environment === 'development' || environment === 'test';
+      const [superConsoleSetting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, 'admin_super_console_enabled'))
+        .limit(1);
+
+      let superConsoleOverride = false;
+      if (superConsoleSetting) {
+        const value = superConsoleSetting.settingValue as any;
+        if (typeof value === 'boolean') {
+          superConsoleOverride = value;
+        } else if (value && typeof value === 'object') {
+          if ('enabled' in value) {
+            superConsoleOverride = Boolean(value.enabled);
+          }
+        } else if (typeof value === 'string') {
+          superConsoleOverride = value === 'true';
+        }
+      }
+
+      const resetEnabled = superConsoleOverride || environment === 'development' || environment === 'test';
 
       // Get counts
       const [
@@ -3559,7 +4691,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get application status breakdown
       const applications = await db.select().from(homestayApplications);
       const byStatus = applications.reduce((acc, app) => {
-        acc[app.status] = (acc[app.status] || 0) + 1;
+        const statusKey = app.status ?? 'unknown';
+        acc[statusKey] = (acc[statusKey] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
@@ -3593,10 +4726,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         environment,
         resetEnabled,
+        superConsoleOverride,
       });
     } catch (error) {
       console.error("[admin] Failed to fetch stats:", error);
       res.status(500).json({ message: "Failed to fetch system statistics" });
+    }
+  });
+
+  app.get("/api/admin/settings/super-console", requireRole('super_admin'), async (_req, res) => {
+    try {
+      const [setting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, 'admin_super_console_enabled'))
+        .limit(1);
+
+      let enabled = false;
+      if (setting) {
+        const value = setting.settingValue as any;
+        if (typeof value === 'boolean') {
+          enabled = value;
+        } else if (value && typeof value === 'object' && 'enabled' in value) {
+          enabled = Boolean(value.enabled);
+        } else if (typeof value === 'string') {
+          enabled = value === 'true';
+        }
+      }
+
+      res.json({ enabled, environment: process.env.NODE_ENV || 'development' });
+    } catch (error) {
+      console.error('[admin] Failed to fetch super console setting:', error);
+      res.status(500).json({ message: 'Failed to fetch super console setting' });
+    }
+  });
+
+  app.post("/api/admin/settings/super-console/toggle", requireRole('super_admin'), async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      const userId = req.session.userId || null;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ message: 'enabled must be a boolean' });
+      }
+
+      const [existingSetting] = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, 'admin_super_console_enabled'))
+        .limit(1);
+
+      if (existingSetting) {
+        const [updated] = await db
+          .update(systemSettings)
+          .set({
+            settingValue: { enabled },
+            description: existingSetting.description || 'Controls whether Super Admin Console is available in production environments',
+            category: existingSetting.category || 'security',
+            updatedBy: userId,
+            updatedAt: new Date(),
+          })
+          .where(eq(systemSettings.settingKey, 'admin_super_console_enabled'))
+          .returning();
+
+        console.log(`[admin] Super console override ${enabled ? 'enabled' : 'disabled'}`);
+        res.json(updated);
+      } else {
+        const [created] = await db
+          .insert(systemSettings)
+          .values({
+            settingKey: 'admin_super_console_enabled',
+            settingValue: { enabled },
+            description: 'Controls whether Super Admin Console is available in production environments',
+            category: 'security',
+            updatedBy: userId,
+          })
+          .returning();
+
+        console.log(`[admin] Super console override ${enabled ? 'enabled' : 'disabled'}`);
+        res.json(created);
+      }
+    } catch (error) {
+      console.error('[admin] Failed to toggle super console:', error);
+      res.status(500).json({ message: 'Failed to toggle super console' });
     }
   });
 
@@ -3631,7 +4843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { key } = req.params;
       const { settingValue, description } = req.body;
-      const userId = req.user?.id;
+      const userId = req.session.userId || null;
       
       if (!settingValue) {
         return res.status(400).json({ message: "Setting value is required" });
@@ -3707,7 +4919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/settings/payment/test-mode/toggle", requireRole('admin'), async (req, res) => {
     try {
       const { enabled } = req.body;
-      const userId = req.user?.id;
+      const userId = req.session.userId || null;
       
       if (typeof enabled !== 'boolean') {
         return res.status(400).json({ message: "enabled must be a boolean" });
@@ -4011,47 +5223,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Generate test applications
           const createdApps = [];
           for (let i = 0; i < count; i++) {
+            const nightlyRate = 2000 + (i * 150);
             const app = await storage.createApplication({
               userId: currentUser.id,
               propertyName: `Test Property ${i + 1}`,
-              propertyAddress: `Test Address ${i + 1}, Shimla`,
-              district: 'shimla',
+              category: ['diamond', 'gold', 'silver'][i % 3] as any,
+              totalRooms: 4,
+              address: `Test Address ${i + 1}, Shimla`,
+              district: 'Shimla',
               pincode: '171001',
               locationType: 'mc',
               ownerName: `Test Owner ${i + 1}`,
-              ownerMobile: `98765${String(i).padStart(5, '0')}`,
+              ownerMobile: `98${String(765000000 + i)}`,
               ownerEmail: `test${i + 1}@example.com`,
-              ownerAadhaar: `${String(i).padStart(12, '0')}`,
-              category: ['diamond', 'gold', 'silver'][i % 3] as any,
-              proposedRoomRate: 2000 + (i * 100),
+              ownerAadhaar: `${(100000000000 + i).toString().slice(-12)}`,
+              proposedRoomRate: nightlyRate,
               projectType: 'new_project',
-              propertyArea: 1000,
-              singleRooms: 2,
-              singleRoomSize: 120,
-              doubleRooms: 3,
-              doubleRoomSize: 150,
-              familyRooms: 1,
-              familyRoomSize: 200,
-              attachedWashrooms: 6,
-              gstin: i % 2 === 0 ? `22AAAAA${i}111Z${i}` : undefined,
-              airportDistance: 22,
-              railwayDistance: 5,
-              cityCenterDistance: 1,
-              shoppingDistance: 0.5,
-              busStandDistance: 2,
-              lobbyArea: 100,
-              diningArea: 80,
-              parkingDescription: 'Covered parking for 5 vehicles',
-              hasWifi: true,
-              hasParking: true,
-              hasAirConditioning: i % 2 === 0,
-              hasHotWater: true,
-              hasRoomService: i % 3 === 0,
-              hasComplimentaryBreakfast: i % 2 === 0,
+              propertyArea: 1200,
+              singleBedRooms: 2,
+              doubleBedRooms: 1,
+              familySuites: 1,
+              attachedWashrooms: 4,
+              amenities: {
+                wifi: true,
+                parking: i % 2 === 0,
+                restaurant: i % 3 === 0,
+              },
+              baseFee: (4000 + i * 250).toString(),
+              totalFee: (6000 + i * 300).toString(),
               status: 'draft',
               currentPage: 1,
               maxStepReached: 1,
-            });
+            } as any);
             createdApps.push(app);
           }
           return res.json({
@@ -4065,7 +5268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const roles = ['property_owner', 'dealing_assistant', 'district_tourism_officer', 'state_officer'];
           for (const role of roles) {
             const user = await storage.createUser({
-              name: `Test ${role.replace('_', ' ')}`,
+              fullName: `Test ${role.replace(/_/g, ' ')}`,
               mobile: `9${role.length}${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
               email: `test.${role}@example.com`,
               password: 'Test@123',
@@ -4121,9 +5324,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // File 2: Villages/Gram Panchayats with hierarchy
         // Headers: stateCode,stateNameEnglish,districtCode,districtNameEnglish,subdistrictCode,subdistrictNameEnglish,villageCode,villageNameEnglish,pincode
         
-        const districtMap = new Map();
-        const tehsilMap = new Map();
-        const villages = [];
+        type DistrictEntry = { lgdCode: string; districtName: string };
+        type TehsilEntry = { lgdCode: string; tehsilName: string; districtCode: string };
+        type VillageEntry = { lgdCode: string; gramPanchayatName: string; tehsilCode: string; districtCode: string; pincode: string | null };
+
+        const districtMap = new Map<string, DistrictEntry>();
+        const tehsilMap = new Map<string, TehsilEntry>();
+        const villages: VillageEntry[] = [];
 
         // Parse all rows
         for (let i = 1; i < lines.length; i++) {
@@ -4139,54 +5346,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const pincode = values[8];
 
           // Collect unique districts
-          if (!districtMap.has(districtCode)) {
-            districtMap.set(districtCode, { code: districtCode, name: districtName });
-          }
+          districtMap.set(districtCode, { lgdCode: districtCode, districtName });
 
           // Collect unique tehsils
           const tehsilKey = `${districtCode}-${tehsilCode}`;
-          if (!tehsilMap.has(tehsilKey)) {
-            tehsilMap.set(tehsilKey, {
-              code: tehsilCode,
-              name: tehsilName,
-              districtCode,
-            });
-          }
+          tehsilMap.set(tehsilKey, {
+            lgdCode: tehsilCode,
+            tehsilName,
+            districtCode,
+          });
 
           // Collect villages
           villages.push({
-            code: villageCode,
-            name: villageName,
+            lgdCode: villageCode,
+            gramPanchayatName: villageName,
             tehsilCode,
+            districtCode,
             pincode: pincode || null,
           });
         }
 
         // Insert districts
-        for (const [code, data] of districtMap) {
+        for (const [, data] of Array.from(districtMap.entries())) {
           await db.insert(lgdDistricts)
             .values({
-              code: data.code,
-              nameEnglish: data.name,
+              lgdCode: data.lgdCode,
+              districtName: data.districtName,
               isActive: true,
             })
             .onConflictDoNothing();
           inserted.districts++;
         }
 
-        // Insert tehsils
-        for (const [key, data] of tehsilMap) {
-          // Get district ID
-          const district = await db.query.lgdDistricts.findFirst({
-            where: eq(lgdDistricts.code, data.districtCode),
-          });
+        const existingDistricts = await db.select().from(lgdDistricts);
+        const districtIdMap = new Map<string, string>();
+        existingDistricts.forEach((district) => {
+          if (district.lgdCode) {
+            districtIdMap.set(district.lgdCode, district.id);
+          }
+          districtIdMap.set(district.districtName, district.id);
+        });
 
-          if (district) {
+        // Insert tehsils
+        for (const [, data] of Array.from(tehsilMap.entries())) {
+          const districtId = districtIdMap.get(data.districtCode);
+          if (districtId) {
             await db.insert(lgdTehsils)
               .values({
-                code: data.code,
-                nameEnglish: data.name,
-                districtId: district.id,
+                lgdCode: data.lgdCode,
+                tehsilName: data.tehsilName,
+                districtId,
                 isActive: true,
               })
               .onConflictDoNothing();
@@ -4196,28 +5405,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Insert gram panchayats (villages)
         for (const village of villages) {
-          // Get tehsil ID
-          const tehsil = await db.query.lgdTehsils.findFirst({
-            where: eq(lgdTehsils.code, village.tehsilCode),
-          });
+          const districtId = districtIdMap.get(village.districtCode);
+          if (!districtId) continue;
 
-          if (tehsil) {
-            await db.insert(lgdGramPanchayats)
-              .values({
-                code: village.code,
-                nameEnglish: village.name,
-                tehsilId: tehsil.id,
-                pincode: village.pincode,
-                isActive: true,
-              })
-              .onConflictDoNothing();
-            inserted.gramPanchayats++;
-          }
+          await db.insert(lgdGramPanchayats)
+            .values({
+              lgdCode: village.lgdCode,
+              gramPanchayatName: village.gramPanchayatName,
+              districtId,
+              blockId: null,
+              isActive: true,
+            })
+            .onConflictDoNothing();
+          inserted.gramPanchayats++;
         }
 
       } else if (dataType === 'urbanBodies') {
         // File 1: Urban Bodies (municipalities, town panchayats)
         // Headers: stateCode,stateNameEnglish,localBodyCode,localBodyNameEnglish,localBodyTypeName,pincode
+
+        const [defaultDistrict] = await db.select().from(lgdDistricts).limit(1);
 
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',');
@@ -4228,12 +5435,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const bodyType = values[4];
           const pincode = values[5];
 
+          if (!defaultDistrict) {
+            console.warn("[LGD] No districts available; skipping urban body import");
+            break;
+          }
+
+          const normalizedType: 'mc' | 'tcp' | 'np' = (() => {
+            const value = bodyType?.toLowerCase() || '';
+            if (value.includes('corporation')) return 'mc';
+            if (value.includes('council') || value.includes('tcp')) return 'tcp';
+            return 'np';
+          })();
+
           await db.insert(lgdUrbanBodies)
             .values({
-              code: bodyCode,
-              nameEnglish: bodyName,
-              type: bodyType,
-              pincode: pincode || null,
+              lgdCode: bodyCode,
+              urbanBodyName: bodyName,
+              bodyType: normalizedType,
+              districtId: defaultDistrict.id,
+              numberOfWards: null,
               isActive: true,
             })
             .onConflictDoNothing();
@@ -4266,3 +5486,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
+const fetchApplicationWithOwner = async (applicationId: string) => {
+  const [row] = await db
+    .select({
+      application: homestayApplications,
+      ownerName: users.fullName,
+      ownerMobile: users.mobile,
+      ownerEmail: users.email,
+    })
+    .from(homestayApplications)
+    .leftJoin(users, eq(users.id, homestayApplications.userId))
+    .where(eq(homestayApplications.id, applicationId))
+    .limit(1);
+
+  if (!row?.application) {
+    return null;
+  }
+
+  const owner =
+    row.ownerName || row.ownerMobile || row.ownerEmail
+      ? {
+          fullName: row.ownerName,
+          mobile: row.ownerMobile,
+          email: row.ownerEmail,
+        }
+      : null;
+
+  return {
+    application: row.application,
+    owner,
+  };
+};

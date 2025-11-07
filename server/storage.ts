@@ -21,6 +21,7 @@ export interface IStorage {
   // Document methods
   createDocument(doc: InsertDocument): Promise<Document>;
   getDocumentsByApplication(applicationId: string): Promise<Document[]>;
+  deleteDocumentsByApplication(applicationId: string): Promise<void>;
   
   // Payment methods
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -54,6 +55,16 @@ export class MemStorage implements IStorage {
   private notifications: Map<string, Notification>;
   private applicationActions: Map<string, ApplicationAction>;
 
+  private static normalizeNullable<T extends Record<string, any>>(input: T): T {
+    const normalized: Record<string, any> = { ...input };
+    for (const key of Object.keys(normalized)) {
+      if (normalized[key] === undefined) {
+        normalized[key] = null;
+      }
+    }
+    return normalized as T;
+  }
+
   constructor() {
     this.users = new Map();
     this.applications = new Map();
@@ -84,10 +95,20 @@ export class MemStorage implements IStorage {
     const user: User = { 
       ...insertUser, 
       id,
-      email: insertUser.email || null,
-      aadhaarNumber: insertUser.aadhaarNumber || null,
-      district: insertUser.district || null,
-      password: insertUser.password || null,
+      fullName: insertUser.fullName,
+      firstName: insertUser.firstName ?? null,
+      lastName: insertUser.lastName ?? null,
+      username: insertUser.username ?? null,
+      email: insertUser.email ?? null,
+      alternatePhone: insertUser.alternatePhone ?? null,
+      designation: insertUser.designation ?? null,
+      department: insertUser.department ?? null,
+      employeeId: insertUser.employeeId ?? null,
+      officeAddress: insertUser.officeAddress ?? null,
+      officePhone: insertUser.officePhone ?? null,
+      aadhaarNumber: insertUser.aadhaarNumber ?? null,
+      district: insertUser.district ?? null,
+      password: insertUser.password ?? null,
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -117,7 +138,9 @@ export class MemStorage implements IStorage {
   }
 
   async getApplicationsByUser(userId: string): Promise<HomestayApplication[]> {
-    return Array.from(this.applications.values()).filter(app => app.userId === userId);
+    return Array.from(this.applications.values())
+      .filter(app => app.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
   }
 
   async getApplicationsByDistrict(district: string): Promise<HomestayApplication[]> {
@@ -147,15 +170,15 @@ export class MemStorage implements IStorage {
     const submittedAt = isTrusted && insertApp.submittedAt ? insertApp.submittedAt : (status === 'pending' ? now : null);
     const currentStage = status === 'pending' ? 'district' : null;
     
-    const app: HomestayApplication = {
-      ...insertApp,
+    const app = ({
+      ...(MemStorage.normalizeNullable(insertApp) as InsertHomestayApplication),
       id,
       applicationNumber,
-      latitude: insertApp.latitude || null,
-      longitude: insertApp.longitude || null,
-      ownerEmail: insertApp.ownerEmail || null,
-      amenities: (insertApp.amenities || null) as any,
-      rooms: (insertApp.rooms || null) as any,
+      latitude: insertApp.latitude ?? null,
+      longitude: insertApp.longitude ?? null,
+      ownerEmail: insertApp.ownerEmail ?? null,
+      amenities: (insertApp.amenities ?? null) as any,
+      rooms: (insertApp.rooms ?? null) as any,
       status,
       currentStage,
       districtOfficerId: null,
@@ -173,7 +196,7 @@ export class MemStorage implements IStorage {
       approvedAt: null,
       createdAt: now,
       updatedAt: now,
-    };
+    } as unknown) as HomestayApplication;
     
     this.applications.set(id, app);
     return app;
@@ -198,18 +221,19 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const now = new Date();
     
-    const doc: Document = {
-      ...insertDoc,
+    const doc = ({
+      ...MemStorage.normalizeNullable(insertDoc),
       id,
       uploadDate: now,
-      aiVerificationStatus: insertDoc.aiVerificationStatus || null,
-      aiConfidenceScore: insertDoc.aiConfidenceScore || null,
-      aiNotes: insertDoc.aiNotes || null,
-      isVerified: insertDoc.isVerified || false,
-      verifiedBy: insertDoc.verifiedBy || null,
-      verificationDate: insertDoc.verificationDate || null,
-      verificationNotes: insertDoc.verificationNotes || null,
-    };
+      aiVerificationStatus: insertDoc.aiVerificationStatus ?? null,
+      aiConfidenceScore: insertDoc.aiConfidenceScore ?? null,
+      aiNotes: insertDoc.aiNotes ?? null,
+      isVerified: insertDoc.isVerified ?? false,
+      verifiedBy: insertDoc.verifiedBy ?? null,
+      verificationDate: insertDoc.verificationDate ?? null,
+      verificationNotes: insertDoc.verificationNotes ?? null,
+      verificationStatus: insertDoc.verificationStatus ?? 'pending',
+    } as unknown) as Document;
     
     this.documents.set(id, doc);
     return doc;
@@ -219,23 +243,35 @@ export class MemStorage implements IStorage {
     return Array.from(this.documents.values()).filter(doc => doc.applicationId === applicationId);
   }
 
+  async deleteDocumentsByApplication(applicationId: string): Promise<void> {
+    for (const [id, doc] of Array.from(this.documents.entries())) {
+      if (doc.applicationId === applicationId) {
+        this.documents.delete(id);
+      }
+    }
+  }
+
   // Payment methods
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
     const id = randomUUID();
     const now = new Date();
     const receiptNumber = `REC-2025-${String(this.payments.size + 1).padStart(6, '0')}`;
     
-    const payment: Payment = {
-      ...insertPayment,
+    const payment = ({
+      ...MemStorage.normalizeNullable(insertPayment),
       id,
-      gatewayTransactionId: insertPayment.gatewayTransactionId || null,
-      paymentMethod: insertPayment.paymentMethod || null,
-      paymentStatus: insertPayment.paymentStatus || 'pending',
+      paymentGateway: insertPayment.paymentGateway ?? null,
+      gatewayTransactionId: insertPayment.gatewayTransactionId ?? null,
+      paymentMethod: insertPayment.paymentMethod ?? null,
+      paymentStatus: insertPayment.paymentStatus ?? 'pending',
       initiatedAt: now,
-      completedAt: insertPayment.completedAt || null,
+      completedAt: insertPayment.completedAt ?? null,
       receiptNumber,
-      receiptUrl: insertPayment.receiptUrl || null,
-    };
+      receiptUrl: insertPayment.receiptUrl ?? null,
+      paymentLink: insertPayment.paymentLink ?? null,
+      qrCodeUrl: insertPayment.qrCodeUrl ?? null,
+      paymentLinkExpiryDate: insertPayment.paymentLinkExpiryDate ?? null,
+    } as unknown) as Payment;
     
     this.payments.set(id, payment);
     return payment;
@@ -267,11 +303,21 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const now = new Date();
     
+    const rawChannels = insertNotification.channels as { email?: boolean; sms?: boolean; whatsapp?: boolean; inapp?: boolean } | undefined;
+    const normalizedChannels = rawChannels
+      ? ({
+          email: rawChannels.email,
+          sms: rawChannels.sms,
+          whatsapp: rawChannels.whatsapp,
+          inapp: rawChannels.inapp,
+        } as Notification["channels"])
+      : { inapp: true, email: false, sms: false, whatsapp: false };
+
     const notification: Notification = {
       ...insertNotification,
       id,
       applicationId: insertNotification.applicationId || null,
-      channels: insertNotification.channels || { inapp: true, email: false, sms: false, whatsapp: false },
+      channels: normalizedChannels,
       isRead: false,
       readAt: null,
       createdAt: now,
@@ -284,7 +330,7 @@ export class MemStorage implements IStorage {
   async getNotificationsByUser(userId: string): Promise<Notification[]> {
     return Array.from(this.notifications.values())
       .filter(notif => notif.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
   }
 
   async markNotificationAsRead(id: string): Promise<void> {
@@ -307,7 +353,9 @@ export class MemStorage implements IStorage {
       previousStatus: insertAction.previousStatus || null,
       newStatus: insertAction.newStatus || null,
       feedback: insertAction.feedback || null,
-      issuesFound: insertAction.issuesFound || null,
+      issuesFound: Array.isArray(insertAction.issuesFound)
+        ? insertAction.issuesFound.map((issue) => String(issue))
+        : null,
       createdAt: now,
     };
     
@@ -318,7 +366,7 @@ export class MemStorage implements IStorage {
   async getApplicationActions(applicationId: string): Promise<ApplicationAction[]> {
     return Array.from(this.applicationActions.values())
       .filter(action => action.applicationId === applicationId)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
   }
 
   // Production Stats methods (stub for MemStorage - not used in production)

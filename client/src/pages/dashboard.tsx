@@ -1,18 +1,24 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
+import { Plus, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, CreditCard, Download } from "lucide-react";
 import type { User, HomestayApplication } from "@shared/schema";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type FilterType = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'sent_back' | 'payment_pending' | 'pending_review' | 'inspection';
 
 export default function Dashboard() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const queryClient = useQueryClient();
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  };
 
   const { data: userData, isLoading: userLoading, error } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -23,6 +29,27 @@ export default function Dashboard() {
     queryKey: ["/api/applications"],
     enabled: !!userData?.user,
   });
+
+  const searchParams = useMemo(() => {
+    const query = location.includes("?") ? location.split("?")[1] : "";
+    return new URLSearchParams(query);
+  }, [location]);
+
+  const paymentQuery = searchParams.get("payment");
+  const paymentApplicationId = searchParams.get("application");
+  const paymentApplicationNumber = searchParams.get("appNo");
+  const paymentSuccess = paymentQuery === "success" && !!paymentApplicationId;
+  const paymentFailed = paymentQuery === "failed" && !!paymentApplicationId;
+
+  useEffect(() => {
+    if (paymentQuery) {
+      const timer = window.setTimeout(() => {
+        const pathOnly = location.split("?")[0];
+        setLocation(pathOnly, true);
+      }, 6000);
+      return () => window.clearTimeout(timer);
+    }
+  }, [paymentQuery, location, setLocation]);
 
   if (userLoading) {
     return (
@@ -118,14 +145,14 @@ export default function Dashboard() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "warning", label: string }> = {
       draft: { variant: "outline", label: "Draft" },
       submitted: { variant: "secondary", label: "Submitted" },
       district_review: { variant: "secondary", label: "District Review" },
       state_review: { variant: "secondary", label: "State Review" },
-      sent_back_for_corrections: { variant: "destructive", label: "Sent Back for Corrections" },
-      reverted_to_applicant: { variant: "destructive", label: "Reverted by DA" },
-      reverted_by_dtdo: { variant: "destructive", label: "Reverted by DTDO" },
+      sent_back_for_corrections: { variant: "warning", label: "Sent Back for Corrections" },
+      reverted_to_applicant: { variant: "warning", label: "Reverted by DA" },
+      reverted_by_dtdo: { variant: "warning", label: "Reverted by DTDO" },
       inspection_scheduled: { variant: "secondary", label: "Inspection Scheduled" },
       inspection_completed: { variant: "secondary", label: "Inspection Completed" },
       payment_pending: { variant: "secondary", label: "Payment Pending" },
@@ -140,6 +167,42 @@ export default function Dashboard() {
   return (
     <div className="bg-background p-6">
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {paymentSuccess && (
+          <Alert className="mb-6 border-green-500 bg-green-50">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <div>
+              <AlertTitle>Payment Successful</AlertTitle>
+              <AlertDescription>
+                Application {paymentApplicationNumber || paymentApplicationId} is now approved.
+                Download your certificate from the application card below.
+              </AlertDescription>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => setLocation(`/applications/${paymentApplicationId}`)}
+                data-testid="button-view-certificate"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Certificate
+              </Button>
+            </div>
+          </Alert>
+        )}
+
+        {paymentFailed && (
+          <Alert className="mb-6 border-destructive/40 bg-red-50">
+            <XCircle className="h-5 w-5 text-red-600" />
+            <div>
+              <AlertTitle>Payment Failed</AlertTitle>
+              <AlertDescription>
+                We could not confirm the payment for application {paymentApplicationNumber || paymentApplicationId}.
+                Please try again or contact support with your HimKosh reference ID.
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold">Welcome, {user.fullName}!</h2>
@@ -156,15 +219,25 @@ export default function Dashboard() {
               <p className="text-muted-foreground">Administrator Dashboard</p>
             )}
           </div>
-          {user.role === 'property_owner' && (
+          <div className="flex items-center gap-2">
             <Button
-              onClick={() => setLocation("/applications/new")}
-              data-testid="button-new-application"
+              variant="outline"
+              onClick={handleRefresh}
+              data-testid="button-dashboard-refresh"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New Application
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
             </Button>
-          )}
+            {user.role === 'property_owner' && (
+              <Button
+                onClick={() => setLocation("/applications/new")}
+                data-testid="button-new-application"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Application
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Payment Required Alert */}
@@ -187,7 +260,7 @@ export default function Dashboard() {
               <Button 
                 onClick={() => {
                   const paymentApp = applications.find(a => a.status === 'payment_pending' || a.status === 'verified_for_payment');
-                  if (paymentApp) setLocation(`/applications/${paymentApp.id}/payment-gateway`);
+                  if (paymentApp) setLocation(`/applications/${paymentApp.id}/payment-himkosh`);
                 }}
                 data-testid="button-make-payment"
               >
@@ -200,11 +273,11 @@ export default function Dashboard() {
 
         {/* Action Required Alert */}
         {user.role === 'property_owner' && stats.sentBack > 0 && (
-          <Card className="mb-6 border-destructive">
+          <Card className="mb-6 border border-orange-400 bg-orange-50 dark:border-orange-500 dark:bg-orange-900/20">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-destructive" />
-                <CardTitle className="text-destructive">Action Required</CardTitle>
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <CardTitle className="text-orange-600">Action Required</CardTitle>
               </div>
               <CardDescription>
                 You have {stats.sentBack} application{stats.sentBack > 1 ? 's' : ''} sent back for corrections
@@ -216,10 +289,10 @@ export default function Dashboard() {
                 Please update and resubmit to continue processing.
               </p>
               <Button 
-                variant="destructive"
+                className="bg-orange-600 hover:bg-orange-700 text-white"
                 onClick={() => {
                   const sentBackApp = applications.find(a => a.status === 'sent_back_for_corrections' || a.status === 'reverted_to_applicant' || a.status === 'reverted_by_dtdo');
-                  if (sentBackApp) setLocation(`/applications/${sentBackApp.id}`);
+                  if (sentBackApp) setLocation(`/applications/new?application=${sentBackApp.id}`);
                 }}
                 data-testid="button-view-sent-back"
               >
@@ -251,17 +324,17 @@ export default function Dashboard() {
 
           {user.role === 'property_owner' && stats.sentBack > 0 && (
             <Card 
-              className={`border-destructive cursor-pointer hover-elevate transition-all ${activeFilter === 'sent_back' ? 'ring-2 ring-destructive' : ''}`}
+              className={`border border-orange-500 cursor-pointer hover-elevate transition-all ${activeFilter === 'sent_back' ? 'ring-2 ring-orange-500' : ''}`}
               onClick={() => setActiveFilter('sent_back')}
               data-testid="card-filter-sent-back"
             >
               <CardHeader className="pb-3">
                 <CardDescription>Sent Back</CardDescription>
-                <CardTitle className="text-3xl text-destructive" data-testid="stat-sent-back">{stats.sentBack}</CardTitle>
+                <CardTitle className="text-3xl text-orange-600" data-testid="stat-sent-back">{stats.sentBack}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center text-xs text-muted-foreground">
-                  <AlertCircle className="w-4 h-4 mr-1" />
+                  <AlertCircle className="w-4 h-4 mr-1 text-orange-500" />
                   Needs correction
                 </div>
               </CardContent>
@@ -428,13 +501,19 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredApplications.map((app) => (
+                {filteredApplications.map((app) => {
+                  const isHighlighted = paymentSuccess && paymentApplicationId === app.id;
+                  return (
                   <div
                     key={app.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer"
+                    className={`flex items-center justify-between p-4 border rounded-lg hover-elevate cursor-pointer transition-all ${
+                      isHighlighted ? "border-green-500 ring-2 ring-green-200" : ""
+                    }`}
                     onClick={() => {
                       if (app.status === 'draft') {
                         setLocation(`/applications/new?draft=${app.id}`);
+                      } else if (app.status === 'sent_back_for_corrections' || app.status === 'reverted_to_applicant' || app.status === 'reverted_by_dtdo') {
+                        setLocation(`/applications/new?application=${app.id}`);
                       } else {
                         setLocation(`/applications/${app.id}`);
                       }
@@ -446,12 +525,17 @@ export default function Dashboard() {
                         <h4 className="font-semibold">{app.propertyName}</h4>
                         {getStatusBadge(app.status || 'draft')}
                         <Badge variant="outline" className="capitalize">{app.category}</Badge>
+                        {isHighlighted && (
+                          <Badge variant="default" className="bg-green-600">
+                            Certificate Ready
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {app.applicationNumber} • {app.district} • {app.totalRooms} rooms
                       </p>
                       {(app.status === 'sent_back_for_corrections' || app.status === 'reverted_to_applicant' || app.status === 'reverted_by_dtdo') && (app.clarificationRequested || (app as any).dtdoRemarks) && (
-                        <p className="text-sm text-destructive mt-1">
+                        <p className="text-sm text-amber-600 mt-1">
                           <AlertCircle className="w-3 h-3 inline mr-1" />
                           {app.clarificationRequested || (app as any).dtdoRemarks}
                         </p>
@@ -472,23 +556,23 @@ export default function Dashboard() {
                       </Button>
                     ) : (app.status === 'sent_back_for_corrections' || app.status === 'reverted_to_applicant' || app.status === 'reverted_by_dtdo') ? (
                       <Button 
-                        variant="destructive" 
+                        variant="warning" 
                         size="sm" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLocation(`/applications/${app.id}`);
+                          setLocation(`/applications/new?application=${app.id}`);
                         }}
                         data-testid={`button-update-${app.id}`}
                       >
                         <RefreshCw className="w-4 h-4 mr-2" />
-                        Update Application
+                        Continue Corrections
                       </Button>
                     ) : (app.status === 'payment_pending' || app.status === 'verified_for_payment') ? (
                       <Button 
                         size="sm" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLocation(`/applications/${app.id}/payment-gateway`);
+                          setLocation(`/applications/${app.id}/payment-himkosh`);
                         }}
                         data-testid={`button-payment-${app.id}`}
                       >
@@ -496,12 +580,28 @@ export default function Dashboard() {
                         Make Payment
                       </Button>
                     ) : (
-                      <Button variant="ghost" size="sm" data-testid={`button-view-${app.id}`}>
-                        View Details
+                      <Button
+                        variant={isHighlighted ? "default" : "ghost"}
+                        size="sm"
+                        data-testid={`button-view-${app.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/applications/${app.id}`);
+                        }}
+                      >
+                        {isHighlighted ? (
+                          <>
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Certificate
+                          </>
+                        ) : (
+                          "View Details"
+                        )}
                       </Button>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

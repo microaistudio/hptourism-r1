@@ -115,41 +115,39 @@ export function calculateHomestayFee(input: FeeCalculationInput): FeeBreakdown {
   };
 }
 
-/**
- * Category requirement validation
- * 2025 Update: Categories based on AVERAGE room rate (total revenue / total rooms)
- */
+export const MAX_ROOMS_ALLOWED = 6;
+export const MAX_BEDS_ALLOWED = 12;
+
 export interface CategoryRequirements {
-  minRooms: number;
-  minAverageRate: number; // Based on average rate, not individual room rates
-  maxAverageRate: number;
+  minTariff: number; // inclusive lower bound
+  maxTariff?: number; // inclusive upper bound (undefined means no upper cap)
   gstinRequired: boolean;
+  tariffLabel: string;
 }
 
 export const CATEGORY_REQUIREMENTS: Record<CategoryType, CategoryRequirements> = {
   diamond: {
-    minRooms: 5, // Minimum 5 rooms for Diamond
-    minAverageRate: 10000, // Average rate >₹10,000 (total revenue >₹50,000)
-    maxAverageRate: Infinity,
-    gstinRequired: true
+    minTariff: 10001, // strictly greater than ₹10,000
+    gstinRequired: true,
+    tariffLabel: "Tariff above ₹10,000 per room per night"
   },
   gold: {
-    minRooms: 1, // No minimum room requirement for Gold
-    minAverageRate: 3000, // Average rate ₹3,000-₹10,000
-    maxAverageRate: 10000,
-    gstinRequired: true
+    minTariff: 3000,
+    maxTariff: 10000,
+    gstinRequired: true,
+    tariffLabel: "Tariff between ₹3,000 and ₹10,000 per room per night"
   },
   silver: {
-    minRooms: 1, // At least 1 room required
-    minAverageRate: 0,
-    maxAverageRate: 3000, // Average rate <₹3,000
-    gstinRequired: false
+    minTariff: 0,
+    maxTariff: 2999,
+    gstinRequired: false,
+    tariffLabel: "Tariff below ₹3,000 per room per night"
   }
 };
 
 /**
  * Validate if a property meets category requirements
- * 2025 Update: Uses AVERAGE room rate for validation
+ * 2025 Update: Uses HIGHEST quoted rate for validation (per Rule 7)
  */
 export interface CategoryValidationResult {
   isValid: boolean;
@@ -161,45 +159,44 @@ export interface CategoryValidationResult {
 export function validateCategorySelection(
   selectedCategory: CategoryType,
   totalRooms: number,
-  averageRoomRate: number
+  highestRoomRate: number
 ): CategoryValidationResult {
-  const requirements = CATEGORY_REQUIREMENTS[selectedCategory];
   const errors: string[] = [];
   const warnings: string[] = [];
   let suggestedCategory: CategoryType | undefined;
-  
-  // Check minimum rooms
-  if (totalRooms < requirements.minRooms) {
-    errors.push(
-      `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} category requires minimum ${requirements.minRooms} rooms. You have ${totalRooms} room${totalRooms === 1 ? '' : 's'}.`
-    );
+  const categoryLabel = selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1);
+
+  if (totalRooms < 1) {
+    errors.push("At least one room must be configured to determine the category.");
   }
-  
-  // Check average room rate range
-  if (averageRoomRate < requirements.minAverageRate) {
-    errors.push(
-      `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} category requires average rate ≥₹${requirements.minAverageRate.toLocaleString('en-IN')}/night. Your average rate is ₹${Math.round(averageRoomRate).toLocaleString('en-IN')}/night.`
-    );
-    
-    // Suggest lower category
-    if (selectedCategory === 'diamond') {
-      suggestedCategory = 'gold';
-    } else if (selectedCategory === 'gold') {
-      suggestedCategory = 'silver';
+
+  if (totalRooms > MAX_ROOMS_ALLOWED) {
+    errors.push(`HP Homestay Rules 2025 permit a maximum of ${MAX_ROOMS_ALLOWED} rooms. You currently have ${totalRooms}.`);
+  }
+
+  if (highestRoomRate <= 0) {
+    errors.push("Please provide nightly rates for at least one room type.");
+  }
+
+  if (selectedCategory === "diamond" && highestRoomRate <= 10000) {
+    errors.push(`${categoryLabel} requires tariff above ₹10,000 per room per night. Your highest rate is ₹${Math.round(highestRoomRate).toLocaleString("en-IN")}.`);
+    suggestedCategory = "gold";
+  }
+
+  if (selectedCategory === "gold") {
+    if (highestRoomRate < 3000) {
+      errors.push(`${categoryLabel} requires tariff between ₹3,000 and ₹10,000 per room per night. Your highest rate is ₹${Math.round(highestRoomRate).toLocaleString("en-IN")}.`);
+      suggestedCategory = "silver";
+    }
+    if (highestRoomRate > 10000) {
+      errors.push(`${categoryLabel} caps tariff at ₹10,000 per room per night. Your highest rate is ₹${Math.round(highestRoomRate).toLocaleString("en-IN")} (Diamond bracket).`);
+      suggestedCategory = "diamond";
     }
   }
-  
-  if (requirements.maxAverageRate !== Infinity && averageRoomRate > requirements.maxAverageRate) {
-    warnings.push(
-      `Your average room rate (₹${Math.round(averageRoomRate).toLocaleString('en-IN')}) exceeds the typical ${selectedCategory} category maximum (₹${requirements.maxAverageRate.toLocaleString('en-IN')}). Consider upgrading to a higher category.`
-    );
-    
-    // Suggest higher category
-    if (selectedCategory === 'silver') {
-      suggestedCategory = 'gold';
-    } else if (selectedCategory === 'gold' && totalRooms >= 5) {
-      suggestedCategory = 'diamond';
-    }
+
+  if (selectedCategory === "silver" && highestRoomRate >= 3000) {
+    errors.push(`${categoryLabel} requires tariff below ₹3,000 per room per night. Your highest rate is ₹${Math.round(highestRoomRate).toLocaleString("en-IN")}.`);
+    suggestedCategory = highestRoomRate > 10000 ? "diamond" : "gold";
   }
   
   return {
@@ -215,24 +212,16 @@ export function validateCategorySelection(
  */
 export function suggestCategory(
   totalRooms: number,
-  averageRoomRate: number
+  highestRoomRate: number
 ): CategoryType {
-  // Diamond: 5+ rooms AND average rate >₹10k/night (total revenue >₹50k)
-  if (totalRooms >= 5 && averageRoomRate > 10000) {
+  if (highestRoomRate > 10000) {
     return 'diamond';
   }
-  
-  // Gold: Average rate ₹3k-10k/night (or high rate but fewer than 5 rooms)
-  if (averageRoomRate >= 3000 && averageRoomRate <= 10000) {
+
+  if (highestRoomRate >= 3000) {
     return 'gold';
   }
-  
-  // High average rate but not enough rooms for diamond → Gold
-  if (averageRoomRate > 10000 && totalRooms < 5) {
-    return 'gold';
-  }
-  
-  // Silver: Average rate <₹3k/night
+
   return 'silver';
 }
 

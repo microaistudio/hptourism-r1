@@ -1,13 +1,196 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { himkoshTransactions, homestayApplications, ddoCodes, systemSettings } from '../../shared/schema';
+import { himkoshTransactions, homestayApplications, ddoCodes, systemSettings, users } from '../../shared/schema';
 import { HimKoshCrypto, buildRequestString, parseResponseString, buildVerificationString } from './crypto';
 import { getHimKoshConfig } from './config';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 const router = Router();
 const crypto = new HimKoshCrypto();
+
+const STATUS_META: Record<
+  string,
+  {
+    title: string;
+    description: string;
+    tone: "success" | "pending" | "error";
+    followUp: string;
+    redirectState: "success" | "failed" | "pending";
+  }
+> = {
+  "1": {
+    title: "Payment Confirmed",
+    description: "HimKosh has confirmed your payment. The HP Tourism portal will unlock your certificate momentarily.",
+    tone: "success",
+    followUp: "You may close this tab once the main window updates.",
+    redirectState: "success",
+  },
+  "0": {
+    title: "Payment Failed",
+    description: "HimKosh reported a failure while processing the payment.",
+    tone: "error",
+    followUp: "If funds were deducted, note the GRN and contact support for reconciliation.",
+    redirectState: "failed",
+  },
+  "2": {
+    title: "Payment Pending",
+    description: "The transaction is still being processed by HimKosh.",
+    tone: "pending",
+    followUp: "Keep this page open or refresh the HP Tourism portal shortly to view the latest status.",
+    redirectState: "pending",
+  },
+};
+
+const buildCallbackPage = (options: {
+  heading: string;
+  description: string;
+  followUp: string;
+  tone: "success" | "pending" | "error";
+  applicationNumber?: string | null;
+  amount?: number | null;
+  reference?: string | null;
+  redirectUrl?: string;
+}) => {
+  const toneColor =
+    options.tone === "success"
+      ? "#0f766e"
+      : options.tone === "pending"
+        ? "#ca8a04"
+        : "#b91c1c";
+
+  const toneBg =
+    options.tone === "success"
+      ? "#ecfdf5"
+      : options.tone === "pending"
+        ? "#fef9c3"
+        : "#fee2e2";
+
+  const metaRefresh = options.redirectUrl
+    ? `<meta http-equiv="refresh" content="4;url=${options.redirectUrl}" />`
+    : "";
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${options.heading}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${metaRefresh}
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: linear-gradient(160deg, #f6faff 0%, #f1f5f9 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        color: #0f172a;
+      }
+      .card {
+        width: min(560px, 100%);
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 32px 36px;
+        box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: ${toneBg};
+        color: ${toneColor};
+        font-weight: 600;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        width: fit-content;
+      }
+      h1 {
+        font-size: clamp(1.5rem, 2vw, 1.9rem);
+        margin: 0;
+      }
+      p {
+        margin: 0;
+        line-height: 1.55;
+        color: #334155;
+      }
+      .summary {
+        margin-top: 8px;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+      }
+      .summary-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+      }
+      .summary-item span:first-child {
+        color: #475569;
+      }
+      .cta {
+        margin-top: 18px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .cta a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        text-decoration: none;
+        background: #0f172a;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .cta small {
+        color: #64748b;
+        font-size: 0.8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <span class="badge">${options.heading}</span>
+      <div>
+        <p>${options.description}</p>
+        <p>${options.followUp}</p>
+      </div>
+      <div class="summary">
+        ${options.applicationNumber ? `<div class="summary-item"><span>Application #</span><span>${options.applicationNumber}</span></div>` : ""}
+        ${options.reference ? `<div class="summary-item"><span>HimKosh Reference</span><span>${options.reference}</span></div>` : ""}
+        ${options.amount !== undefined && options.amount !== null ? `<div class="summary-item"><span>Amount</span><span>₹${Number(options.amount).toLocaleString("en-IN")}</span></div>` : ""}
+      </div>
+      ${options.redirectUrl ? `<div class="cta">
+        <a href="${options.redirectUrl}">Return to HP Tourism Portal</a>
+        <small>You will be redirected automatically in a few seconds.</small>
+      </div>` : ""}
+    </div>
+  </body>
+</html>`;
+};
+
+const parseEnvBool = (value?: string | null) => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+};
 
 /**
  * POST /api/himkosh/initiate
@@ -76,9 +259,15 @@ router.post('/initiate', async (req, res) => {
       .where(eq(systemSettings.settingKey, 'payment_test_mode'))
       .limit(1);
     
-    const isTestMode = testModeSetting 
-      ? (testModeSetting.settingValue as { enabled: boolean }).enabled 
-      : false;
+    const envTestOverride =
+      parseEnvBool(process.env.HIMKOSH_TEST_MODE) ??
+      parseEnvBool(process.env.HIMKOSH_FORCE_TEST_MODE);
+
+    const isTestMode = envTestOverride !== undefined
+      ? envTestOverride
+      : testModeSetting 
+        ? (testModeSetting.settingValue as { enabled: boolean }).enabled 
+        : false;
     
     // Use ₹1 for gateway if test mode is enabled, otherwise use actual amount
     const gatewayAmount = isTestMode ? 1 : actualAmount;
@@ -93,7 +282,22 @@ router.post('/initiate', async (req, res) => {
 
     // Build request parameters
     // CRITICAL: Government code ALWAYS includes Head2/Amount2 (even if 0)
-    const requestParams = {
+    const requestParams: {
+      deptId: string;
+      deptRefNo: string;
+      totalAmount: number;
+      tenderBy: string;
+      appRefNo: string;
+      head1: string;
+      amount1: number;
+      ddo: string;
+      periodFrom: string;
+      periodTo: string;
+      head2?: string;
+      amount2?: number;
+      serviceCode?: string;
+      returnUrl?: string;
+    } = {
       deptId: config.deptId,
       deptRefNo: application.applicationNumber,
       totalAmount: gatewayAmount, // Use gateway amount (₹1 in test mode)
@@ -101,14 +305,20 @@ router.post('/initiate', async (req, res) => {
       appRefNo,
       head1: config.heads.registrationFee,
       amount1: gatewayAmount, // Use gateway amount (₹1 in test mode)
-      head2: config.heads.registrationFee, // Same head, amount 0 (required by HimKosh)
-      amount2: 0,
       ddo: ddoCode,
       periodFrom: periodDate,
       periodTo: periodDate,
       serviceCode: config.serviceCode,
       returnUrl: config.returnUrl,
     };
+    
+    // Optional secondary head support – only include when configured with a positive amount.
+    const secondaryHead = config.heads.secondaryHead;
+    const secondaryAmountRaw = Number(config.heads.secondaryHeadAmount ?? 0);
+    if (secondaryHead && secondaryAmountRaw > 0) {
+      requestParams.head2 = secondaryHead;
+      requestParams.amount2 = Math.round(secondaryAmountRaw);
+    }
 
     // Build request strings (core for checksum, full for encryption)
     const { coreString, fullString } = buildRequestString(requestParams);
@@ -159,6 +369,8 @@ router.post('/initiate', async (req, res) => {
       ddo: ddoCode,
       head1: config.heads.registrationFee,
       amount1: gatewayAmount, // Store what was sent to gateway
+      head2: requestParams.head2,
+      amount2: requestParams.amount2,
       periodFrom: periodDate,
       periodTo: periodDate,
       encryptedRequest: encryptedData,
@@ -178,11 +390,10 @@ router.post('/initiate', async (req, res) => {
       actualAmount, // Actual calculated fee (for display purposes)
       isTestMode, // Flag to indicate test mode
       isConfigured: config.isConfigured,
-      message: isTestMode 
-        ? `🧪 TEST MODE: Sending ₹1 to gateway (actual fee: ₹${actualAmount})`
-        : (config.isConfigured 
-          ? 'Payment initiated successfully' 
-          : 'Using test configuration - waiting for CTP credentials'),
+      configStatus: (config as any).configStatus || 'production',
+      message: isTestMode
+        ? `🧪 Test mode active: Gateway receives ₹${gatewayAmount.toLocaleString('en-IN')}`
+        : 'Payment initiated successfully.',
     };
     
     console.log('[himkosh] Response isConfigured:', config.isConfigured);
@@ -195,6 +406,37 @@ router.post('/initiate', async (req, res) => {
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
+});
+
+/**
+ * GET /api/himkosh/callback
+ * HimKosh occasionally performs a GET redirect before POSTing the encrypted payload.
+ * Respond with a friendly holding page so users do not see a 404.
+ */
+router.get('/callback', (_req, res) => {
+  res.status(200).send(`
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>HimKosh Payment</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+          body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#f5f7fb; margin:0; display:flex; justify-content:center; align-items:center; min-height:100vh; color:#0f172a; }
+          .card { background:#fff; border-radius:16px; padding:32px; box-shadow:0 20px 45px rgba(15,23,42,0.12); max-width:420px; text-align:center; }
+          h1 { font-size:1.5rem; margin-bottom:0.5rem; }
+          p { margin:0.25rem 0; color:#334155; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>Processing Payment</h1>
+          <p>HimKosh is completing your transaction and will return you to the HP Tourism portal automatically.</p>
+          <p>You can safely close this tab once the confirmation appears in the main window.</p>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 /**
@@ -211,14 +453,24 @@ router.post('/callback', async (req, res) => {
 
     // Decrypt response
     const decryptedData = await crypto.decrypt(encdata);
+
+    const checksumMatch = decryptedData.match(/\|checksum=([0-9a-fA-F]+)/i);
+    if (!checksumMatch || checksumMatch.index === undefined) {
+      console.error('HimKosh callback: checksum token missing', decryptedData);
+      return res.status(400).send('Invalid checksum payload');
+    }
+
+    const dataWithoutChecksum = decryptedData.slice(0, checksumMatch.index);
+    const receivedChecksum = checksumMatch[1];
+    const isValid = HimKoshCrypto.verifyChecksum(dataWithoutChecksum, receivedChecksum);
     const parsedResponse = parseResponseString(decryptedData);
 
-    // Verify checksum
-    const dataWithoutChecksum = decryptedData.substring(0, decryptedData.lastIndexOf('|checksum='));
-    const isValid = HimKoshCrypto.verifyChecksum(dataWithoutChecksum, parsedResponse.checksum);
-
     if (!isValid) {
-      console.error('HimKosh callback: Checksum verification failed');
+      console.error('HimKosh callback: Checksum verification failed', {
+        dataWithoutChecksum,
+        receivedChecksum,
+        parsedResponse,
+      });
       return res.status(400).send('Invalid checksum');
     }
 
@@ -276,8 +528,41 @@ router.post('/callback', async (req, res) => {
         .where(eq(homestayApplications.id, transaction.applicationId));
     }
 
-    // Redirect user to application page
-    res.redirect(`${process.env.VITE_FRONTEND_URL || ''}/application/${transaction.applicationId}?payment=${parsedResponse.statusCd === '1' ? 'success' : 'failed'}&himgrn=${parsedResponse.echTxnId}`);
+    const statusCode = parsedResponse.statusCd ?? parsedResponse.status ?? "";
+    const meta = STATUS_META[statusCode] ?? {
+      title: "Payment Status Received",
+      description: parsedResponse.status
+        ? `Gateway reported status: ${parsedResponse.status}`
+        : "The payment response was received from HimKosh.",
+      tone: statusCode === "1" ? "success" : statusCode === "2" ? "pending" : "error",
+      followUp: "Review the details below and return to the portal.",
+      redirectState: statusCode === "1" ? "success" : statusCode === "2" ? "pending" : "failed",
+    };
+
+    const frontendBase =
+      process.env.VITE_FRONTEND_URL ||
+      `${req.protocol}://${req.get("host") ?? ""}`;
+    const trimmedBase = frontendBase.replace(/\/$/, "");
+
+    const redirectPath =
+      meta.redirectState === "success"
+        ? `/dashboard?payment=${meta.redirectState}&application=${transaction.applicationId}&appNo=${transaction.deptRefNo ?? ""}`
+        : `/applications/${transaction.applicationId}?payment=${meta.redirectState}&himgrn=${parsedResponse.echTxnId ?? ""}`;
+
+    const redirectUrl = trimmedBase ? `${trimmedBase}${redirectPath}` : undefined;
+
+    const html = buildCallbackPage({
+      heading: meta.title,
+      description: meta.description,
+      followUp: meta.followUp,
+      tone: meta.tone,
+      applicationNumber: transaction.deptRefNo,
+      amount: transaction.totalAmount,
+      reference: parsedResponse.echTxnId,
+      redirectUrl,
+    });
+
+    res.status(200).send(html);
   } catch (error) {
     console.error('HimKosh callback error:', error);
     res.status(500).send('Payment processing failed');
@@ -397,6 +682,147 @@ router.get('/transaction/:appRefNo', async (req, res) => {
   } catch (error) {
     console.error('Error fetching transaction:', error);
     res.status(500).json({ error: 'Failed to fetch transaction' });
+  }
+});
+
+/**
+ * GET /api/himkosh/application/:applicationId/transactions
+ * Fetch transactions for a specific application (newest first)
+ */
+router.get('/application/:applicationId/transactions', async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const sessionUserId = req.session?.userId;
+
+    if (!sessionUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const [application] = await db
+      .select({
+        id: homestayApplications.id,
+        ownerId: homestayApplications.userId,
+      })
+      .from(homestayApplications)
+      .where(eq(homestayApplications.id, applicationId))
+      .limit(1);
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    if (application.ownerId !== sessionUserId) {
+      const [actor] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, sessionUserId))
+        .limit(1);
+
+      const allowedOfficerRoles = new Set([
+        'district_officer',
+        'state_officer',
+        'dealing_assistant',
+        'district_tourism_officer',
+        'super_admin',
+        'admin',
+      ]);
+
+      if (!actor || !allowedOfficerRoles.has(actor.role)) {
+        return res.status(403).json({ error: 'Access denied for this application' });
+      }
+    }
+
+    const transactions = await db
+      .select()
+      .from(himkoshTransactions)
+      .where(eq(himkoshTransactions.applicationId, applicationId))
+      .orderBy(desc(himkoshTransactions.createdAt));
+
+    res.json({ transactions });
+  } catch (error) {
+    console.error('Error fetching application transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+/**
+ * POST /api/himkosh/application/:applicationId/reset
+ * Allow applicant/officer to cancel an in-progress transaction so a fresh attempt can be initiated.
+ */
+router.post('/application/:applicationId/reset', async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const sessionUserId = req.session?.userId;
+
+    if (!sessionUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const [application] = await db
+      .select({
+        id: homestayApplications.id,
+        ownerId: homestayApplications.userId,
+      })
+      .from(homestayApplications)
+      .where(eq(homestayApplications.id, applicationId))
+      .limit(1);
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    if (application.ownerId !== sessionUserId) {
+      const [actor] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, sessionUserId))
+        .limit(1);
+
+      const allowedOfficerRoles = new Set([
+        'district_officer',
+        'state_officer',
+        'dealing_assistant',
+        'district_tourism_officer',
+        'super_admin',
+        'admin',
+      ]);
+
+      if (!actor || !allowedOfficerRoles.has(actor.role)) {
+        return res.status(403).json({ error: 'Access denied for this application' });
+      }
+    }
+
+    const [latestTransaction] = await db
+      .select()
+      .from(himkoshTransactions)
+      .where(eq(himkoshTransactions.applicationId, applicationId))
+      .orderBy(desc(himkoshTransactions.createdAt))
+      .limit(1);
+
+    if (!latestTransaction) {
+      return res.status(404).json({ error: 'No transactions found for this application' });
+    }
+
+    const finalStates = new Set(['success', 'failed', 'verified']);
+    if (finalStates.has(latestTransaction.transactionStatus ?? '')) {
+      return res.status(400).json({ error: 'Latest transaction is already complete' });
+    }
+
+    await db
+      .update(himkoshTransactions)
+      .set({
+        transactionStatus: 'failed',
+        status: 'Cancelled by applicant',
+        statusCd: '0',
+        respondedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(himkoshTransactions.id, latestTransaction.id));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error resetting HimKosh transaction:', error);
+    res.status(500).json({ error: 'Failed to reset transaction' });
   }
 });
 

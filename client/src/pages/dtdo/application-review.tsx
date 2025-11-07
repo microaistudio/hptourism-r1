@@ -32,7 +32,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import type { HomestayApplication, HomestayDocument } from "@shared/schema";
+import type { HomestayApplication, Document as HomestayDocument } from "@shared/schema";
 
 interface ApplicationData {
   application: HomestayApplication;
@@ -118,19 +118,30 @@ export default function DTDOApplicationReview() {
   }
 
   const { application, owner, documents, daInfo } = data;
+  const applicationStatus = application.status ?? "forwarded_to_dtdo";
+  const daRemarks = (application as unknown as { daRemarks?: string | null }).daRemarks ?? null;
 
   const handleAction = (action: 'accept' | 'reject' | 'revert') => {
     setActionType(action);
     setRemarks("");
   };
 
+  const actionRequiresRemarks = (action: typeof actionType) =>
+    action === 'accept' || action === 'reject' || action === 'revert';
+
   const confirmAction = () => {
     if (!actionType) return;
     
-    if (!remarks.trim() && (actionType === 'reject' || actionType === 'revert')) {
+    if (actionRequiresRemarks(actionType) && !remarks.trim()) {
+      const context =
+        actionType === 'accept'
+          ? 'scheduling the inspection'
+          : actionType === 'reject'
+          ? 'rejection'
+          : 'reverting';
       toast({
         title: "Remarks Required",
-        description: `Please provide remarks for ${actionType === 'reject' ? 'rejection' : 'reverting'}`,
+        description: `Please provide remarks for ${context}.`,
         variant: "destructive",
       });
       return;
@@ -188,12 +199,12 @@ export default function DTDOApplicationReview() {
         </div>
         <div className="flex gap-2">
           {getCategoryBadge(application.category)}
-          {getStatusBadge(application.status)}
+          {getStatusBadge(applicationStatus)}
         </div>
       </div>
 
       {/* DA Remarks Card */}
-      {(application.daRemarks || daInfo) && (
+      {(daRemarks || daInfo) && (
         <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
@@ -209,7 +220,7 @@ export default function DTDOApplicationReview() {
           <CardContent>
             <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border">
               <p className="text-sm whitespace-pre-wrap">
-                {application.daRemarks || "No remarks provided"}
+                {daRemarks || "No remarks provided"}
               </p>
             </div>
           </CardContent>
@@ -290,8 +301,10 @@ export default function DTDOApplicationReview() {
                         No documents uploaded
                       </p>
                     ) : (
-                      documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover-elevate">
+                      documents.map((doc) => {
+                        const fileUrl = (doc as { fileUrl?: string }).fileUrl ?? doc.filePath;
+                        return (
+                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover-elevate">
                           <div className="flex items-center gap-3">
                             <FileText className="h-4 w-4 text-muted-foreground" />
                             <div>
@@ -302,13 +315,18 @@ export default function DTDOApplicationReview() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(doc.fileUrl, "_blank")}
+                            onClick={() => {
+                              if (fileUrl) {
+                                window.open(fileUrl, "_blank");
+                              }
+                            }}
                             data-testid={`button-view-doc-${doc.id}`}
                           >
                             View
                           </Button>
-                        </div>
-                      ))
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
@@ -408,13 +426,15 @@ export default function DTDOApplicationReview() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="remarks">
-                {actionType === 'accept' ? 'Remarks (Optional)' : 'Remarks (Required)'}
+                {actionType === 'accept'
+                  ? 'Inspection Remarks (Required)'
+                  : 'Remarks (Required)'}
               </Label>
               <Textarea
                 id="remarks"
                 placeholder={
                   actionType === 'accept'
-                    ? 'Any notes for the inspection team...'
+                    ? 'Share instructions or observations for the inspection team...'
                     : actionType === 'reject'
                     ? 'Please specify the reason for rejection...'
                     : 'Please specify what corrections are needed...'
@@ -438,7 +458,10 @@ export default function DTDOApplicationReview() {
             </Button>
             <Button
               onClick={confirmAction}
-              disabled={actionMutation.isPending}
+              disabled={
+                actionMutation.isPending ||
+                (actionRequiresRemarks(actionType) && !remarks.trim())
+              }
               variant={actionType === 'reject' ? 'destructive' : 'default'}
               data-testid="button-confirm-action"
             >

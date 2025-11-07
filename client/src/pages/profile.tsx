@@ -70,7 +70,6 @@ export default function ProfilePage() {
       address: "",
       pincode: "",
       telephone: "",
-      fax: "",
     },
   });
 
@@ -92,7 +91,6 @@ export default function ProfilePage() {
         address: profile.address || "",
         pincode: profile.pincode || "",
         telephone: profile.telephone || "",
-        fax: profile.fax || "",
       });
     } else if (user) {
       // If no profile, pre-fill from user data
@@ -111,7 +109,6 @@ export default function ProfilePage() {
         address: "",
         pincode: "",
         telephone: "",
-        fax: "",
       });
     }
   }, [profile, user, form]);
@@ -536,23 +533,6 @@ export default function ProfilePage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="fax"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fax Number</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="0177-2812346"
-                          data-testid="input-profile-fax"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             </CardContent>
           </Card>

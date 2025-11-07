@@ -164,14 +164,17 @@ export const homestayApplications = pgTable("homestay_applications", {
   
   // 2025 Rules - Per Room Type Rates (Required for Form-A certificate)
   singleBedRooms: integer("single_bed_rooms").default(0),
+  singleBedBeds: integer("single_bed_beds").default(1),
   singleBedRoomSize: decimal("single_bed_room_size", { precision: 10, scale: 2 }), // in sq ft
   singleBedRoomRate: decimal("single_bed_room_rate", { precision: 10, scale: 2 }), // per night rate for single bed rooms
   
   doubleBedRooms: integer("double_bed_rooms").default(0),
+  doubleBedBeds: integer("double_bed_beds").default(2),
   doubleBedRoomSize: decimal("double_bed_room_size", { precision: 10, scale: 2 }), // in sq ft
   doubleBedRoomRate: decimal("double_bed_room_rate", { precision: 10, scale: 2 }), // per night rate for double bed rooms
   
   familySuites: integer("family_suites").default(0),
+  familySuiteBeds: integer("family_suite_beds").default(4),
   familySuiteSize: decimal("family_suite_size", { precision: 10, scale: 2 }), // in sq ft
   familySuiteRate: decimal("family_suite_rate", { precision: 10, scale: 2 }), // per night rate for family suites
   
@@ -319,7 +322,7 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
   category: z.enum(['diamond', 'gold', 'silver']),
   locationType: z.enum(['mc', 'tcp', 'gp']),
-  totalRooms: z.number().int().min(1).max(50),
+  totalRooms: z.number().int().min(0).max(6),
   
   // LGD Hierarchical Address
   district: z.string().min(2, "District is required"),
@@ -344,14 +347,17 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   
   // 2025 Rules - Per Room Type Rates
   singleBedRooms: z.number().int().min(0).default(0),
+  singleBedBeds: z.number().int().min(0).default(1),
   singleBedRoomSize: z.number().min(0).optional(),
   singleBedRoomRate: z.number().min(100, "Single bed room rate must be at least ₹100").optional(),
   
   doubleBedRooms: z.number().int().min(0).default(0),
+  doubleBedBeds: z.number().int().min(0).default(2),
   doubleBedRoomSize: z.number().min(0).optional(),
   doubleBedRoomRate: z.number().min(100, "Double bed room rate must be at least ₹100").optional(),
   
   familySuites: z.number().int().min(0).max(3).default(0),
+  familySuiteBeds: z.number().int().min(0).default(4),
   familySuiteSize: z.number().min(0).optional(),
   familySuiteRate: z.number().min(100, "Family suite rate must be at least ₹100").optional(),
   
@@ -378,7 +384,32 @@ export const insertHomestayApplicationSchema = createInsertSchema(homestayApplic
   differentlyAbledFacilities: z.string().optional().or(z.literal('')),
   fireEquipmentDetails: z.string().optional().or(z.literal('')),
   nearestHospital: z.string().optional().or(z.literal('')),
-}).omit({ id: true, applicationNumber: true, createdAt: true, updatedAt: true });
+}).omit({ id: true, applicationNumber: true, createdAt: true, updatedAt: true }).superRefine((data, ctx) => {
+  const singleRooms = data.singleBedRooms ?? 0;
+  const doubleRooms = data.doubleBedRooms ?? 0;
+  const suiteRooms = data.familySuites ?? 0;
+  const totalRooms = singleRooms + doubleRooms + suiteRooms;
+  const totalBeds =
+    singleRooms * (data.singleBedBeds ?? 0) +
+    doubleRooms * (data.doubleBedBeds ?? 0) +
+    suiteRooms * (data.familySuiteBeds ?? 0);
+
+  if (totalBeds > 12) {
+    ctx.addIssue({
+      path: ["singleBedBeds"],
+      code: z.ZodIssueCode.custom,
+      message: "Total beds cannot exceed 12 across all room types",
+    });
+  }
+
+  if (totalRooms > 0 && (data.attachedWashrooms ?? 0) < totalRooms) {
+    ctx.addIssue({
+      path: ["attachedWashrooms"],
+      code: z.ZodIssueCode.custom,
+      message: "Every room must have its own washroom. Increase attached washrooms to at least the total rooms.",
+    });
+  }
+});
 
 // Draft Application Schema - Most fields optional for saving incomplete applications
 export const draftHomestayApplicationSchema = createInsertSchema(homestayApplications, {
@@ -410,14 +441,17 @@ export const draftHomestayApplicationSchema = createInsertSchema(homestayApplica
   
   // 2025 Rules - Per Room Type Rates (optional for drafts)
   singleBedRooms: z.number().int().min(0).optional(),
+  singleBedBeds: z.number().int().min(0).optional(),
   singleBedRoomSize: z.number().optional(),
   singleBedRoomRate: z.number().optional(),
   
   doubleBedRooms: z.number().int().min(0).optional(),
+  doubleBedBeds: z.number().int().min(0).optional(),
   doubleBedRoomSize: z.number().optional(),
   doubleBedRoomRate: z.number().optional(),
   
   familySuites: z.number().int().optional(),
+  familySuiteBeds: z.number().int().min(0).optional(),
   familySuiteSize: z.number().optional(),
   familySuiteRate: z.number().optional(),
   
@@ -864,7 +898,7 @@ export const inspectionReports = pgTable("inspection_reports", {
   
   // Overall Assessment
   overallSatisfactory: boolean("overall_satisfactory").notNull(),
-  recommendation: varchar("recommendation", { length: 50 }).notNull(), // 'approve', 'approve_with_conditions', 'raise_objections', 'reject'
+  recommendation: varchar("recommendation", { length: 50 }).notNull(), // 'approve' or 'raise_objections'
   detailedFindings: text("detailed_findings").notNull(),
   
   // Supporting Documents (Photos from inspection)
@@ -932,7 +966,7 @@ export const insertInspectionReportSchema = createInsertSchema(inspectionReports
   fireSafetyCompliant: z.boolean().optional(),
   structuralSafety: z.boolean().optional(),
   overallSatisfactory: z.boolean(),
-  recommendation: z.enum(['approve', 'approve_with_conditions', 'raise_objections', 'reject']),
+  recommendation: z.enum(['approve', 'raise_objections']),
   detailedFindings: z.string().min(20, "Detailed findings must be at least 20 characters"),
 }).omit({ id: true, createdAt: true, updatedAt: true });
 

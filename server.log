@@ -1,0 +1,30 @@
+[himkosh] Payment gateway routes registered
+[scraper] Fetching stats from https://eservices.himachaltourism.gov.in/
+[scraper] Scheduler started - will scrape every hour
+[scraper] Production stats scraper initialized
+2:08:21 PM [express] serving on port 5000
+[scraper] Parsed stats: {
+  totalApplications: 4,
+  approvedApplications: 4,
+  rejectedApplications: 4,
+  pendingApplications: 4
+}
+[scraper] Successfully scraped and saved stats: {
+  totalApplications: 4,
+  approvedApplications: 4,
+  rejectedApplications: 4,
+  pendingApplications: 4
+}
+2:09:00 PM [express] POST /api/auth/login 200 in 102ms :: {"user":{"id":"e713aa95-3245-4d15-9f2b-8e2…
+2:09:14 PM [express] POST /api/applications/draft 401 in 3ms :: {"message":"Authentication required"}
+2:12:25 PM [express] POST /api/auth/login 200 in 92ms :: {"user":{"id":"e713aa95-3245-4d15-9f2b-8e2f…
+2:21:04 PM [express] GET /api/stats/production 200 in 5ms
+2:21:16 PM [express] POST /api/auth/login 200 in 90ms :: {"user":{"id":"e713aa95-3245-4d15-9f2b-8e2f…
+2:21:16 PM [express] GET /api/auth/me 304 in 9ms :: {"user":{"id":"e713aa95-3245-4d15-9f2b-8e2fa7b73…
+2:21:16 PM [express] GET /api/applications 304 in 14ms :: {"applications":[]}
+2:21:17 PM [express] GET /api/profile 404 in 8ms :: {"message":"Profile not found"}
+2:21:17 PM [express] GET /api/settings/upload-policy 304 in 19ms :: {"documents":{"allowedMimeTypes"…
+2:22:16 PM [express] GET /api/auth/me 200 in 7ms :: {"user":{"id":"e713aa95-3245-4d15-9f2b-8e2fa7b73…
+2:22:16 PM [express] GET /api/applications 200 in 14ms :: {"applications":[]}
+2:22:16 PM [express] GET /api/settings/upload-policy 200 in 21ms :: {"documents":{"allowedMimeTypes"…
+2:24:02 PM [express] GET /api/auth/me 200 in 18ms :: {"user":{"id":"e713aa95-3245-4d15-9f2b-8e2fa7b7…

@@ -255,6 +255,15 @@ export default function AdminUsers() {
       officePhone: editUserData.officePhone || null,
     };
 
+    // Keep staff display name consistent across dashboards
+    if (
+      editingUser.role !== 'property_owner' &&
+      editUserData.firstName?.trim() &&
+      editUserData.lastName?.trim()
+    ) {
+      updates.fullName = `${editUserData.firstName.trim()} ${editUserData.lastName.trim()}`;
+    }
+
     // Remove password if empty (keep current password)
     if (!editUserData.password) {
       delete updates.password;

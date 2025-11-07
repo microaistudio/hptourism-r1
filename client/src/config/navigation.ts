@@ -1,4 +1,4 @@
-import { Home, FileText, Bell, BarChart3, BarChart, Users, ClipboardList, Settings, Database, ClipboardCheck, User, Activity, MapPin } from "lucide-react";
+import { Home, FileText, Bell, BarChart3, BarChart, Users, ClipboardList, Settings, Database, ClipboardCheck, User, Activity, MapPin, Search } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -145,6 +145,11 @@ export const daNavigation: NavSection[] = [
         icon: ClipboardCheck,
       },
       {
+        title: "Search Application",
+        url: "/da/search",
+        icon: Search,
+      },
+      {
         title: "Analytics",
         url: "/analytics",
         icon: BarChart,
@@ -182,6 +187,11 @@ export const dtdoNavigation: NavSection[] = [
         title: "Workflow Monitor",
         url: "/workflow-monitoring",
         icon: Activity,
+      },
+      {
+        title: "Search Application",
+        url: "/dtdo/search",
+        icon: Search,
       },
       {
         title: "My Profile",

@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { buildObjectViewUrl } from "@/lib/utils";
 
 interface ImageGalleryProps {
   images: Array<{
     filePath: string;
     fileName: string;
+    mimeType?: string | null;
   }>;
   open: boolean;
   onClose: () => void;
@@ -32,8 +34,11 @@ export function ImageGallery({ images, open, onClose, initialIndex = 0 }: ImageG
     setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  const getImageUrl = (filePath: string) => {
-    return `/api/object-storage/view?path=${encodeURIComponent(filePath)}`;
+  const getImageUrl = (filePath: string, mimeType?: string | null, fileName?: string) => {
+    return buildObjectViewUrl(filePath, {
+      mimeType: mimeType ?? undefined,
+      fileName,
+    });
   };
 
   if (images.length === 0) return null;
@@ -75,7 +80,11 @@ export function ImageGallery({ images, open, onClose, initialIndex = 0 }: ImageG
 
             {/* Current image */}
             <img
-              src={getImageUrl(images[currentIndex].filePath)}
+              src={getImageUrl(
+                images[currentIndex].filePath,
+                images[currentIndex].mimeType,
+                images[currentIndex].fileName
+              )}
               alt={images[currentIndex].fileName}
               className="max-h-full max-w-full object-contain"
               data-testid={`image-current-${currentIndex}`}
@@ -111,7 +120,7 @@ export function ImageGallery({ images, open, onClose, initialIndex = 0 }: ImageG
                     }`}
                   >
                     <img
-                      src={getImageUrl(image.filePath)}
+                      src={getImageUrl(image.filePath, image.mimeType, image.fileName)}
                       alt={image.fileName}
                       className="w-full h-full object-cover"
                     />

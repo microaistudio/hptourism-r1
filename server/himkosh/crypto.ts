@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { promises as fs } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { resolveKeyFilePath } from './config';
 
 /**
  * HimKosh Encryption/Decryption Utilities
@@ -14,18 +13,13 @@ import { fileURLToPath } from 'url';
  * Block Size: 128 bits (16 bytes)
  */
 
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 export class HimKoshCrypto {
   private keyFilePath: string;
   private key: Buffer | null = null;
   private iv: Buffer | null = null;
 
   constructor(keyFilePath?: string) {
-    // Default to echallan.key in server/himkosh directory
-    this.keyFilePath = keyFilePath || path.join(__dirname, 'echallan.key');
+    this.keyFilePath = resolveKeyFilePath(keyFilePath);
   }
 
   /**
@@ -62,7 +56,7 @@ export class HimKoshCrypto {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error(`Key file not found at: ${this.keyFilePath}. Please obtain echallan.key from CTP team.`);
+      throw new Error(`Key file not found at: ${this.keyFilePath}. Please obtain echallan.key from CTP team or set HIMKOSH_KEY_FILE_PATH.`);
     }
   }
 
@@ -119,17 +113,15 @@ export class HimKoshCrypto {
   }
 
   /**
-   * Generate MD5 checksum for data string
-   * CRITICAL FIX: DLL returns lowercase hex (not uppercase as doc implied)
+   * Generate MD5 checksum for data string.
+   * HimKosh reference DLL emits lowercase hexadecimal using UTF-8 bytes.
    * @param dataString - String to generate checksum for
    * @returns MD5 checksum in lowercase hexadecimal
    */
   static generateChecksum(dataString: string): string {
     const hash = crypto.createHash('md5');
-    // CRITICAL: Use ASCII encoding to match .NET's Encoding.ASCII
-    hash.update(dataString, 'ascii');
-    // CRITICAL FIX #1: DLL returns lowercase hex (doc was wrong about uppercase)
-    return hash.digest('hex').toLowerCase();
+    hash.update(dataString, 'utf8');
+    return hash.digest('hex');
   }
 
   /**
@@ -186,7 +178,11 @@ export function buildRequestString(params: {
 
   // Add Head2/Amount2 BEFORE Ddo (government code order)
   // CRITICAL: Government code includes Head2/Amount2 ALWAYS (even if Amount2=0)
-  if (params.head2 !== undefined && params.amount2 !== undefined) {
+  if (
+    params.head2 &&
+    params.amount2 !== undefined &&
+    Math.round(params.amount2) > 0
+  ) {
     parts.push(`Head2=${params.head2}`);
     parts.push(`Amount2=${Math.round(params.amount2)}`); // Ensure integer
   }
@@ -208,23 +204,15 @@ export function buildRequestString(params: {
     parts.push(`Amount10=${Math.round(params.amount10)}`); // Ensure integer
   }
 
-  // CRITICAL FIX: Per NIC-HP feedback, checksum is calculated on CORE fields only
-  // Service_code and return_url are appended AFTER checksum calculation
-  // Core string ends at last Amount/Period field
-  const coreString = parts.join('|');
-  
-  // Append Service_code and return_url to the FULL string (but NOT in checksum)
   if (params.serviceCode) {
     parts.push(`Service_code=${params.serviceCode}`);
   }
   if (params.returnUrl) {
     parts.push(`return_url=${params.returnUrl}`);
   }
-  
-  const fullString = parts.join('|');
-  
-  // Return object with both strings
-  return { coreString, fullString };
+
+  const dataString = parts.join('|');
+  return { coreString: dataString, fullString: dataString };
 }
 
 /**
@@ -249,23 +237,24 @@ export function parseResponseString(responseString: string): {
   const data: Record<string, string> = {};
 
   for (const part of parts) {
-    const [key, value] = part.split('=');
-    if (key && value !== undefined) {
+    const [rawKey, value] = part.split('=');
+    if (rawKey && value !== undefined) {
+      const key = rawKey.trim().toLowerCase();
       data[key] = value;
     }
   }
 
   return {
-    echTxnId: data.EchTxnId || '',
-    bankCIN: data.BankCIN || '',
-    bank: data.Bank || '',
-    status: data.Status || '',
-    statusCd: data.StatusCd || '',
-    appRefNo: data.AppRefNo || '',
-    amount: data.Amount || '',
-    paymentDate: data.Payment_date || '',
-    deptRefNo: data.DeptRefNo || '',
-    bankName: data.BankName || '',
+    echTxnId: data.echtxnid || '',
+    bankCIN: data.bankcin || '',
+    bank: data.bank || '',
+    status: data.status || '',
+    statusCd: data.statuscd || '',
+    appRefNo: data.apprefno || '',
+    amount: data.amount || '',
+    paymentDate: data.payment_date || '',
+    deptRefNo: data.deptrefno || '',
+    bankName: data.bankname || '',
     checksum: data.checksum || '',
   };
 }

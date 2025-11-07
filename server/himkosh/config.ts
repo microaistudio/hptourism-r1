@@ -3,43 +3,83 @@
  * Store sensitive credentials in Replit Secrets
  */
 
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const getEnvValue = (...keys: Array<string | undefined>) => {
+  for (const key of keys) {
+    if (!key) continue;
+    const value = process.env[key];
+    if (value && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+export function resolveKeyFilePath(explicitPath?: string): string {
+  const candidates = [
+    explicitPath,
+    process.env.HIMKOSH_KEY_FILE_PATH,
+    path.resolve(process.cwd(), 'server/himkosh/echallan.key'),
+    path.resolve(process.cwd(), 'dist/himkosh/echallan.key'),
+    path.resolve(process.cwd(), 'dist/echallan.key'),
+    path.join(__dirname, 'echallan.key'),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+      // ignore and continue to next candidate
+    }
+  }
+
+  // Fall back to module-relative path; loadKey will throw a clearer error
+  return path.join(__dirname, 'echallan.key');
+}
+
 export const himkoshConfig = {
   // CTP API Endpoints
-  paymentUrl: 'https://himkosh.hp.nic.in/echallan/WebPages/wrfApplicationRequest.aspx',
-  verificationUrl: 'https://himkosh.hp.nic.in/eChallan/webpages/AppVerification.aspx',
-  challanPrintUrl: 'https://himkosh.hp.nic.in/eChallan/challan_reports/reportViewer.aspx',
-  searchChallanUrl: 'https://himkosh.hp.nic.in/eChallan/SearchChallan.aspx',
+  paymentUrl: getEnvValue('HIMKOSH_PAYMENT_URL', 'HIMKOSH_POST_URL') || 'https://himkosh.hp.nic.in/echallan/WebPages/wrfApplicationRequest.aspx',
+  verificationUrl: getEnvValue('HIMKOSH_VERIFICATION_URL', 'HIMKOSH_VERIFY_URL') || 'https://himkosh.hp.nic.in/eChallan/webpages/AppVerification.aspx',
+  challanPrintUrl: getEnvValue('HIMKOSH_CHALLAN_PRINT_URL') || 'https://himkosh.hp.nic.in/eChallan/challan_reports/reportViewer.aspx',
+  searchChallanUrl: getEnvValue('HIMKOSH_SEARCH_URL') || 'https://himkosh.hp.nic.in/eChallan/SearchChallan.aspx',
 
   // Merchant Configuration (from CTP team)
   // These will be stored in Replit Secrets
-  merchantCode: process.env.HIMKOSH_MERCHANT_CODE || '', // e.g., 'HIMKOSH228'
-  deptId: process.env.HIMKOSH_DEPT_ID || '', // 3-digit dept code
-  serviceCode: process.env.HIMKOSH_SERVICE_CODE || '', // 3-char service code (e.g., 'TSM')
-  ddo: process.env.HIMKOSH_DDO || '', // DDO code (e.g., 'SML00-532')
+  merchantCode: getEnvValue('HIMKOSH_MERCHANT_CODE', 'HIMKOSH_MERCHANTCODE', 'HIMKOSH_MERCHANT_ID') || '',
+  deptId: getEnvValue('HIMKOSH_DEPT_ID', 'HIMKOSH_DEPT_CODE') || '',
+  serviceCode: getEnvValue('HIMKOSH_SERVICE_CODE', 'HIMKOSH_SERVICECODE') || '',
+  ddo: getEnvValue('HIMKOSH_DDO', 'HIMKOSH_DDO_CODE') || '',
 
   // Head of Account Codes (Budget heads)
   heads: {
-    registrationFee: process.env.HIMKOSH_HEAD || '', // e.g., '1452-00-800-01'
-    // Add more heads as needed
+    registrationFee: getEnvValue('HIMKOSH_HEAD', 'HIMKOSH_HEAD_OF_ACCOUNT', 'HIMKOSH_HEAD1') || '',
+    secondaryHead: getEnvValue('HIMKOSH_HEAD2', 'HIMKOSH_SECONDARY_HEAD', 'HIMKOSH_HEAD_OF_ACCOUNT_2'),
+    secondaryHeadAmount: (() => {
+      const raw = getEnvValue('HIMKOSH_HEAD2_AMOUNT', 'HIMKOSH_SECONDARY_HEAD_AMOUNT');
+      if (!raw) return undefined;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    })(),
   },
 
   // Return URL for payment callback
   // CRITICAL: Must be the actual URL where this app is running
   // In Replit, use REPLIT_DEV_DOMAIN or REPL_SLUG/REPL_OWNER
-  returnUrl: process.env.HIMKOSH_RETURN_URL || 
-    (process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/himkosh/callback`
-      : `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/himkosh/callback`),
+  returnUrl:
+    getEnvValue("HIMKOSH_RETURN_URL") || "https://hptourism.osipl.dev/api/himkosh/callback",
 
   // Key file path (will be provided by CTP team)
   // Use absolute path to ensure it's found regardless of working directory
-  keyFilePath: process.env.HIMKOSH_KEY_FILE_PATH || path.join(__dirname, 'echallan.key'),
+  keyFilePath: resolveKeyFilePath(),
 };
 
 /**
@@ -88,6 +128,7 @@ export function getHimKoshConfig() {
     serviceCode: !!himkoshConfig.serviceCode,
     ddo: !!himkoshConfig.ddo,
     head: !!himkoshConfig.heads.registrationFee,
+    secondaryHead: !!himkoshConfig.heads.secondaryHead,
   });
   
   if (!config.valid) {
@@ -102,8 +143,11 @@ export function getHimKoshConfig() {
       ddo: himkoshConfig.ddo || 'SML10-001',
       heads: {
         registrationFee: himkoshConfig.heads.registrationFee || '0230-00-104-01',
+        secondaryHead: himkoshConfig.heads.secondaryHead,
+        secondaryHeadAmount: himkoshConfig.heads.secondaryHeadAmount,
       },
-      isConfigured: false,
+      isConfigured: true,
+      configStatus: 'placeholder' as const,
     };
   }
 
@@ -111,5 +155,6 @@ export function getHimKoshConfig() {
   return {
     ...himkoshConfig,
     isConfigured: true,
+    configStatus: 'production' as const,
   };
 }

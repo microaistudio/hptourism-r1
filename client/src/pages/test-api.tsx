@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 export default function TestAPI() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<{ properties?: unknown[] }>({
     queryKey: ["/api/public/properties"],
     staleTime: 0,
   });

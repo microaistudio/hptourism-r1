@@ -1,7 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Upload, X, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DEFAULT_UPLOAD_POLICY,
+  type UploadPolicy,
+} from "@shared/uploadPolicy";
 
 export interface UploadedFileMetadata {
   id?: string; // Optional ID for existing documents
@@ -17,6 +22,7 @@ interface ObjectUploaderProps {
   multiple?: boolean;
   maxFiles?: number;
   fileType?: string;
+  category?: "documents" | "photos";
   onUploadComplete: (files: UploadedFileMetadata[]) => void;
   existingFiles?: UploadedFileMetadata[];
   className?: string;
@@ -24,10 +30,11 @@ interface ObjectUploaderProps {
 
 export function ObjectUploader({
   label,
-  accept = "*/*",
+  accept,
   multiple = false,
   maxFiles = 1,
   fileType = "document",
+  category = "documents",
   onUploadComplete,
   existingFiles = [],
   className = "",
@@ -36,6 +43,125 @@ export function ObjectUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileMetadata[]>(existingFiles);
+  const { data: uploadPolicyData } = useQuery<UploadPolicy>({
+    queryKey: ["/api/settings/upload-policy"],
+    staleTime: 5 * 60 * 1000,
+  });
+  const uploadPolicy = uploadPolicyData ?? DEFAULT_UPLOAD_POLICY;
+  const categoryPolicy = uploadPolicy[category];
+  const allowedMimeSet = useMemo(
+    () => new Set(categoryPolicy.allowedMimeTypes.map((mime) => mime.toLowerCase())),
+    [categoryPolicy.allowedMimeTypes],
+  );
+  const allowedExtensionSet = useMemo(
+    () =>
+      new Set(
+        categoryPolicy.allowedExtensions.map((ext) =>
+          ext.toLowerCase(),
+        ),
+      ),
+    [categoryPolicy.allowedExtensions],
+  );
+  const maxFileSizeBytes = categoryPolicy.maxFileSizeMB * 1024 * 1024;
+  const derivedAccept = useMemo(() => {
+    const entries = new Set<string>();
+
+    categoryPolicy.allowedExtensions.forEach((ext) => {
+      if (ext && typeof ext === "string") {
+        entries.add(ext.toLowerCase());
+      }
+    });
+
+    categoryPolicy.allowedMimeTypes.forEach((mime) => {
+      if (mime && typeof mime === "string") {
+        entries.add(mime.toLowerCase());
+      }
+    });
+
+    if (entries.size === 0) {
+      return undefined;
+    }
+
+    return Array.from(entries).join(",");
+  }, [categoryPolicy.allowedExtensions, categoryPolicy.allowedMimeTypes]);
+
+  const effectiveAccept = accept ?? derivedAccept;
+
+  const getExtension = (name: string) => {
+    const lastDot = name.lastIndexOf(".");
+    if (lastDot === -1 || lastDot === name.length - 1) {
+      return "";
+    }
+    return name.slice(lastDot).toLowerCase();
+  };
+
+  const normalizeMime = (mime: string | undefined) =>
+    (mime || "").split(";")[0].trim().toLowerCase();
+
+  const isMimeAllowed = (mime: string) => {
+    const normalized = normalizeMime(mime);
+    if (!normalized) {
+      return allowedMimeSet.size === 0;
+    }
+    if (allowedMimeSet.size === 0) {
+      return true;
+    }
+    if (allowedMimeSet.has(normalized)) {
+      return true;
+    }
+    // Accept image/jpg when only image/jpeg is configured (common alias)
+    if (
+      normalized === "image/jpg" &&
+      allowedMimeSet.has("image/jpeg")
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  const isExtensionAllowed = (extension: string) => {
+    if (!allowedExtensionSet.size) {
+      return true;
+    }
+    return allowedExtensionSet.has(extension.toLowerCase());
+  };
+
+  const appendLocalUploadParams = (
+    url: string,
+    params: Record<string, string | undefined>,
+  ) => {
+    try {
+      const hasProtocol = /^https?:\/\//i.test(url);
+      const target = new URL(
+        url,
+        hasProtocol ? undefined : window.location.origin,
+      );
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) {
+          target.searchParams.set(key, value);
+        }
+      });
+      if (hasProtocol) {
+        return target.toString();
+      }
+      return `${target.pathname}${target.search}${target.hash}`;
+    } catch {
+      return url;
+    }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return "0 B";
+    }
+    const units = ["B", "KB", "MB", "GB"];
+    const index = Math.min(
+      Math.floor(Math.log(bytes) / Math.log(1024)),
+      units.length - 1,
+    );
+    const value = bytes / Math.pow(1024, index);
+    return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[index]}`;
+  };
 
   // Sync internal state with existingFiles prop changes
   useEffect(() => {
@@ -44,7 +170,9 @@ export function ObjectUploader({
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      return;
+    }
 
     const remainingSlots = maxFiles - uploadedFiles.length;
     if (files.length > remainingSlots) {
@@ -53,6 +181,51 @@ export function ObjectUploader({
         description: `You can only upload ${remainingSlots} more file(s)`,
         variant: "destructive",
       });
+      event.target.value = "";
+      return;
+    }
+
+    const validFiles: File[] = [];
+    const skippedMessages: string[] = [];
+
+    for (const file of files) {
+      const extension = getExtension(file.name);
+      const normalizedMime = normalizeMime(file.type) || "application/octet-stream";
+
+      if (file.size > maxFileSizeBytes) {
+        skippedMessages.push(
+          `${file.name} is ${formatBytes(file.size)} (limit ${categoryPolicy.maxFileSizeMB} MB)`,
+        );
+        continue;
+      }
+
+      if (!isExtensionAllowed(extension)) {
+        skippedMessages.push(
+          `${file.name} must use ${categoryPolicy.allowedExtensions.join(", ")}`,
+        );
+        continue;
+      }
+
+      if (!isMimeAllowed(normalizedMime)) {
+        skippedMessages.push(
+          `${file.name} has unsupported type ${normalizedMime}`,
+        );
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (skippedMessages.length > 0) {
+      toast({
+        title: "Some files were skipped",
+        description: skippedMessages.join("\n"),
+        variant: "destructive",
+      });
+    }
+
+    if (validFiles.length === 0) {
+      event.target.value = "";
       return;
     }
 
@@ -61,34 +234,53 @@ export function ObjectUploader({
     try {
       const uploadedMetadata: UploadedFileMetadata[] = [];
 
-      for (const file of files) {
-        // Get signed upload URL from server
-        const urlResponse = await fetch(`/api/upload-url?fileType=${fileType}`);
+      for (const file of validFiles) {
+        const normalizedMime = normalizeMime(file.type) || "application/octet-stream";
+        const params = new URLSearchParams({
+          fileType,
+          category,
+          fileName: file.name,
+          fileSize: file.size.toString(),
+          mimeType: normalizedMime,
+        });
+
+        const urlResponse = await fetch(`/api/upload-url?${params.toString()}`, {
+          credentials: "include",
+        });
         if (!urlResponse.ok) {
-          throw new Error("Failed to get upload URL");
+          const errorText = await urlResponse.text();
+          throw new Error(errorText || `Failed to prepare upload for ${file.name}`);
         }
 
         const { uploadUrl, filePath } = await urlResponse.json();
+        const uploadTarget =
+          uploadUrl.startsWith("/api/local-object/upload")
+            ? appendLocalUploadParams(uploadUrl, {
+                category,
+                name: file.name,
+                size: file.size.toString(),
+                mime: normalizedMime,
+              })
+            : uploadUrl;
 
-        // Upload file to object storage
-        const uploadResponse = await fetch(uploadUrl, {
+        const uploadResponse = await fetch(uploadTarget, {
           method: "PUT",
           body: file,
           headers: {
-            "Content-Type": file.type || "application/octet-stream",
+            "Content-Type": normalizedMime,
           },
         });
 
         if (!uploadResponse.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
+          const errorText = await uploadResponse.text();
+          throw new Error(errorText || `Failed to upload ${file.name}`);
         }
 
-        // Capture file metadata
         uploadedMetadata.push({
           filePath,
           fileName: file.name,
           fileSize: file.size,
-          mimeType: file.type || "application/octet-stream",
+          mimeType: normalizedMime,
         });
       }
 
@@ -98,7 +290,7 @@ export function ObjectUploader({
 
       toast({
         title: "Upload successful",
-        description: `${files.length} file(s) uploaded successfully`,
+        description: `${uploadedMetadata.length} file(s) uploaded successfully`,
       });
     } catch (error) {
       console.error("Upload error:", error);
@@ -207,7 +399,7 @@ export function ObjectUploader({
         <input
           ref={fileInputRef}
           type="file"
-          accept={accept}
+          accept={effectiveAccept}
           multiple={multiple}
           onChange={handleFileSelect}
           className="hidden"

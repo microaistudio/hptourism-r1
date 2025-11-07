@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import type { KeyboardEvent } from "react";
+import { nanoid } from "nanoid";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -15,13 +16,15 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info, MapPin, Wind, ParkingCircle, UtensilsCrossed, Droplets, Tv, Shirt, ConciergeBell, Trees, Mountain, PawPrint } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Send, Home, User as UserIcon, Bed, Wifi, FileText, IndianRupee, Eye, Lightbulb, AlertTriangle, Sparkles, Info, MapPin, Wind, ParkingCircle, UtensilsCrossed, Droplets, Tv, Shirt, ConciergeBell, Trees, Mountain, PawPrint, Video, Flame } from "lucide-react";
 import type { User, HomestayApplication, UserProfile } from "@shared/schema";
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
-import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, type CategoryType, type LocationType } from "@shared/fee-calculator";
+import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, MAX_ROOMS_ALLOWED, MAX_BEDS_ALLOWED, type CategoryType, type LocationType } from "@shared/fee-calculator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ApplicationStepper } from "@/components/application-stepper";
+import { useLocation } from "wouter";
 import { 
   getDistricts, 
   getTehsilsForDistrict, 
@@ -30,6 +33,10 @@ import {
   getWardsForUrbanBody,
   LOCATION_TYPE_LABELS 
 } from "@shared/lgd-data";
+import {
+  DEFAULT_UPLOAD_POLICY,
+  type UploadPolicy,
+} from "@shared/uploadPolicy";
 
 const HP_DISTRICTS = getDistricts();
 
@@ -42,8 +49,11 @@ const LOCATION_TYPES = [
 const GENDER_OPTIONS = [
   { value: "female", label: "Female (5% additional discount)" },
   { value: "male", label: "Male" },
-  { value: "other", label: "Other" },
 ];
+
+const normalizeGender = (value: unknown): "male" | "female" => {
+  return value === "female" ? "female" : "male";
+};
 
 // District-based typical distances (user can override)
 const DISTRICT_DISTANCES: Record<string, { airport: number; railway: number; cityCenter: number; shopping: number; busStand: number }> = {
@@ -65,6 +75,21 @@ const DISTRICT_DISTANCES: Record<string, { airport: number; railway: number; cit
 };
 
 // Strict schema for final submission - all required fields
+const OWNERSHIP_LABELS: Record<"owned" | "leased", string> = {
+  owned: "Owned",
+  leased: "Lease Deed",
+};
+
+const formatBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, index);
+  return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[index]}`;
+};
+
 const applicationSchema = z.object({
   // Basic property info
   propertyName: z.string().min(3, "Property name must be at least 3 characters"),
@@ -72,22 +97,27 @@ const applicationSchema = z.object({
   
   // LGD Hierarchical Address
   district: z.string().min(1, "District is required"),
-  tehsil: z.string().min(1, "Tehsil is required"),
+  tehsil: z.string().optional(),
+  tehsilOther: z.string().optional().or(z.literal("")),
   block: z.string().optional(),
+  blockOther: z.string().optional().or(z.literal("")),
   gramPanchayat: z.string().optional(),
+  gramPanchayatOther: z.string().optional().or(z.literal("")),
   urbanBody: z.string().optional(),
+  urbanBodyOther: z.string().optional().or(z.literal("")),
   ward: z.string().optional(),
   address: z.string().min(10, "House/Building number and street required"),
   pincode: z.string().regex(/^[1-9]\d{5}$/, "Enter valid 6-digit pincode"),
   
   // Contact details
   telephone: z.string().optional().or(z.literal("")),
-  fax: z.string().optional().or(z.literal("")),
   ownerEmail: z.string().min(1, "Email is required").email("Enter valid email"),
   ownerMobile: z.string().regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile"),
   
   // Owner info
   ownerName: z.string().min(3, "Owner name is required"),
+  ownerFirstName: z.string().min(1, "First name is required").regex(/^[A-Za-z\s'-]+$/, "First name can only contain letters"),
+  ownerLastName: z.string().min(1, "Last name is required").regex(/^[A-Za-z\s'-]+$/, "Last name can only contain letters"),
   ownerGender: z.enum(["male", "female", "other"]),
   ownerAadhaar: z.string().min(1, "Aadhaar is required").regex(/^\d{12}$/, "Aadhaar must be 12 digits"),
   propertyOwnership: z.enum(["owned", "leased"]),
@@ -116,10 +146,13 @@ const applicationSchema = z.object({
   
   // Room configuration (single/double/suite)
   singleBedRooms: z.number().int().min(0).default(0),
+  singleBedBeds: z.number().int().min(0).default(1),
   singleBedRoomSize: z.number().min(0).optional(),
   doubleBedRooms: z.number().int().min(0).default(0),
+  doubleBedBeds: z.number().int().min(0).default(2),
   doubleBedRoomSize: z.number().min(0).optional(),
   familySuites: z.number().int().min(0).max(3, "Maximum 3 family suites").default(0),
+  familySuiteBeds: z.number().int().min(0).default(4),
   familySuiteSize: z.number().min(0).optional(),
   attachedWashrooms: z.number().int().min(0),
   
@@ -149,19 +182,25 @@ const draftSchema = z.object({
   locationType: z.enum(["mc", "tcp", "gp"]).optional(),
   district: z.string().optional(),
   tehsil: z.string().optional(),
+  tehsilOther: z.string().optional(),
   block: z.string().optional(),
+  blockOther: z.string().optional(),
   gramPanchayat: z.string().optional(),
+  gramPanchayatOther: z.string().optional(),
   urbanBody: z.string().optional(),
+  urbanBodyOther: z.string().optional(),
   ward: z.string().optional(),
   address: z.string().optional(),
   pincode: z.string().optional(),
   telephone: z.string().optional(),
-  fax: z.string().optional(),
   ownerEmail: z.string().optional(),
   ownerMobile: z.string().optional(),
   ownerName: z.string().optional(),
+  ownerFirstName: z.string().optional(),
+  ownerLastName: z.string().optional(),
   ownerGender: z.enum(["male", "female", "other"]).optional(),
   ownerAadhaar: z.string().optional(),
+  propertyOwnership: z.enum(["owned", "leased"]).optional(),
   category: z.enum(["diamond", "gold", "silver"]).optional(),
   proposedRoomRate: z.number().optional(),
   singleBedRoomRate: z.number().optional(),
@@ -175,10 +214,13 @@ const draftSchema = z.object({
   projectType: z.enum(["new_rooms", "new_project"]).optional(),
   propertyArea: z.number().optional(),
   singleBedRooms: z.number().optional(),
+  singleBedBeds: z.number().optional(),
   singleBedRoomSize: z.number().optional(),
   doubleBedRooms: z.number().optional(),
+  doubleBedBeds: z.number().optional(),
   doubleBedRoomSize: z.number().optional(),
   familySuites: z.number().optional(),
+  familySuiteBeds: z.number().optional(),
   familySuiteSize: z.number().optional(),
   attachedWashrooms: z.number().optional(),
   lobbyArea: z.number().optional(),
@@ -195,6 +237,65 @@ const draftSchema = z.object({
 type ApplicationForm = z.infer<typeof applicationSchema>;
 type DraftForm = z.infer<typeof draftSchema>;
 
+const splitFullName = (fullName?: string | null) => {
+  if (!fullName) {
+    return { firstName: "", lastName: "" };
+  }
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return { firstName: "", lastName: "" };
+  }
+  const [firstName, ...rest] = parts;
+  return { firstName, lastName: rest.join(" ") };
+};
+
+const sanitizeNamePart = (value: string) =>
+  value.replace(/[^A-Za-z\s'-]/g, "").replace(/\s{2,}/g, " ");
+
+  const sanitizeDigits = (value: string, maxLength?: number) => {
+    let digitsOnly = value.replace(/\D/g, "");
+    if (typeof maxLength === "number") {
+      digitsOnly = digitsOnly.slice(0, maxLength);
+    }
+  return digitsOnly;
+};
+
+const preventDigitKey = (event: KeyboardEvent<HTMLInputElement>) => {
+  if (
+    event.key.length === 1 &&
+    /\d/.test(event.key) &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+  }
+};
+
+const coerceNumber = (value: unknown, fallback: number | undefined = undefined) => {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    return fallback;
+  }
+  return parsed;
+};
+
+const normalizeOptionalString = (value?: string | null) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+};
+
+const generateClientId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return nanoid();
+};
+
 const AMENITIES = [
   { id: "ac", label: "Air Conditioning", icon: Wind },
   { id: "wifi", label: "WiFi", icon: Wifi },
@@ -207,7 +308,11 @@ const AMENITIES = [
   { id: "garden", label: "Garden", icon: Trees },
   { id: "mountainView", label: "Mountain View", icon: Mountain },
   { id: "petFriendly", label: "Pet Friendly", icon: PawPrint },
+  { id: "cctv", label: "CCTV Surveillance", icon: Video },
+  { id: "fireSafety", label: "Fire Safety Equipment", icon: Flame },
 ];
+
+const MANDATORY_AMENITY_IDS = new Set(["cctv", "fireSafety"]);
 
 // Fee structure as per ANNEXURE-I (location-based)
 const FEE_STRUCTURE = {
@@ -230,14 +335,23 @@ const STEP_CONFIG = [
     label: "Property Details",
     shortLabel: "Property",
     icon: Home,
-    requiredFields: ["propertyName", "address", "district", "pincode", "locationType"],
+    requiredFields: ["propertyName", "address", "district", "tehsil", "pincode", "locationType"],
   },
   {
     id: 2,
     label: "Owner Information",
     shortLabel: "Owner Info",
     icon: UserIcon,
-    requiredFields: ["ownerName", "ownerMobile", "ownerEmail", "ownerAadhaar"],
+    requiredFields: [
+      "ownerFirstName",
+      "ownerLastName",
+      "ownerName",
+      "ownerMobile",
+      "ownerEmail",
+      "ownerAadhaar",
+      "ownerGender",
+      "propertyOwnership",
+    ],
   },
   {
     id: 3,
@@ -270,11 +384,21 @@ const STEP_CONFIG = [
 ];
 
 export default function NewApplication() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [step, setStep] = useState(1);
+const { data: uploadPolicyData } = useQuery<UploadPolicy>({
+  queryKey: ["/api/settings/upload-policy"],
+  staleTime: 5 * 60 * 1000,
+});
+const uploadPolicy = uploadPolicyData ?? DEFAULT_UPLOAD_POLICY;
+const isCategoryEnforced = false;
+const maxTotalUploadBytes = uploadPolicy.totalPerApplicationMB * 1024 * 1024;
+const [step, setStep] = useState(1);
   const [maxStepReached, setMaxStepReached] = useState(1); // Track highest step visited
-  const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({});
+const [selectedAmenities, setSelectedAmenities] = useState<Record<string, boolean>>({
+  cctv: false,
+  fireSafety: false,
+});
   const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, UploadedFileMetadata[]>>({
     revenuePapers: [],
     affidavitSection29: [],
@@ -282,28 +406,95 @@ export default function NewApplication() {
     registerForVerification: [],
     billBook: [],
   });
-  const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
-  const totalSteps = 6;
+const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
+const totalSteps = 6;
+const guardrailToastShownRef = useRef(false);
 
-  // Get draft ID from URL query parameter (use window.location.search to get query params)
-  const draftIdFromUrl = new URLSearchParams(window.location.search).get('draft');
+// Get draft ID and correction ID from URL query parameters
+const searchParams = new URLSearchParams(window.location.search);
+const draftIdFromUrl = searchParams.get('draft');
+const correctionIdFromUrl = searchParams.get('application');
+const [draftId, setDraftId] = useState<string | null>(draftIdFromUrl);
+const [correctionId, setCorrectionId] = useState<string | null>(correctionIdFromUrl);
+const [showPreview, setShowPreview] = useState(false);
 
-  const { data: userData } = useQuery<{ user: User }>({
-    queryKey: ["/api/auth/me"],
-  });
+const [, navigate] = useLocation();
+const isCorrectionMode = Boolean(correctionId);
+
+const { data: userData } = useQuery<{ user: User }>({
+  queryKey: ["/api/auth/me"],
+});
+
+const { data: applicationsData } = useQuery<{ applications: HomestayApplication[] }>({
+  queryKey: ["/api/applications"],
+  enabled: !!userData?.user,
+  staleTime: 30_000,
+});
+
+useEffect(() => {
+  if (isCorrectionMode) {
+    return;
+  }
+  if (!applicationsData?.applications) return;
+  const apps = applicationsData.applications;
+  if (apps.length === 0) {
+    return;
+  }
+
+  const draftApplication = apps.find((app) => app.status === "draft");
+  if (draftApplication) {
+    if (!draftId || draftId !== draftApplication.id) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("draft", draftApplication.id);
+      window.history.replaceState(null, "", url.pathname + url.search);
+      setDraftId(draftApplication.id);
+    }
+    return;
+  }
+
+  const activeApplication = apps[0];
+  if (!guardrailToastShownRef.current) {
+    guardrailToastShownRef.current = true;
+    toast({
+      title: "Application already in progress",
+      description: "You already have an application in process. You’ll be redirected to continue it.",
+    });
+  }
+  setLocation(`/applications/${activeApplication.id}`);
+  }, [applicationsData, draftId, setLocation, toast, isCorrectionMode]);
 
   // Fetch user profile for auto-population
-  const { data: userProfile } = useQuery<UserProfile>({
+  const { data: userProfile } = useQuery<UserProfile | null>({
     queryKey: ["/api/profile"],
     enabled: !!userData?.user,
     retry: false,
+    queryFn: async ({ queryKey }) => {
+      const res = await fetch(queryKey[0] as string, {
+        credentials: "include",
+      });
+      if (res.status === 404) {
+        return null;
+      }
+      if (!res.ok) {
+        const text = (await res.text()) || res.statusText;
+        throw new Error(text);
+      }
+      return res.json();
+    },
   });
 
   // Load draft application if resuming
-  const { data: draftData } = useQuery<{ application: HomestayApplication }>({
-    queryKey: ["/api/applications", draftIdFromUrl],
-    enabled: !!draftIdFromUrl,
-  });
+const { data: draftData } = useQuery<{ application: HomestayApplication }>({
+  queryKey: ["/api/applications", draftIdFromUrl],
+  enabled: !!draftIdFromUrl,
+});
+
+const { data: correctionData } = useQuery<{ application: HomestayApplication }>({
+  queryKey: ["/api/applications", correctionIdFromUrl],
+  enabled: !!correctionIdFromUrl,
+});
+
+  const defaultOwnerNameParts = splitFullName(userData?.user?.fullName || "");
 
   const form = useForm<ApplicationForm>({
     // No resolver - validation happens manually on next/submit to allow draft saves
@@ -314,11 +505,15 @@ export default function NewApplication() {
       pincode: "",
       locationType: "gp",
       telephone: "",
-      fax: "",
+      tehsilOther: "",
       ownerEmail: userData?.user?.email || "",
       ownerMobile: userData?.user?.mobile || "",
       ownerName: userData?.user?.fullName || "",
+      ownerFirstName: defaultOwnerNameParts.firstName,
+      ownerLastName: defaultOwnerNameParts.lastName,
       ownerAadhaar: userData?.user?.aadhaarNumber || "",
+      ownerGender: normalizeGender((userData?.user as any)?.gender) as "male" | "female" | "other",
+      propertyOwnership: "owned",
       category: "silver",
       proposedRoomRate: 2000,
       singleBedRoomRate: 0,
@@ -327,10 +522,13 @@ export default function NewApplication() {
       projectType: "new_project",
       propertyArea: 0,
       singleBedRooms: 0,
+      singleBedBeds: 1,
       singleBedRoomSize: undefined,
       doubleBedRooms: 1,
+      doubleBedBeds: 2,
       doubleBedRoomSize: undefined,
       familySuites: 0,
+      familySuiteBeds: 4,
       familySuiteSize: undefined,
       attachedWashrooms: 1,
       gstin: "",
@@ -354,16 +552,301 @@ export default function NewApplication() {
   const locationType = form.watch("locationType");
   const district = form.watch("district");
   const tehsil = form.watch("tehsil");
+  const tehsilOther = form.watch("tehsilOther");
+  const ownerFirstName = form.watch("ownerFirstName");
+  const ownerLastName = form.watch("ownerLastName");
   const ownerGender = form.watch("ownerGender");
+  const propertyOwnership = form.watch("propertyOwnership") as "owned" | "leased" | undefined;
   const certificateValidityYears = form.watch("certificateValidityYears");
+  const isLeaseBlocked = step === 2 && propertyOwnership === "leased";
+  const submitButtonLabel = isCorrectionMode ? "Resubmit Application" : "Submit Application";
+  const isHydratingDraft = useRef(false);
+  const trimmedTehsilOther = tehsilOther?.trim() || "";
+  const displayTehsil = tehsil === "__other" ? (trimmedTehsilOther || "—") : (tehsil || "—");
+  const tehsilForRules = tehsil === "__other" ? trimmedTehsilOther : tehsil;
+
+  useEffect(() => {
+    if (isHydratingDraft.current) {
+      return;
+    }
+    if (!district) {
+      if (tehsil || tehsilOther) {
+        form.setValue("tehsil", "", { shouldDirty: false, shouldValidate: step >= 1 });
+        form.setValue("tehsilOther", "", { shouldDirty: false, shouldValidate: step >= 1 });
+      }
+      return;
+    }
+
+    const tehsilOptions = getTehsilsForDistrict(district);
+    const hasOptions = tehsilOptions.length > 0;
+
+    if (tehsil === "__other") {
+      if (tehsilOther && tehsilOther.trim().length > 0) {
+        return;
+      }
+      if (hasOptions) {
+        form.setValue("tehsil", tehsilOptions[0], { shouldDirty: false, shouldValidate: step >= 1 });
+        form.setValue("tehsilOther", "", { shouldDirty: false, shouldValidate: step >= 1 });
+      }
+      return;
+    }
+
+    if (!hasOptions) {
+      if (tehsil !== "__other") {
+        const manualValue = tehsil?.trim() ?? "";
+        form.setValue("tehsil", "__other", { shouldDirty: false, shouldValidate: step >= 1 });
+        form.setValue("tehsilOther", manualValue, { shouldDirty: false, shouldValidate: step >= 1 });
+      }
+      return;
+    }
+
+    if (!tehsil) {
+      form.setValue("tehsil", tehsilOptions[0], { shouldDirty: false, shouldValidate: step >= 1 });
+      form.setValue("tehsilOther", "", { shouldDirty: false, shouldValidate: step >= 1 });
+      return;
+    }
+
+    if (!tehsilOptions.includes(tehsil)) {
+      form.setValue("tehsil", "__other", { shouldDirty: false, shouldValidate: step >= 1 });
+      form.setValue("tehsilOther", tehsil, { shouldDirty: false, shouldValidate: step >= 1 });
+      return;
+    }
+
+    if (tehsilOther) {
+      form.setValue("tehsilOther", "", { shouldDirty: false, shouldValidate: step >= 1 });
+    }
+  }, [district, tehsil, tehsilOther, form, step]);
+
+  const hydrateFormFromSource = (source: Partial<HomestayApplication> | DraftForm | null | undefined) => {
+    if (!source) return;
+    const defaults = form.getValues();
+    const explicitFirst = (source as any).ownerFirstName as string | undefined;
+    const explicitLast = (source as any).ownerLastName as string | undefined;
+    const nameParts = splitFullName(source.ownerName ?? defaults.ownerName);
+    const resolvedFirstName = explicitFirst ?? nameParts.firstName ?? defaults.ownerFirstName ?? "";
+    const resolvedLastName = explicitLast ?? nameParts.lastName ?? defaults.ownerLastName ?? "";
+    const resolvedCertificateYears =
+      (source as any).certificateValidityYears !== undefined && (source as any).certificateValidityYears !== null
+        ? String((source as any).certificateValidityYears)
+        : defaults.certificateValidityYears;
+
+    const districtValue = (source as any).district ?? defaults.district ?? "";
+    let incomingTehsilRaw = (source as any).tehsil ?? defaults.tehsil ?? "";
+    const incomingTehsilOtherRaw = (source as any).tehsilOther ?? defaults.tehsilOther ?? "";
+
+    if (typeof incomingTehsilRaw === "string" && incomingTehsilRaw.trim() === "Not Provided") {
+      incomingTehsilRaw = "";
+    }
+
+    const tehsilOptions = districtValue ? getTehsilsForDistrict(districtValue) : [];
+    const trimmedTehsil = typeof incomingTehsilRaw === "string" ? incomingTehsilRaw.trim() : "";
+    const trimmedTehsilOther = typeof incomingTehsilOtherRaw === "string" ? incomingTehsilOtherRaw.trim() : "";
+
+    let resolvedTehsil: string;
+    let resolvedTehsilOther: string;
+
+    if (trimmedTehsil && tehsilOptions.includes(trimmedTehsil)) {
+      resolvedTehsil = trimmedTehsil;
+      resolvedTehsilOther = "";
+    } else if (trimmedTehsil) {
+      resolvedTehsil = "__other";
+      resolvedTehsilOther = trimmedTehsil;
+    } else if (trimmedTehsilOther) {
+      resolvedTehsil = "__other";
+      resolvedTehsilOther = trimmedTehsilOther;
+    } else if (tehsilOptions.length > 0) {
+      resolvedTehsil = tehsilOptions[0];
+      resolvedTehsilOther = "";
+    } else {
+      resolvedTehsil = "";
+      resolvedTehsilOther = "";
+    }
+
+    isHydratingDraft.current = true;
+    form.reset({
+      ...defaults,
+      propertyName: source.propertyName ?? defaults.propertyName ?? "",
+      address: source.address ?? defaults.address ?? "",
+      district: districtValue,
+      tehsil: resolvedTehsil,
+      tehsilOther: resolvedTehsilOther,
+      block: (source as any).block ?? defaults.block ?? "",
+      gramPanchayat: (source as any).gramPanchayat ?? defaults.gramPanchayat ?? "",
+      urbanBody: (source as any).urbanBody ?? defaults.urbanBody ?? "",
+      ward: (source as any).ward ?? defaults.ward ?? "",
+      pincode: (source as any).pincode ?? defaults.pincode ?? "",
+      locationType: ((source.locationType as "mc" | "tcp" | "gp") || defaults.locationType || "gp"),
+      telephone: (source as any).telephone ?? defaults.telephone ?? "",
+      ownerEmail: source.ownerEmail ?? defaults.ownerEmail ?? "",
+      ownerMobile: source.ownerMobile ?? defaults.ownerMobile ?? "",
+      ownerName: source.ownerName ?? defaults.ownerName ?? "",
+      ownerFirstName: resolvedFirstName,
+      ownerLastName: resolvedLastName,
+      ownerGender: normalizeGender(
+        (source.ownerGender as "male" | "female" | "other") ?? defaults.ownerGender,
+      ) as "male" | "female" | "other",
+      ownerAadhaar: source.ownerAadhaar ?? defaults.ownerAadhaar ?? "",
+      propertyOwnership: ((source as any).propertyOwnership as "owned" | "leased") ?? defaults.propertyOwnership ?? "owned",
+      category: (source.category as "diamond" | "gold" | "silver") ?? defaults.category ?? "silver",
+      proposedRoomRate: coerceNumber((source as any).proposedRoomRate, defaults.proposedRoomRate ?? 0) ?? 0,
+      singleBedRoomRate: coerceNumber((source as any).singleBedRoomRate, defaults.singleBedRoomRate ?? 0) ?? 0,
+      doubleBedRoomRate: coerceNumber((source as any).doubleBedRoomRate, defaults.doubleBedRoomRate ?? 0) ?? 0,
+      familySuiteRate: coerceNumber((source as any).familySuiteRate, defaults.familySuiteRate ?? 0) ?? 0,
+      projectType: (source.projectType as "new_rooms" | "new_project") ?? defaults.projectType ?? "new_project",
+      propertyArea: coerceNumber((source as any).propertyArea, defaults.propertyArea ?? 0) ?? 0,
+      singleBedRooms: coerceNumber((source as any).singleBedRooms, defaults.singleBedRooms ?? 0) ?? 0,
+      singleBedBeds: coerceNumber((source as any).singleBedBeds, defaults.singleBedBeds ?? 1) ?? 1,
+      singleBedRoomSize: coerceNumber((source as any).singleBedRoomSize),
+      doubleBedRooms: coerceNumber((source as any).doubleBedRooms, defaults.doubleBedRooms ?? 0) ?? 0,
+      doubleBedBeds: coerceNumber((source as any).doubleBedBeds, defaults.doubleBedBeds ?? 2) ?? 2,
+      doubleBedRoomSize: coerceNumber((source as any).doubleBedRoomSize),
+      familySuites: coerceNumber((source as any).familySuites, defaults.familySuites ?? 0) ?? 0,
+      familySuiteBeds: coerceNumber((source as any).familySuiteBeds, defaults.familySuiteBeds ?? 4) ?? 4,
+      familySuiteSize: coerceNumber((source as any).familySuiteSize),
+      attachedWashrooms: coerceNumber((source as any).attachedWashrooms, defaults.attachedWashrooms ?? 0) ?? 0,
+      gstin: (source as any).gstin ?? defaults.gstin ?? "",
+      distanceAirport: coerceNumber((source as any).distanceAirport),
+      distanceRailway: coerceNumber((source as any).distanceRailway),
+      distanceCityCenter: coerceNumber((source as any).distanceCityCenter),
+      distanceShopping: coerceNumber((source as any).distanceShopping),
+      distanceBusStand: coerceNumber((source as any).distanceBusStand),
+      lobbyArea: coerceNumber((source as any).lobbyArea),
+      diningArea: coerceNumber((source as any).diningArea),
+      parkingArea: (source as any).parkingArea ?? defaults.parkingArea ?? "",
+      ecoFriendlyFacilities: (source as any).ecoFriendlyFacilities ?? defaults.ecoFriendlyFacilities ?? "",
+      differentlyAbledFacilities: (source as any).differentlyAbledFacilities ?? defaults.differentlyAbledFacilities ?? "",
+      fireEquipmentDetails: (source as any).fireEquipmentDetails ?? defaults.fireEquipmentDetails ?? "",
+      certificateValidityYears: (resolvedCertificateYears === "3" ? "3" : "1"),
+      nearestHospital: (source as any).nearestHospital ?? defaults.nearestHospital ?? "",
+    });
+
+    const amenitiesSource = (source as any).amenities;
+    if (amenitiesSource) {
+      try {
+        const parsedAmenities =
+          typeof amenitiesSource === "string" ? JSON.parse(amenitiesSource) : amenitiesSource;
+        setSelectedAmenities(parsedAmenities || {});
+      } catch {
+        setSelectedAmenities({});
+      }
+    }
+
+    const documentsSource = Array.isArray((source as any).documents) ? (source as any).documents : [];
+    if (documentsSource.length > 0) {
+      const docs: Record<string, UploadedFileMetadata[]> = {
+        revenuePapers: [],
+        affidavitSection29: [],
+        undertakingFormC: [],
+        registerForVerification: [],
+        billBook: [],
+      };
+      const photos: UploadedFileMetadata[] = [];
+      documentsSource.forEach((doc: any) => {
+        const base: UploadedFileMetadata = {
+          id: doc.id,
+          filePath: doc.fileUrl || doc.filePath,
+          fileName: doc.fileName || doc.name || "document",
+          fileSize: doc.fileSize || 0,
+          mimeType: doc.mimeType || doc.type || "application/octet-stream",
+        };
+        switch (doc.documentType) {
+          case "revenue_papers":
+            docs.revenuePapers.push(base);
+            break;
+          case "affidavit_section_29":
+            docs.affidavitSection29.push(base);
+            break;
+          case "undertaking_form_c":
+            docs.undertakingFormC.push(base);
+            break;
+          case "register_for_verification":
+            docs.registerForVerification.push(base);
+            break;
+          case "bill_book":
+            docs.billBook.push(base);
+            break;
+          case "property_photo":
+            photos.push(base);
+            break;
+          default:
+            break;
+        }
+      });
+    setUploadedDocuments(docs);
+      setPropertyPhotos(photos);
+    } else {
+      setUploadedDocuments({
+        revenuePapers: [],
+        affidavitSection29: [],
+        undertakingFormC: [],
+        registerForVerification: [],
+        billBook: [],
+      });
+      setPropertyPhotos([]);
+    }
+    setTimeout(() => {
+      isHydratingDraft.current = false;
+    }, 0);
+  };
+
+  const buildDocumentsPayload = () => {
+    const normalize = (files: UploadedFileMetadata[], type: string) =>
+      files.map((file) => ({
+        id: file.id || generateClientId(),
+        fileName: file.fileName,
+        filePath: file.filePath,
+        fileUrl: file.filePath,
+        documentType: type,
+        fileSize: file.fileSize ?? 0,
+        mimeType: file.mimeType || "application/octet-stream",
+        name: file.fileName,
+        type,
+        url: file.filePath,
+      }));
+
+    return [
+      ...normalize(uploadedDocuments.revenuePapers, "revenue_papers"),
+      ...normalize(uploadedDocuments.affidavitSection29, "affidavit_section_29"),
+      ...normalize(uploadedDocuments.undertakingFormC, "undertaking_form_c"),
+      ...normalize(uploadedDocuments.registerForVerification, "register_for_verification"),
+      ...normalize(uploadedDocuments.billBook, "bill_book"),
+      ...normalize(propertyPhotos, "property_photo"),
+    ];
+  };
+
+  useEffect(() => {
+    const normalizedFirst = sanitizeNamePart(ownerFirstName || "").trim();
+    const normalizedLast = sanitizeNamePart(ownerLastName || "").trim();
+    const combined = [normalizedFirst, normalizedLast].filter(Boolean).join(" ");
+    const currentFullName = form.getValues("ownerName");
+
+    if (combined !== currentFullName) {
+      form.setValue("ownerName", combined, {
+        shouldValidate: step >= 2,
+        shouldDirty: Boolean(normalizedFirst || normalizedLast),
+      });
+    }
+  }, [ownerFirstName, ownerLastName, form, step]);
+
   const singleBedRooms = form.watch("singleBedRooms") || 0;
   const doubleBedRooms = form.watch("doubleBedRooms") || 0;
   const familySuites = form.watch("familySuites") || 0;
+  const singleBedBeds = form.watch("singleBedBeds") || 0;
+  const doubleBedBeds = form.watch("doubleBedBeds") || 0;
+  const familySuiteBeds = form.watch("familySuiteBeds") || 0;
+  const attachedWashroomsValue = form.watch("attachedWashrooms") || 0;
   const proposedRoomRate = form.watch("proposedRoomRate") || 0;
   const singleBedRoomRate = form.watch("singleBedRoomRate") || 0;
   const doubleBedRoomRate = form.watch("doubleBedRoomRate") || 0;
   const familySuiteRate = form.watch("familySuiteRate") || 0;
   const totalRooms = singleBedRooms + doubleBedRooms + familySuites;
+  const totalBeds =
+    singleBedRooms * singleBedBeds +
+    doubleBedRooms * doubleBedBeds +
+    familySuites * familySuiteBeds;
+  const roomLimitExceeded = totalRooms > MAX_ROOMS_ALLOWED;
+  const bedLimitExceeded = totalBeds > MAX_BEDS_ALLOWED;
+  const bathroomsBelowRooms = totalRooms > 0 && attachedWashroomsValue < totalRooms;
 
   // Calculate weighted average rate (2025 Rules - based on total revenue)
   const calculateWeightedAverageRate = (): number => {
@@ -380,179 +863,155 @@ export default function NewApplication() {
   // Use weighted average if per-room-type rates are set, otherwise fall back to proposedRoomRate (legacy)
   const hasPerRoomTypeRates = singleBedRoomRate > 0 || doubleBedRoomRate > 0 || familySuiteRate > 0;
   const effectiveRate = hasPerRoomTypeRates ? calculateWeightedAverageRate() : proposedRoomRate;
+  const calculatedHighestRoomRate = Math.max(
+    singleBedRooms > 0 ? singleBedRoomRate : 0,
+    doubleBedRooms > 0 ? doubleBedRoomRate : 0,
+    familySuites > 0 ? familySuiteRate : 0,
+    !hasPerRoomTypeRates ? proposedRoomRate : 0
+  );
+  const highestRoomRate = calculatedHighestRoomRate > 0 ? calculatedHighestRoomRate : proposedRoomRate;
+  const categoryBlocked = isCategoryEnforced && categoryValidation && !categoryValidation.isValid;
+  const isNextDisabled =
+    isLeaseBlocked || roomLimitExceeded || bedLimitExceeded || bathroomsBelowRooms || categoryBlocked;
 
   // Smart category suggestion based on room count + weighted average rate
-  const suggestedCategoryValue = totalRooms > 0 && effectiveRate > 0 
-    ? suggestCategory(totalRooms, effectiveRate) 
+  const suggestedCategoryValue = totalRooms > 0 && highestRoomRate > 0 
+    ? suggestCategory(totalRooms, highestRoomRate) 
     : null;
 
   // Validate selected category against room specs
-  const categoryValidation = category && totalRooms > 0 && effectiveRate > 0
-    ? validateCategorySelection(category as CategoryType, totalRooms, effectiveRate)
+  const categoryValidation = category && totalRooms > 0 && highestRoomRate > 0
+    ? validateCategorySelection(category as CategoryType, totalRooms, highestRoomRate)
     : null;
 
   // Load draft data into form when resuming
   useEffect(() => {
-    if (draftData?.application) {
-      const draft = draftData.application;
-      
-      // Set the draft ID for updating
-      setDraftId(draft.id);
+    if (!draftData?.application) return;
+    const draft = draftData.application;
+    setDraftId(draft.id);
+    hydrateFormFromSource(draft);
 
-      // Populate all form fields with draft data
-      form.reset({
-        propertyName: draft.propertyName || "",
-        address: draft.address || "",
-        district: draft.district || "",
-        pincode: draft.pincode || "",
-        locationType: (draft.locationType as "mc" | "tcp" | "gp") || "gp",
-        telephone: draft.telephone || "",
-        fax: draft.fax || "",
-        ownerEmail: draft.ownerEmail || "",
-        ownerMobile: draft.ownerMobile || "",
-        ownerName: draft.ownerName || "",
-        ownerAadhaar: draft.ownerAadhaar || "",
-        category: (draft.category as "diamond" | "gold" | "silver") || "silver",
-        proposedRoomRate: draft.proposedRoomRate ? parseFloat(draft.proposedRoomRate.toString()) : 2000,
-        singleBedRoomRate: draft.singleBedRoomRate ? parseFloat(draft.singleBedRoomRate.toString()) : 0,
-        doubleBedRoomRate: draft.doubleBedRoomRate ? parseFloat(draft.doubleBedRoomRate.toString()) : 2000,
-        familySuiteRate: draft.familySuiteRate ? parseFloat(draft.familySuiteRate.toString()) : 0,
-        projectType: (draft.projectType as "new_rooms" | "new_project") || "new_project",
-        propertyArea: draft.propertyArea ? parseFloat(draft.propertyArea.toString()) : 0,
-        singleBedRooms: draft.singleBedRooms ? parseInt(draft.singleBedRooms.toString()) : 0,
-        singleBedRoomSize: draft.singleBedRoomSize ? parseFloat(draft.singleBedRoomSize.toString()) : undefined,
-        doubleBedRooms: draft.doubleBedRooms ? parseInt(draft.doubleBedRooms.toString()) : 0,
-        doubleBedRoomSize: draft.doubleBedRoomSize ? parseFloat(draft.doubleBedRoomSize.toString()) : undefined,
-        familySuites: draft.familySuites ? parseInt(draft.familySuites.toString()) : 0,
-        familySuiteSize: draft.familySuiteSize ? parseFloat(draft.familySuiteSize.toString()) : undefined,
-        attachedWashrooms: draft.attachedWashrooms ? parseInt(draft.attachedWashrooms.toString()) : 0,
-        gstin: draft.gstin || "",
-        distanceAirport: draft.distanceAirport ? parseFloat(draft.distanceAirport.toString()) : undefined,
-        distanceRailway: draft.distanceRailway ? parseFloat(draft.distanceRailway.toString()) : undefined,
-        distanceCityCenter: draft.distanceCityCenter ? parseFloat(draft.distanceCityCenter.toString()) : undefined,
-        distanceShopping: draft.distanceShopping ? parseFloat(draft.distanceShopping.toString()) : undefined,
-        distanceBusStand: draft.distanceBusStand ? parseFloat(draft.distanceBusStand.toString()) : undefined,
-        lobbyArea: draft.lobbyArea ? parseFloat(draft.lobbyArea.toString()) : undefined,
-        diningArea: draft.diningArea ? parseFloat(draft.diningArea.toString()) : undefined,
-        parkingArea: draft.parkingArea || "",
-        ecoFriendlyFacilities: draft.ecoFriendlyFacilities || "",
-        differentlyAbledFacilities: draft.differentlyAbledFacilities || "",
-        fireEquipmentDetails: draft.fireEquipmentDetails || "",
-        nearestHospital: draft.nearestHospital || "",
-      });
-
-      // Load amenities if present
-      if (draft.amenities) {
-        try {
-          const amenities = typeof draft.amenities === 'string' 
-            ? JSON.parse(draft.amenities) 
-            : draft.amenities;
-          setSelectedAmenities(amenities);
-        } catch (e) {
-          console.error("Failed to parse amenities:", e);
-        }
-      }
-
-      // Load uploaded documents
-      if (draft.documents && Array.isArray(draft.documents)) {
-        const docs: Record<string, UploadedFileMetadata[]> = {
-          revenuePapers: [],
-          affidavitSection29: [],
-          undertakingFormC: [],
-          registerForVerification: [],
-          billBook: [],
-        };
-        const photos: UploadedFileMetadata[] = [];
-
-        draft.documents.forEach((doc: any) => {
-          if (doc.documentType === 'property_photo') {
-            photos.push(doc);
-          } else if (doc.documentType === 'revenue_papers') {
-            docs.revenuePapers.push(doc);
-          } else if (doc.documentType === 'affidavit_section_29') {
-            docs.affidavitSection29.push(doc);
-          } else if (doc.documentType === 'undertaking_form_c') {
-            docs.undertakingFormC.push(doc);
-          } else if (doc.documentType === 'register_for_verification') {
-            docs.registerForVerification.push(doc);
-          } else if (doc.documentType === 'bill_book') {
-            docs.billBook.push(doc);
-          }
-        });
-
-        setUploadedDocuments(docs);
-        setPropertyPhotos(photos);
-      }
-
-      // Restore the page/step user was on when they saved the draft
-      if (draft.currentPage && draft.currentPage >= 1 && draft.currentPage <= totalSteps) {
-        setStep(draft.currentPage);
-        setMaxStepReached(draft.currentPage); // Allow navigation to all previously visited steps
-      }
-
-      toast({
-        title: "Draft loaded",
-        description: "Continue editing your application from where you left off.",
-      });
+    if (draft.currentPage && draft.currentPage >= 1 && draft.currentPage <= totalSteps) {
+      setStep(draft.currentPage);
+      setMaxStepReached(draft.currentPage);
+    } else {
+      setStep(1);
+      setMaxStepReached(1);
     }
+
+    toast({
+      title: "Draft loaded",
+      description: "Continue editing your application from where you left off.",
+    });
   }, [draftData]);
+
+  // Load existing application for corrections
+  useEffect(() => {
+    if (!correctionData?.application) return;
+    const application = correctionData.application;
+
+    if (!['sent_back_for_corrections', 'reverted_to_applicant', 'reverted_by_dtdo'].includes((application.status || '') as string)) {
+      toast({
+        title: "Application not editable",
+        description: "This application is no longer awaiting corrections.",
+        variant: "destructive",
+      });
+      setLocation(`/applications/${application.id}`);
+      return;
+    }
+
+    setCorrectionId(application.id);
+    hydrateFormFromSource(application);
+    setDraftId(null);
+    setStep(1);
+    setMaxStepReached(totalSteps);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("application", application.id);
+    url.searchParams.delete("draft");
+    window.history.replaceState(null, "", url.pathname + url.search);
+
+    toast({
+      title: "Continue with corrections",
+      description: "Review each step, update details, and resubmit when ready.",
+    });
+  }, [correctionData, toast, setLocation]);
 
   // Auto-populate owner details from user profile (only for new applications, not drafts)
   useEffect(() => {
-    // Only populate if NOT loading a draft and profile exists
-    if (!draftIdFromUrl && userProfile && !form.formState.isDirty) {
-      form.reset({
-        // Keep existing property-related defaults
-        propertyName: "",
-        locationType: "gp",
-        category: "silver",
-        proposedRoomRate: 2000,
-        singleBedRoomRate: 0,
-        doubleBedRoomRate: 2000,
-        familySuiteRate: 0,
-        projectType: "new_project",
-        propertyArea: 0,
-        singleBedRooms: 0,
-        singleBedRoomSize: undefined,
-        doubleBedRooms: 1,
-        doubleBedRoomSize: undefined,
-        familySuites: 0,
-        familySuiteSize: undefined,
-        attachedWashrooms: 1,
-        gstin: "",
-        distanceAirport: undefined,
-        distanceRailway: undefined,
-        distanceCityCenter: undefined,
-        distanceShopping: undefined,
-        distanceBusStand: undefined,
-        lobbyArea: undefined,
-        diningArea: undefined,
-        parkingArea: "",
-        ecoFriendlyFacilities: "",
-        differentlyAbledFacilities: "",
-        fireEquipmentDetails: "",
-        certificateValidityYears: "1",
-        nearestHospital: "",
-        
-        // Auto-populate from profile
-        ownerName: userProfile.fullName,
-        ownerGender: userProfile.gender as "male" | "female" | "other",
-        ownerMobile: userProfile.mobile,
-        ownerEmail: userProfile.email || "",
-        ownerAadhaar: userProfile.aadhaarNumber || "",
-        district: userProfile.district || "",
-        tehsil: userProfile.tehsil || "",
-        block: userProfile.block || "",
-        gramPanchayat: userProfile.gramPanchayat || "",
-        urbanBody: userProfile.urbanBody || "",
-        ward: userProfile.ward || "",
-        address: userProfile.address || "",
-        pincode: userProfile.pincode || "",
-        telephone: userProfile.telephone || "",
-        fax: userProfile.fax || "",
-      });
+    if (!userProfile || draftIdFromUrl || correctionIdFromUrl || form.formState.isDirty) {
+      return;
     }
-  }, [userProfile, draftIdFromUrl, form]);
+
+    const profileNameParts = splitFullName(userProfile.fullName || "");
+    const profileDistrict = userProfile.district || "";
+    const profileTehsil = (userProfile.tehsil || "").trim();
+    const profileTehsilOptions = profileDistrict ? getTehsilsForDistrict(profileDistrict) : [];
+    let defaultTehsilValue = "";
+    let defaultTehsilOtherValue = "";
+
+    if (profileTehsil && profileTehsilOptions.includes(profileTehsil)) {
+      defaultTehsilValue = profileTehsil;
+    } else if (profileTehsil) {
+      defaultTehsilValue = "__other";
+      defaultTehsilOtherValue = profileTehsil;
+    } else if (profileTehsilOptions.length > 0) {
+      defaultTehsilValue = profileTehsilOptions[0];
+    }
+
+    form.reset({
+      propertyName: "",
+      locationType: "gp",
+      category: "silver",
+      proposedRoomRate: 2000,
+      singleBedRoomRate: 0,
+      doubleBedRoomRate: 2000,
+      familySuiteRate: 0,
+      projectType: "new_project",
+      propertyArea: 0,
+      singleBedRooms: 0,
+      singleBedBeds: 1,
+      singleBedRoomSize: undefined,
+      doubleBedRooms: 1,
+      doubleBedBeds: 2,
+      doubleBedRoomSize: undefined,
+      familySuites: 0,
+      familySuiteBeds: 4,
+      familySuiteSize: undefined,
+      attachedWashrooms: 1,
+      gstin: "",
+      distanceAirport: undefined,
+      distanceRailway: undefined,
+      distanceCityCenter: undefined,
+      distanceShopping: undefined,
+      distanceBusStand: undefined,
+      lobbyArea: undefined,
+      diningArea: undefined,
+      parkingArea: "",
+      ecoFriendlyFacilities: "",
+      differentlyAbledFacilities: "",
+      fireEquipmentDetails: "",
+      certificateValidityYears: "1",
+      nearestHospital: "",
+      ownerName: userProfile.fullName || "",
+      ownerFirstName: profileNameParts.firstName || "",
+      ownerLastName: profileNameParts.lastName || "",
+        ownerGender: normalizeGender(userProfile.gender as string) as "male" | "female" | "other",
+      ownerMobile: userProfile.mobile || "",
+      ownerEmail: userProfile.email || "",
+      ownerAadhaar: userProfile.aadhaarNumber || "",
+      district: profileDistrict,
+      tehsil: defaultTehsilValue,
+      tehsilOther: defaultTehsilOtherValue,
+      block: userProfile.block || "",
+      gramPanchayat: userProfile.gramPanchayat || "",
+      urbanBody: userProfile.urbanBody || "",
+      ward: userProfile.ward || "",
+      address: userProfile.address || "",
+      pincode: userProfile.pincode || "",
+      telephone: userProfile.telephone || "",
+    });
+  }, [userProfile, draftIdFromUrl, correctionIdFromUrl, form]);
 
   // Auto-populate distances when district changes (user can override)
   useEffect(() => {
@@ -580,7 +1039,7 @@ export default function NewApplication() {
 
   const calculateFee = () => {
     // Detect Pangi sub-division (Chamba district, Pangi tehsil)
-    const isPangiSubDivision = district === "Chamba" && tehsil === "Pangi";
+  const isPangiSubDivision = district === "Chamba" && tehsilForRules === "Pangi";
     
     // Use new 2025 fee calculator
     const feeBreakdown = calculateHomestayFee({
@@ -607,12 +1066,16 @@ export default function NewApplication() {
     };
   };
 
-  const [draftId, setDraftId] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-
   // Draft save mutation - bypasses form validation to allow partial saves
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
+      if (isCorrectionMode) {
+        toast({
+          title: "Drafts unavailable",
+          description: "Use final submission instead. Draft saving is disabled while updating an existing application.",
+        });
+        return null;
+      }
       // Get raw form values without triggering validation
       const rawFormData = form.getValues();
       
@@ -620,8 +1083,27 @@ export default function NewApplication() {
       const validatedData = draftSchema.parse(rawFormData);
       
       const fees = calculateFee();
+      const draftTehsilOtherTrimmed = typeof validatedData.tehsilOther === "string" ? validatedData.tehsilOther.trim() : "";
+      const resolvedDraftTehsil =
+        validatedData.tehsil === "__other"
+          ? draftTehsilOtherTrimmed
+          : (validatedData.tehsil ?? "");
+      const resolvedDraftTehsilOther =
+        validatedData.tehsil === "__other" ? draftTehsilOtherTrimmed : "";
+      const documentsPayload = buildDocumentsPayload();
+      const totalDocumentBytes = documentsPayload.reduce(
+        (sum, doc) => sum + (doc.fileSize ?? 0),
+        0,
+      );
+      if (totalDocumentBytes > maxTotalUploadBytes) {
+        throw new Error(
+          `Combined document size ${formatBytes(totalDocumentBytes)} exceeds ${uploadPolicy.totalPerApplicationMB} MB limit`,
+        );
+      }
       const payload = {
         ...validatedData,
+        tehsil: resolvedDraftTehsil,
+        tehsilOther: resolvedDraftTehsilOther || "",
         ownerEmail: validatedData.ownerEmail || undefined,
         amenities: selectedAmenities,
         // 2025 Fee Structure
@@ -637,16 +1119,9 @@ export default function NewApplication() {
         gstAmount: "0",
         totalRooms,
         certificateValidityYears: parseInt(certificateValidityYears),
-        isPangiSubDivision: district === "Chamba" && tehsil === "Pangi",
+        isPangiSubDivision: district === "Chamba" && resolvedDraftTehsil === "Pangi",
         currentPage: step, // Save the current page/step for resume functionality
-        documents: [
-          ...uploadedDocuments.revenuePapers.map(f => ({ ...f, documentType: 'revenue_papers' })),
-          ...uploadedDocuments.affidavitSection29.map(f => ({ ...f, documentType: 'affidavit_section_29' })),
-          ...uploadedDocuments.undertakingFormC.map(f => ({ ...f, documentType: 'undertaking_form_c' })),
-          ...uploadedDocuments.registerForVerification.map(f => ({ ...f, documentType: 'register_for_verification' })),
-          ...uploadedDocuments.billBook.map(f => ({ ...f, documentType: 'bill_book' })),
-          ...propertyPhotos.map(f => ({ ...f, documentType: 'property_photo' })),
-        ],
+        documents: documentsPayload,
       };
 
       if (draftId) {
@@ -655,13 +1130,38 @@ export default function NewApplication() {
         return response.json();
       } else {
         // Create new draft
-        const response = await apiRequest("POST", "/api/applications/draft", payload);
+        const response = await fetch("/api/applications/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+
+        if (response.status === 409) {
+          const data = await response.json().catch(() => ({}));
+          const error = new Error(data?.message || "An application already exists for this owner.");
+          (error as any).status = 409;
+          (error as any).data = data;
+          throw error;
+        }
+
+        if (!response.ok) {
+          const text = (await response.text()) || response.statusText;
+          throw new Error(text);
+        }
+
         return response.json();
       }
     },
     onSuccess: (data) => {
+      if (!data?.application) {
+        return;
+      }
       if (!draftId) {
         setDraftId(data.application.id);
+        const url = new URL(window.location.href);
+        url.searchParams.set("draft", data.application.id);
+        window.history.replaceState(null, "", url.pathname + url.search);
       }
       // Invalidate and refetch to ensure dashboard shows the draft immediately
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
@@ -672,6 +1172,17 @@ export default function NewApplication() {
       });
     },
     onError: (error: any) => {
+      if (error?.status === 409) {
+        toast({
+          title: "Existing application found",
+          description: error?.data?.message || "You already have an application on file. Please continue with the existing application.",
+        });
+        const existingId = error?.data?.existingApplicationId;
+        if (existingId) {
+          navigate(`/applications/${existingId}`);
+        }
+        return;
+      }
       toast({
         title: "Failed to save draft",
         description: error.message || "Please try again",
@@ -680,14 +1191,171 @@ export default function NewApplication() {
     },
   });
 
-  const createApplicationMutation = useMutation({
-    mutationFn: async (data: ApplicationForm) => {
+  const submitApplicationMutation = useMutation({
+    mutationFn: async (formData: ApplicationForm) => {
       const fees = calculateFee();
+      const documentsPayload = buildDocumentsPayload();
+      const totalDocumentBytes = documentsPayload.reduce(
+        (sum, doc) => sum + (doc.fileSize ?? 0),
+        0,
+      );
+      if (totalDocumentBytes > maxTotalUploadBytes) {
+        throw new Error(
+          `Combined document size ${formatBytes(totalDocumentBytes)} exceeds ${uploadPolicy.totalPerApplicationMB} MB limit`,
+        );
+      }
+      const tehsilOtherTrimmed = typeof formData.tehsilOther === "string" ? formData.tehsilOther.trim() : "";
+      const resolvedTehsil =
+        formData.tehsil === "__other"
+          ? tehsilOtherTrimmed
+          : formData.tehsil;
+      const normalizedTehsilOther = formData.tehsil === "__other" ? tehsilOtherTrimmed : "";
+
+      if (!resolvedTehsil) {
+        throw new Error("Tehsil is required");
+      }
+
+      const totalRoomsCount =
+        (formData.singleBedRooms || 0) +
+        (formData.doubleBedRooms || 0) +
+        (formData.familySuites || 0);
+      const totalBedsCalculated =
+        (formData.singleBedRooms || 0) * (formData.singleBedBeds || 0) +
+        (formData.doubleBedRooms || 0) * (formData.doubleBedBeds || 0) +
+        (formData.familySuites || 0) * (formData.familySuiteBeds || 0);
+      if (totalRoomsCount > MAX_ROOMS_ALLOWED) {
+        throw new Error(`Total rooms cannot exceed ${MAX_ROOMS_ALLOWED}.`);
+      }
+
+      if (totalBedsCalculated > MAX_BEDS_ALLOWED) {
+        throw new Error(`Total beds cannot exceed ${MAX_BEDS_ALLOWED}. Please adjust the bed counts per room type.`);
+      }
+      if (totalRoomsCount > 0 && (formData.attachedWashrooms || 0) < totalRoomsCount) {
+        throw new Error("Ensure the number of attached washrooms is at least equal to the total rooms.");
+      }
+
+      if (isCategoryEnforced && categoryValidation && !categoryValidation.isValid) {
+        throw new Error(
+          categoryValidation.errors.join(" ") ||
+            "Category selection must meet the required thresholds before submission.",
+        );
+      }
+
+      if (isCorrectionMode && correctionId) {
+        const normalizedBlock = normalizeOptionalString(formData.block);
+        const normalizedBlockOther = normalizeOptionalString(formData.blockOther);
+        const normalizedGramPanchayat = normalizeOptionalString(formData.gramPanchayat);
+        const normalizedGramPanchayatOther = normalizeOptionalString(formData.gramPanchayatOther);
+        const normalizedUrbanBody = normalizeOptionalString(formData.urbanBody);
+        const normalizedUrbanBodyOther = normalizeOptionalString(formData.urbanBodyOther);
+        const normalizedWard = normalizeOptionalString(formData.ward);
+
+        const correctionPayload = {
+          propertyName: formData.propertyName,
+          locationType: formData.locationType,
+          district: formData.district,
+          tehsil: resolvedTehsil,
+          tehsilOther: normalizedTehsilOther || "",
+          block: normalizedBlock ?? "",
+          blockOther: normalizedBlockOther ?? "",
+          gramPanchayat: normalizedGramPanchayat ?? "",
+          gramPanchayatOther: normalizedGramPanchayatOther ?? "",
+          urbanBody: normalizedUrbanBody ?? "",
+          urbanBodyOther: normalizedUrbanBodyOther ?? "",
+          ward: normalizedWard ?? "",
+          address: formData.address,
+          pincode: formData.pincode,
+          telephone: normalizeOptionalString(formData.telephone) ?? undefined,
+          ownerName: formData.ownerName,
+          ownerFirstName: formData.ownerFirstName,
+          ownerLastName: formData.ownerLastName,
+          ownerGender: formData.ownerGender,
+          ownerMobile: formData.ownerMobile,
+          ownerEmail: normalizeOptionalString(formData.ownerEmail) ?? undefined,
+          ownerAadhaar: formData.ownerAadhaar,
+          propertyOwnership: formData.propertyOwnership,
+          category: formData.category,
+          proposedRoomRate: formData.proposedRoomRate,
+          singleBedRoomRate: formData.singleBedRoomRate,
+          doubleBedRoomRate: formData.doubleBedRoomRate,
+          familySuiteRate: formData.familySuiteRate,
+          projectType: formData.projectType,
+          propertyArea: formData.propertyArea,
+          singleBedRooms: formData.singleBedRooms,
+          singleBedBeds: formData.singleBedBeds,
+          singleBedRoomSize: formData.singleBedRoomSize,
+          doubleBedRooms: formData.doubleBedRooms,
+          doubleBedBeds: formData.doubleBedBeds,
+          doubleBedRoomSize: formData.doubleBedRoomSize,
+          familySuites: formData.familySuites,
+          familySuiteBeds: formData.familySuiteBeds,
+          familySuiteSize: formData.familySuiteSize,
+          attachedWashrooms: formData.attachedWashrooms,
+          gstin: normalizeOptionalString(formData.gstin) ?? undefined,
+          certificateValidityYears: parseInt(certificateValidityYears),
+          isPangiSubDivision: district === "Chamba" && resolvedTehsil === "Pangi",
+          distanceAirport: formData.distanceAirport,
+          distanceRailway: formData.distanceRailway,
+          distanceCityCenter: formData.distanceCityCenter,
+          distanceShopping: formData.distanceShopping,
+          distanceBusStand: formData.distanceBusStand,
+          lobbyArea: formData.lobbyArea,
+          diningArea: formData.diningArea,
+          parkingArea: normalizeOptionalString(formData.parkingArea) ?? undefined,
+          ecoFriendlyFacilities: normalizeOptionalString(formData.ecoFriendlyFacilities) ?? undefined,
+          differentlyAbledFacilities: normalizeOptionalString(formData.differentlyAbledFacilities) ?? undefined,
+          fireEquipmentDetails: normalizeOptionalString(formData.fireEquipmentDetails) ?? undefined,
+          nearestHospital: normalizeOptionalString(formData.nearestHospital) ?? undefined,
+          amenities: selectedAmenities,
+          baseFee: fees.baseFee,
+          totalBeforeDiscounts: fees.totalBeforeDiscounts,
+          validityDiscount: fees.validityDiscount,
+          femaleOwnerDiscount: fees.femaleOwnerDiscount,
+          pangiDiscount: fees.pangiDiscount,
+          totalDiscount: fees.totalDiscount,
+          totalFee: fees.totalFee,
+          perRoomFee: 0,
+          gstAmount: 0,
+          totalRooms,
+          documents: documentsPayload,
+        };
+
+        const response = await apiRequest("PATCH", `/api/applications/${correctionId}` , correctionPayload);
+        return response.json();
+      }
+
+      const normalizedFormData = {
+        ...formData,
+        tehsil: resolvedTehsil,
+        tehsilOther: normalizedTehsilOther || "",
+      };
+
+      const normalizedBlock = normalizeOptionalString(formData.block);
+      const normalizedBlockOther = normalizeOptionalString(formData.blockOther);
+      const normalizedGramPanchayat = normalizeOptionalString(formData.gramPanchayat);
+      const normalizedGramPanchayatOther = normalizeOptionalString(formData.gramPanchayatOther);
+      const normalizedUrbanBody = normalizeOptionalString(formData.urbanBody);
+      const normalizedUrbanBodyOther = normalizeOptionalString(formData.urbanBodyOther);
+      const normalizedWard = normalizeOptionalString(formData.ward);
+
       const payload = {
-        ...data,
-        ownerEmail: data.ownerEmail || undefined,
+        ...normalizedFormData,
+        ownerEmail: normalizeOptionalString(formData.ownerEmail) || undefined,
+        telephone: normalizeOptionalString(formData.telephone) || undefined,
+        block: normalizedBlock ?? undefined,
+        blockOther: normalizedBlockOther ?? undefined,
+        gramPanchayat: normalizedGramPanchayat ?? undefined,
+        gramPanchayatOther: normalizedGramPanchayatOther ?? undefined,
+        urbanBody: normalizedUrbanBody ?? undefined,
+        urbanBodyOther: normalizedUrbanBodyOther ?? undefined,
+        ward: normalizedWard ?? undefined,
+        propertyOwnership: formData.propertyOwnership,
+        parkingArea: normalizeOptionalString(formData.parkingArea) || undefined,
+        ecoFriendlyFacilities: normalizeOptionalString(formData.ecoFriendlyFacilities) || undefined,
+        differentlyAbledFacilities: normalizeOptionalString(formData.differentlyAbledFacilities) || undefined,
+        fireEquipmentDetails: normalizeOptionalString(formData.fireEquipmentDetails) || undefined,
+        nearestHospital: normalizeOptionalString(formData.nearestHospital) || undefined,
         amenities: selectedAmenities,
-        // 2025 Fee Structure
         baseFee: fees.baseFee.toString(),
         totalBeforeDiscounts: fees.totalBeforeDiscounts?.toString() || "0",
         validityDiscount: fees.validityDiscount?.toFixed(2) || "0",
@@ -695,23 +1363,14 @@ export default function NewApplication() {
         pangiDiscount: fees.pangiDiscount?.toFixed(2) || "0",
         totalDiscount: fees.totalDiscount?.toFixed(2) || "0",
         totalFee: fees.totalFee.toFixed(2),
-        // Legacy fields for backward compatibility
         perRoomFee: "0",
         gstAmount: "0",
         totalRooms,
         certificateValidityYears: parseInt(certificateValidityYears),
-        isPangiSubDivision: district === "Chamba" && tehsil === "Pangi",
-        status: 'pending',
+        isPangiSubDivision: district === "Chamba" && resolvedTehsil === "Pangi",
+        status: "submitted",
         submittedAt: new Date().toISOString(),
-        // Include uploaded ANNEXURE-II documents with metadata
-        documents: [
-          ...uploadedDocuments.revenuePapers.map(f => ({ ...f, documentType: 'revenue_papers' })),
-          ...uploadedDocuments.affidavitSection29.map(f => ({ ...f, documentType: 'affidavit_section_29' })),
-          ...uploadedDocuments.undertakingFormC.map(f => ({ ...f, documentType: 'undertaking_form_c' })),
-          ...uploadedDocuments.registerForVerification.map(f => ({ ...f, documentType: 'register_for_verification' })),
-          ...uploadedDocuments.billBook.map(f => ({ ...f, documentType: 'bill_book' })),
-          ...propertyPhotos.map(f => ({ ...f, documentType: 'property_photo' })),
-        ],
+        documents: documentsPayload,
       };
 
       const response = await apiRequest("POST", "/api/applications", payload);
@@ -720,14 +1379,20 @@ export default function NewApplication() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
       toast({
-        title: "Application submitted successfully!",
-        description: "Your homestay application has been submitted for review.",
+        title: isCorrectionMode ? "Application resubmitted" : "Application submitted successfully!",
+        description: isCorrectionMode
+          ? "Your updates were sent back to the department for review."
+          : "Your homestay application has been submitted for review.",
       });
-      setLocation("/dashboard");
+      if (isCorrectionMode && correctionId) {
+        setLocation(`/applications/${correctionId}`);
+      } else {
+        setLocation("/dashboard");
+      }
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to create application",
+        title: isCorrectionMode ? "Failed to resubmit application" : "Failed to create application",
         description: error.message || "Please try again",
         variant: "destructive",
       });
@@ -746,7 +1411,7 @@ export default function NewApplication() {
     }
     
     console.log("Submitting application...");
-    createApplicationMutation.mutate(data);
+    submitApplicationMutation.mutate(data);
   };
 
   const nextStep = async () => {
@@ -767,15 +1432,32 @@ export default function NewApplication() {
         });
         return;
       }
+
+      const selectedTehsil = form.getValues("tehsil");
+      if (selectedTehsil === "__other") {
+        const isOtherValid = await form.trigger("tehsilOther");
+        if (!isOtherValid) {
+          toast({
+            title: "Enter tehsil name",
+            description: "Provide the tehsil or sub-division name when using the manual option",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
     }
 
     // Step 2: Validate Owner Information
     if (step === 2) {
       const isValid = await form.trigger([
+        "ownerFirstName",
+        "ownerLastName",
         "ownerName",
         "ownerMobile",
         "ownerEmail",
-        "ownerAadhaar"
+        "ownerAadhaar",
+        "ownerGender",
+        "propertyOwnership"
       ]);
       if (!isValid) {
         toast({
@@ -796,8 +1478,11 @@ export default function NewApplication() {
         "projectType",
         "propertyArea",
         "singleBedRooms",
+        "singleBedBeds",
         "doubleBedRooms",
+        "doubleBedBeds",
         "familySuites",
+        "familySuiteBeds",
         "attachedWashrooms"
       ];
       
@@ -828,14 +1513,57 @@ export default function NewApplication() {
       }
 
       // Validate total beds <= 12
-      const totalBeds = (form.getValues("singleBedRooms") || 0) + 
-                       (form.getValues("doubleBedRooms") || 0) * 2 + 
-                       (form.getValues("familySuites") || 0) * 4;
-      if (totalBeds > 12) {
+      const singleRooms = form.getValues("singleBedRooms") || 0;
+      const doubleRooms = form.getValues("doubleBedRooms") || 0;
+      const suiteRooms = form.getValues("familySuites") || 0;
+      const totalRoomsCurrent = singleRooms + doubleRooms + suiteRooms;
+      if (totalRoomsCurrent > MAX_ROOMS_ALLOWED) {
+        toast({
+          title: "Room limit exceeded",
+          description: `HP Homestay Rules permit a maximum of ${MAX_ROOMS_ALLOWED} rooms. You currently have ${totalRoomsCurrent}.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const totalBeds = (singleRooms * (form.getValues("singleBedBeds") || 0)) +
+                        (doubleRooms * (form.getValues("doubleBedBeds") || 0)) +
+                        (suiteRooms * (form.getValues("familySuiteBeds") || 0));
+      if (totalBeds > MAX_BEDS_ALLOWED) {
         toast({
           title: "Maximum beds exceeded",
-          description: "Total beds cannot exceed 12 (Single=1, Double=2, Suite=4 beds each)",
+          description: `Total beds across all room types cannot exceed ${MAX_BEDS_ALLOWED}. Please adjust the bed counts.`,
           variant: "destructive"
+        });
+        return;
+      }
+
+      const attachedBaths = form.getValues("attachedWashrooms") || 0;
+      if (totalRoomsCurrent > 0 && attachedBaths < totalRoomsCurrent) {
+        toast({
+          title: "Attached washrooms required",
+          description: "Ensure each room has an attached washroom before proceeding.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!selectedAmenities.cctv || !selectedAmenities.fireSafety) {
+        toast({
+          title: "Mandatory safety items missing",
+          description: "Install CCTV coverage and fire-safety equipment before continuing.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (isCategoryEnforced && categoryValidation && !categoryValidation.isValid) {
+        toast({
+          title: "Category requirements not met",
+          description:
+            categoryValidation.errors.join(" ") ||
+            "Adjust tariffs or selected category to satisfy the mandatory criteria.",
+          variant: "destructive",
         });
         return;
       }
@@ -912,6 +1640,18 @@ export default function NewApplication() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-5xl mx-auto">
+        {isCorrectionMode && correctionId && (
+          <div className="mb-6 border border-amber-200 bg-amber-50/80 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <p className="font-semibold text-amber-800">You are updating application #{(correctionId?.slice(0, 8) || '').toUpperCase()}…</p>
+            </div>
+            <p className="text-sm text-amber-700">
+              All previous details are pre-filled. Review each step, upload corrected documents, and resubmit to continue the approval workflow.
+            </p>
+          </div>
+        )}
+
         <ApplicationStepper
           currentStep={step}
           maxStepReached={maxStepReached}
@@ -936,11 +1676,20 @@ export default function NewApplication() {
                   <FormField
                     control={form.control}
                     name="propertyName"
-                    render={({ field }) => (
+                    rules={{ required: "Property name is required" }}
+                    render={({ field, fieldState }) => (
                       <FormItem>
-                        <FormLabel>Property Name</FormLabel>
+                        <FormLabel>
+                          Property Name <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., Himalayan View Homestay" data-testid="input-property-name" {...field} />
+                          <Input
+                            placeholder="e.g., Himalayan View Homestay"
+                            data-testid="input-property-name"
+                            aria-invalid={fieldState.invalid}
+                            className={fieldState.invalid ? "border-destructive focus-visible:ring-destructive" : ""}
+                            {...field}
+                          />
                         </FormControl>
                         <FormDescription>Choose a memorable name for your property</FormDescription>
                         <FormMessage />
@@ -951,12 +1700,19 @@ export default function NewApplication() {
                   <FormField
                     control={form.control}
                     name="locationType"
-                    render={({ field }) => (
+                    rules={{ required: "Location type is required" }}
+                    render={({ field, fieldState }) => (
                       <FormItem>
-                        <FormLabel>Location Type (affects registration fee)</FormLabel>
+                        <FormLabel>
+                          Location Type (affects registration fee) <span className="text-destructive">*</span>
+                        </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-location-type">
+                            <SelectTrigger
+                              data-testid="select-location-type"
+                              className={fieldState.invalid ? "border-destructive focus-visible:ring-destructive" : ""}
+                              aria-invalid={fieldState.invalid}
+                            >
                               <SelectValue placeholder="Select location type" />
                             </SelectTrigger>
                           </FormControl>
@@ -976,26 +1732,43 @@ export default function NewApplication() {
 
                   {/* LGD Hierarchical Address - Step 1: District & Tehsil */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="district"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>District</FormLabel>
+                  <FormField
+                    control={form.control}
+                    name="district"
+                    rules={{ required: "District is required" }}
+                    render={({ field, fieldState }) => (
+                      <FormItem>
+                        <FormLabel>
+                          District <span className="text-destructive">*</span>
+                          </FormLabel>
                           <Select 
                             onValueChange={(value) => {
                               field.onChange(value);
                               // Reset dependent fields when district changes
-                              form.setValue('tehsil', '');
                               form.setValue('block', '');
                               form.setValue('gramPanchayat', '');
                               form.setValue('urbanBody', '');
                               form.setValue('ward', '');
+
+                              const tehsilOptions = getTehsilsForDistrict(value);
+                              const defaultTehsil = tehsilOptions[0] ?? '__other';
+                              form.setValue('tehsil', defaultTehsil, {
+                                shouldDirty: false,
+                                shouldValidate: step >= 1,
+                              });
+                              form.setValue('tehsilOther', '', {
+                                shouldDirty: false,
+                                shouldValidate: step >= 1,
+                              });
                             }} 
                             value={field.value}
                           >
                             <FormControl>
-                              <SelectTrigger data-testid="select-district">
+                              <SelectTrigger
+                                data-testid="select-district"
+                                className={fieldState.invalid ? "border-destructive focus-visible:ring-destructive" : ""}
+                                aria-invalid={fieldState.invalid}
+                              >
                                 <SelectValue placeholder="Select district" />
                               </SelectTrigger>
                             </FormControl>
@@ -1013,41 +1786,96 @@ export default function NewApplication() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="tehsil"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tehsil / Sub-Division</FormLabel>
-                          <Select 
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              // Reset block/GP when tehsil changes
-                              form.setValue('block', '');
-                              form.setValue('gramPanchayat', '');
-                            }} 
+                  <FormField
+                    control={form.control}
+                    name="tehsil"
+                    render={({ field, fieldState }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Tehsil / Sub-Division <span className="text-destructive">*</span>
+                          </FormLabel>
+                          {(() => {
+                            const districtValue = form.watch('district') || '';
+                            const tehsilOptions = getTehsilsForDistrict(districtValue);
+                            const currentTehsil = field.value;
+                            const includeCurrentValue =
+                              currentTehsil &&
+                              typeof currentTehsil === "string" &&
+                              !tehsilOptions.includes(currentTehsil);
+                            
+                            return (
+                              <Select 
+                                onValueChange={(value) => {
+                                  const previousTehsil = form.getValues('tehsil');
+                                  field.onChange(value);
+
+                                  const tehsilChanged = value !== previousTehsil;
+                                  if (!isHydratingDraft.current && tehsilChanged) {
+                                    form.setValue('block', '', { shouldDirty: false, shouldValidate: step >= 1 });
+                                    form.setValue('gramPanchayat', '', { shouldDirty: false, shouldValidate: step >= 1 });
+                                  }
+
+                                  if (!isHydratingDraft.current && value !== '__other') {
+                                    form.setValue('tehsilOther', '', { shouldDirty: false, shouldValidate: step >= 1 });
+                                  }
+                                }} 
                             value={field.value}
-                            disabled={!form.watch('district')}
+                            disabled={!districtValue}
                           >
                             <FormControl>
-                              <SelectTrigger data-testid="select-tehsil">
+                              <SelectTrigger
+                                data-testid="select-tehsil"
+                                className={fieldState.invalid ? "border-destructive focus-visible:ring-destructive" : ""}
+                                aria-invalid={fieldState.invalid}
+                              >
                                 <SelectValue placeholder="Select tehsil" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
-                              {getTehsilsForDistrict(form.watch('district')).map((tehsil) => (
-                                <SelectItem key={tehsil} value={tehsil}>
-                                  {tehsil}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>Select tehsil after district</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                              <SelectContent>
+                                {tehsilOptions.map((tehsil) => (
+                                  <SelectItem key={tehsil} value={tehsil}>
+                                    {tehsil}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value="__other">Other (Manual Entry)</SelectItem>
+                                {includeCurrentValue && (
+                                  <SelectItem key={currentTehsil} value={currentTehsil}>
+                                    {currentTehsil}
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                              </Select>
+                              );
+                            })()}
+                            <FormDescription>Select tehsil after district</FormDescription>
+                            <FormMessage />
+                            {form.watch('tehsil') === '__other' && (
+                              <FormField
+                                control={form.control}
+                                name="tehsilOther"
+                                rules={{ required: "Please enter the tehsil name" }}
+                                render={({ field, fieldState }) => (
+                                  <FormItem className="mt-3">
+                                    <FormLabel>Manual Tehsil Entry <span className="text-destructive">*</span></FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="Type tehsil or sub-division name"
+                                        data-testid="input-tehsil-other"
+                                        value={field.value ?? ""}
+                                        onChange={(event) => field.onChange(event.target.value)}
+                                        aria-invalid={fieldState.invalid}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>Provide the correct tehsil if it is not listed above.</FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                   {/* Conditional: Rural Address (Gram Panchayat) */}
                   {form.watch('locationType') === 'gp' && (
@@ -1061,7 +1889,7 @@ export default function NewApplication() {
                             <Select 
                               onValueChange={field.onChange} 
                               value={field.value}
-                              disabled={!form.watch('tehsil')}
+                              disabled={!tehsil || tehsil === '__other'}
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-block">
@@ -1069,7 +1897,7 @@ export default function NewApplication() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {getBlocksForTehsil(form.watch('district'), form.watch('tehsil')).map((block) => (
+                                {(tehsil && tehsil !== '__other' ? getBlocksForTehsil(district, tehsil) : []).map((block) => (
                                   <SelectItem key={block} value={block}>
                                     {block}
                                   </SelectItem>
@@ -1174,14 +2002,18 @@ export default function NewApplication() {
                   <FormField
                     control={form.control}
                     name="address"
-                    render={({ field }) => (
+                    rules={{ required: "Address is required" }}
+                    render={({ field, fieldState }) => (
                       <FormItem>
-                        <FormLabel>House/Building Number, Street & Locality</FormLabel>
+                        <FormLabel>
+                          House/Building Number, Street & Locality <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder="e.g., House No. 123, Main Road, Near Post Office" 
-                            className="min-h-20"
+          <Textarea 
+            placeholder="e.g., House No. 123, Main Road, Near Post Office" 
+            className={`min-h-20 ${fieldState.invalid ? "border-destructive focus-visible:ring-destructive" : ""}`}
                             data-testid="input-address"
+                            aria-invalid={fieldState.invalid}
                             {...field} 
                           />
                         </FormControl>
@@ -1194,11 +2026,32 @@ export default function NewApplication() {
                   <FormField
                     control={form.control}
                     name="pincode"
-                    render={({ field }) => (
+                    rules={{
+                      required: "PIN code is required",
+                      validate: (value) => (/^[1-9]\d{5}$/.test(value) ? true : "Enter a valid 6-digit PIN code"),
+                    }}
+                    render={({ field, fieldState }) => (
                       <FormItem>
-                        <FormLabel>PIN Code</FormLabel>
+                        <FormLabel>
+                          PIN Code <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
-                          <Input placeholder="6-digit PIN code" data-testid="input-pincode" {...field} />
+                          <Input
+                            placeholder="6-digit PIN code"
+                            data-testid="input-pincode"
+                            aria-invalid={fieldState.invalid}
+                            className={fieldState.invalid ? "border-destructive focus-visible:ring-destructive" : ""}
+                            value={field.value ?? ""}
+                            onChange={(event) => {
+                              const nextValue = sanitizeDigits(event.target.value, 6);
+                              field.onChange(nextValue);
+                            }}
+                            onBlur={(event) => {
+                              const trimmed = sanitizeDigits(event.target.value, 6);
+                              field.onChange(trimmed);
+                              field.onBlur();
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1220,19 +2073,6 @@ export default function NewApplication() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="fax"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fax (Optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Fax number" data-testid="input-fax" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
                 </CardContent>
               </Card>
@@ -1248,15 +2088,87 @@ export default function NewApplication() {
                   <CardDescription>Details of the property owner</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="ownerFirstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            First Name <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              ref={field.ref}
+                              name={field.name}
+                              value={field.value ?? ""}
+                              placeholder="First name"
+                              autoComplete="given-name"
+                              autoCapitalize="words"
+                              data-testid="input-owner-first-name"
+                              onKeyDown={preventDigitKey}
+                              onChange={(event) => field.onChange(sanitizeNamePart(event.target.value))}
+                              onBlur={(event) => {
+                                field.onChange(sanitizeNamePart(event.target.value).trim());
+                                field.onBlur();
+                              }}
+                            />
+                          </FormControl>
+                          <FormDescription>Letters only; digits are blocked automatically.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="ownerLastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Last Name <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              ref={field.ref}
+                              name={field.name}
+                              value={field.value ?? ""}
+                              placeholder="Last name"
+                              autoComplete="family-name"
+                              autoCapitalize="words"
+                              data-testid="input-owner-last-name"
+                              onKeyDown={preventDigitKey}
+                              onChange={(event) => field.onChange(sanitizeNamePart(event.target.value))}
+                              onBlur={(event) => {
+                                field.onChange(sanitizeNamePart(event.target.value).trim());
+                                field.onBlur();
+                              }}
+                            />
+                          </FormControl>
+                          <FormDescription>Only alphabets, spaces, hyphen or apostrophe are allowed.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="ownerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Owner Name</FormLabel>
+                        <FormLabel>Owner Full Name (auto-filled)</FormLabel>
                         <FormControl>
-                          <Input placeholder="Full name" data-testid="input-owner-name" {...field} />
+                          <Input
+                            ref={field.ref}
+                            name={field.name}
+                            value={field.value ?? ""}
+                            readOnly
+                            data-testid="input-owner-name"
+                            className="bg-muted"
+                          />
                         </FormControl>
+                        <FormDescription>Generated from first and last name for application records.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1294,9 +2206,26 @@ export default function NewApplication() {
                       name="ownerMobile"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Mobile Number</FormLabel>
+                          <FormLabel>
+                            Mobile Number <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
-                            <Input placeholder="10-digit mobile" data-testid="input-owner-mobile" {...field} />
+                            <Input
+                              ref={field.ref}
+                              name={field.name}
+                              value={field.value ?? ""}
+                              placeholder="10-digit mobile"
+                              autoComplete="tel"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={10}
+                              data-testid="input-owner-mobile"
+                              onChange={(event) => field.onChange(sanitizeDigits(event.target.value, 10))}
+                              onBlur={(event) => {
+                                field.onChange(sanitizeDigits(event.target.value, 10));
+                                field.onBlur();
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1314,7 +2243,19 @@ export default function NewApplication() {
                             Email <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="your@email.com" data-testid="input-owner-email" {...field} />
+                            <Input
+                              ref={field.ref}
+                              name={field.name}
+                              type="email"
+                              value={field.value ?? ""}
+                              placeholder="your@email.com"
+                              data-testid="input-owner-email"
+                              onChange={(event) => field.onChange(event.target.value)}
+                              onBlur={(event) => {
+                                field.onChange(event.target.value.trim());
+                                field.onBlur();
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1330,7 +2271,21 @@ export default function NewApplication() {
                             Aadhaar Number <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
-                            <Input placeholder="12-digit Aadhaar" data-testid="input-owner-aadhaar" {...field} />
+                            <Input
+                              ref={field.ref}
+                              name={field.name}
+                              value={field.value ?? ""}
+                              placeholder="12-digit Aadhaar"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={12}
+                              data-testid="input-owner-aadhaar"
+                              onChange={(event) => field.onChange(sanitizeDigits(event.target.value, 12))}
+                              onBlur={(event) => {
+                                field.onChange(sanitizeDigits(event.target.value, 12));
+                                field.onBlur();
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1343,7 +2298,9 @@ export default function NewApplication() {
                     name="propertyOwnership"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Property Ownership</FormLabel>
+                        <FormLabel>
+                          Property Ownership <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
                           <RadioGroup
                             onValueChange={field.onChange}
@@ -1360,7 +2317,7 @@ export default function NewApplication() {
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="leased" id="leased" data-testid="radio-ownership-leased" />
                               <label htmlFor="leased" className="text-sm font-medium cursor-pointer">
-                                Leased
+                                {OWNERSHIP_LABELS.leased}
                               </label>
                             </div>
                           </RadioGroup>
@@ -1368,6 +2325,24 @@ export default function NewApplication() {
                         <FormDescription>
                           Specify whether you own the property or have it on lease
                         </FormDescription>
+                        {propertyOwnership === "leased" && (
+                          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mt-3" data-testid="alert-lease-not-allowed">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-500 mt-0.5" />
+                              <div className="space-y-1">
+                                <p className="font-medium text-sm text-orange-700 dark:text-orange-200">
+                                  Lease Deed Applications Not Accepted
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  The tourism department currently processes homestay registrations only for properties under clear ownership. Applications submitted on lease or sale deeds are not entertained.
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Please proceed with an owned property to continue your registration.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1394,7 +2369,8 @@ export default function NewApplication() {
               </Card>
             )}
 
-            {step === 3 && (
+{step === 3 && (
+              <>
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-2 mb-2">
@@ -1405,37 +2381,49 @@ export default function NewApplication() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="bg-muted/50 p-4 rounded-lg">
-                    <p className="text-sm font-medium mb-2">Total Rooms: {totalRooms}</p>
-                    <p className="text-xs text-muted-foreground">Maximum 12 beds across all rooms</p>
+                    <p className="text-sm font-medium mb-2">
+                      Total Rooms: {totalRooms} / {MAX_ROOMS_ALLOWED} allowed
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      HP Homestay Rules 2025 permit up to {MAX_ROOMS_ALLOWED} rooms and {MAX_BEDS_ALLOWED} beds across all room types.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total beds configured: {totalBeds}
+                    </p>
                   </div>
 
-                  {/* Weighted Average Rate Display */}
-                  {hasPerRoomTypeRates && totalRooms > 0 && effectiveRate > 0 && (
+                  {/* Nightly Rate Summary */}
+                  {highestRoomRate > 0 && (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                       <div className="flex items-center gap-2">
                         <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                         <div>
-                          <p className="font-medium text-sm">Weighted Average Rate</p>
+                          <p className="font-medium text-sm">Highest Nightly Rate</p>
                           <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1">
-                            ₹{effectiveRate.toLocaleString('en-IN')}/night
+                            ₹{highestRoomRate.toLocaleString('en-IN')}/night
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with different rates
+                            Used to determine category per HP Homestay Rules 2025.
                           </p>
+                          {hasPerRoomTypeRates && effectiveRate > 0 && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Weighted average (for reference): ₹{effectiveRate.toLocaleString('en-IN')}/night across {totalRooms} {totalRooms === 1 ? "room" : "rooms"}.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
                   )}
 
                   {/* Smart Category Suggestion */}
-                  {suggestedCategoryValue && totalRooms > 0 && effectiveRate > 0 && (
+                  {suggestedCategoryValue && totalRooms > 0 && highestRoomRate > 0 && (
                     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4" data-testid="alert-category-suggestion">
                       <div className="flex items-start gap-3">
                         <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
                         <div className="flex-1">
                           <p className="font-medium text-sm">Recommended Category</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with ₹{effectiveRate.toLocaleString('en-IN')}/night {hasPerRoomTypeRates ? 'average' : ''} rate
+                            Based on {totalRooms} {totalRooms === 1 ? 'room' : 'rooms'} with highest nightly rate ₹{highestRoomRate.toLocaleString('en-IN')}.
                           </p>
                           <div className="mt-3 flex items-center gap-3">
                             <Badge variant={getCategoryBadge(suggestedCategoryValue).variant} className="text-base px-3 py-1">
@@ -1454,11 +2442,10 @@ export default function NewApplication() {
                             )}
                           </div>
                           <div className="mt-3 text-xs text-muted-foreground">
-                            <p className="font-medium mb-1">Category Requirements:</p>
+                            <p className="font-medium mb-1">Category Criteria:</p>
                             <ul className="space-y-0.5">
-                              <li>• Diamond: 5+ rooms, ₹10,000+ per night</li>
-                              <li>• Gold: 3+ rooms, ₹3,000-₹10,000 per night</li>
-                              <li>• Silver: 1+ rooms, below ₹3,000 per night</li>
+                              <li>• Tariff: {CATEGORY_REQUIREMENTS[suggestedCategoryValue].tariffLabel}</li>
+                              <li>• Capacity: Up to {MAX_ROOMS_ALLOWED} rooms / {MAX_BEDS_ALLOWED} beds (applies to all categories)</li>
                             </ul>
                           </div>
                         </div>
@@ -1473,7 +2460,7 @@ export default function NewApplication() {
                       <FormItem>
                         <FormLabel>Property Category</FormLabel>
                         <FormDescription className="mb-4">
-                          Select based on amenities and services offered
+                          Category is determined by nightly tariff per HP Homestay Rules 2025.
                         </FormDescription>
                         <FormControl>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1486,7 +2473,7 @@ export default function NewApplication() {
                                 }`}
                                 data-testid={`option-category-${cat}`}
                               >
-                                <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center justify-between mb-3">
                                   <Badge variant={getCategoryBadge(cat).variant}>
                                     {getCategoryBadge(cat).label}
                                   </Badge>
@@ -1496,11 +2483,10 @@ export default function NewApplication() {
                                     </div>
                                   )}
                                 </div>
-                                <p className="text-sm text-muted-foreground capitalize">
-                                  {cat === "diamond" && "Premium amenities & exceptional service"}
-                                  {cat === "gold" && "Quality amenities & good service"}
-                                  {cat === "silver" && "Essential amenities & comfort"}
-                                </p>
+                                <ul className="text-xs text-muted-foreground space-y-1">
+                                  <li>{CATEGORY_REQUIREMENTS[cat].tariffLabel}</li>
+                                  <li>Capacity: Up to {MAX_ROOMS_ALLOWED} rooms / {MAX_BEDS_ALLOWED} beds</li>
+                                </ul>
                               </div>
                             ))}
                           </div>
@@ -1516,12 +2502,17 @@ export default function NewApplication() {
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
                         <div className="flex-1">
-                          <p className="font-medium text-sm text-destructive">Category Requirements Not Met</p>
+                          <p className="font-medium text-sm text-destructive">Category Criteria Not Met</p>
                           <ul className="mt-2 space-y-1 text-sm text-destructive/90">
                             {categoryValidation.errors.map((error, idx) => (
                               <li key={idx}>• {error}</li>
                             ))}
                           </ul>
+                          {isCategoryEnforced && (
+                            <p className="mt-3 text-xs text-destructive/80">
+                              Category enforcement is active. Please adjust room tariffs or selected category to meet the required criteria before continuing.
+                            </p>
+                          )}
                           {categoryValidation.suggestedCategory && (
                             <div className="mt-3 pt-3 border-t border-destructive/20">
                               <p className="text-sm text-muted-foreground">Suggested: 
@@ -1608,7 +2599,7 @@ export default function NewApplication() {
                     <h4 className="font-medium">Room Configuration</h4>
                     
                     {/* Single Bed Rooms Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
                         name="singleBedRooms"
@@ -1624,6 +2615,28 @@ export default function NewApplication() {
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                               />
                             </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="singleBedBeds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Beds per Single Room</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="1"
+                                min={0}
+                                data-testid="input-single-bed-count"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormDescription>Maximum total beds across all room types is {MAX_BEDS_ALLOWED}.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1671,7 +2684,7 @@ export default function NewApplication() {
                     </div>
 
                     {/* Double Bed Rooms Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
                         name="doubleBedRooms"
@@ -1683,6 +2696,27 @@ export default function NewApplication() {
                                 type="number" 
                                 placeholder="0" 
                                 data-testid="input-double-bed-rooms" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="doubleBedBeds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Beds per Double Room</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="2"
+                                min={0}
+                                data-testid="input-double-bed-count"
                                 {...field}
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                               />
@@ -1734,7 +2768,7 @@ export default function NewApplication() {
                     </div>
 
                     {/* Family Suites Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
                         name="familySuites"
@@ -1746,6 +2780,27 @@ export default function NewApplication() {
                                 type="number" 
                                 placeholder="0" 
                                 data-testid="input-family-suites" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="familySuiteBeds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Beds per Suite</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="4"
+                                min={0}
+                                data-testid="input-family-suite-bed-count"
                                 {...field}
                                 onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                               />
@@ -1796,25 +2851,74 @@ export default function NewApplication() {
                       />
                     </div>
 
+                    {roomLimitExceeded && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-500 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-sm text-red-700 dark:text-red-200">
+                              Room limit exceeded
+                            </p>
+                            <p className="text-sm text-red-700/80 dark:text-red-200/80">
+                              HP Homestay Rules permit a maximum of {MAX_ROOMS_ALLOWED} rooms. Please reduce the number of rooms to continue.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {bedLimitExceeded && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-500 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-sm text-red-700 dark:text-red-200">
+                              Total bed capacity exceeded
+                            </p>
+                            <p className="text-sm text-red-700/80 dark:text-red-200/80">
+                              You currently have {totalBeds} beds configured. Homestay registrations allow a maximum of {MAX_BEDS_ALLOWED} beds across all room types.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {bathroomsBelowRooms && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-500 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-sm text-red-700 dark:text-red-200">
+                              Attached washrooms below requirement
+                            </p>
+                            <p className="text-sm text-red-700/80 dark:text-red-200/80">
+                              Each room must have an attached washroom. Increase the attached washrooms to at least {totalRooms} to continue.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <FormField
                       control={form.control}
                       name="attachedWashrooms"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Total Attached Washrooms</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="Number of washrooms" 
-                              data-testid="input-attached-washrooms" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        <FormLabel>Total Attached Washrooms</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="Number of washrooms" 
+                            data-testid="input-attached-washrooms" 
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormDescription>Cannot exceed the total number of rooms configured above.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   </div>
 
                   {(category === "diamond" || category === "gold") && (
@@ -1839,6 +2943,62 @@ export default function NewApplication() {
                   )}
                 </CardContent>
               </Card>
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Video className="w-5 h-5 text-primary" />
+                    <CardTitle>Mandatory Safety Checklist</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Confirm these baseline safety requirements before inspections.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    CCTV coverage and fire-safety equipment (extinguishers, alarms, emergency exits) must be installed and working before your site inspection. Check both boxes to acknowledge compliance.
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {["cctv", "fireSafety"].map((id) => {
+                      const amenity = AMENITIES.find((a) => a.id === id)!;
+                      const IconComponent = amenity.icon;
+                      return (
+                        <label
+                          key={id}
+                          className="flex items-start gap-3 border rounded-lg p-3 bg-muted/30 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={selectedAmenities[id] || false}
+                            onCheckedChange={(checked) =>
+                              setSelectedAmenities((prev) => ({
+                                ...prev,
+                                [id]: !!checked,
+                              }))
+                            }
+                          />
+                          <div>
+                            <p className="font-medium flex items-center gap-2">
+                              <IconComponent className="w-4 h-4 text-primary" />
+                              {amenity.label}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Required before approval and inspection.
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {(!selectedAmenities.cctv || !selectedAmenities.fireSafety) && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Please confirm both CCTV and fire-safety measures to proceed.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+              </>
             )}
 
             {step === 4 && (
@@ -2049,7 +3209,6 @@ export default function NewApplication() {
                     </p>
                     <ObjectUploader
                       label="Upload Revenue Papers"
-                      accept=".pdf,.jpg,.jpeg,.png"
                       maxFiles={2}
                       fileType="revenue-papers"
                       onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: paths }))}
@@ -2067,7 +3226,6 @@ export default function NewApplication() {
                     </p>
                     <ObjectUploader
                       label="Upload Affidavit"
-                      accept=".pdf"
                       maxFiles={1}
                       fileType="affidavit-section29"
                       onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: paths }))}
@@ -2085,7 +3243,6 @@ export default function NewApplication() {
                     </p>
                     <ObjectUploader
                       label="Upload Form-C"
-                      accept=".pdf"
                       maxFiles={1}
                       fileType="undertaking-form-c"
                       onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: paths }))}
@@ -2103,7 +3260,6 @@ export default function NewApplication() {
                     </p>
                     <ObjectUploader
                       label="Upload Register"
-                      accept=".pdf,.jpg,.jpeg,.png"
                       maxFiles={1}
                       fileType="register-verification"
                       onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: paths }))}
@@ -2121,7 +3277,6 @@ export default function NewApplication() {
                     </p>
                     <ObjectUploader
                       label="Upload Bill Book"
-                      accept=".pdf,.jpg,.jpeg,.png"
                       maxFiles={1}
                       fileType="bill-book"
                       onUploadComplete={(paths) => setUploadedDocuments(prev => ({ ...prev, billBook: paths }))}
@@ -2139,10 +3294,10 @@ export default function NewApplication() {
                     </p>
                     <ObjectUploader
                       label="Upload Property Photos"
-                      accept=".jpg,.jpeg,.png"
                       multiple={true}
                       maxFiles={10}
                       fileType="property-photo"
+                      category="photos"
                       onUploadComplete={(paths) => setPropertyPhotos(paths)}
                       existingFiles={propertyPhotos}
                     />
@@ -2176,27 +3331,41 @@ export default function NewApplication() {
                   {/* Amenities Section */}
                   <div className="space-y-4">
                     <h4 className="font-medium">Property Amenities</h4>
+                    <p className="text-sm text-muted-foreground">
+                      CCTV surveillance and fire-safety equipment remain locked because you confirmed them in the safety checklist. Other amenities are optional.
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {AMENITIES.map((amenity) => {
                         const IconComponent = amenity.icon;
+                        const isMandatory = MANDATORY_AMENITY_IDS.has(amenity.id);
+                        const isChecked = selectedAmenities[amenity.id] || false;
                         return (
                           <div
                             key={amenity.id}
-                            className="flex items-center space-x-3 p-3 border rounded-lg hover-elevate"
+                            className={`flex items-center space-x-3 p-3 border rounded-lg hover-elevate ${isMandatory ? "opacity-90 border-dashed bg-muted/50 cursor-not-allowed" : ""}`}
                             data-testid={`checkbox-amenity-${amenity.id}`}
                           >
                             <Checkbox
-                              checked={selectedAmenities[amenity.id] || false}
+                              checked={isChecked}
+                              disabled={isMandatory}
                               onCheckedChange={(checked) => 
-                                setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !!checked }))
+                                !isMandatory && setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !!checked }))
                               }
                             />
                             <label 
-                              className="flex items-center gap-2 flex-1 cursor-pointer"
-                              onClick={() => setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }))}
+                              className={`flex items-center gap-2 flex-1 ${isMandatory ? "cursor-not-allowed" : "cursor-pointer"}`}
+                              onClick={() => {
+                                if (isMandatory) return;
+                                setSelectedAmenities(prev => ({ ...prev, [amenity.id]: !prev[amenity.id] }));
+                              }}
                             >
                               <IconComponent className="w-4 h-4 text-primary" />
                               <span className="text-sm font-medium">{amenity.label}</span>
+                              {isMandatory && (
+                                <Badge variant="outline" className="text-[10px] uppercase ml-auto">
+                                  Mandatory
+                                </Badge>
+                              )}
                             </label>
                           </div>
                         );
@@ -2428,17 +3597,19 @@ export default function NewApplication() {
 
               <div className="flex-1" />
 
-              {/* Save Draft button - available on all pages */}
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => saveDraftMutation.mutate()}
-                disabled={saveDraftMutation.isPending}
-                data-testid="button-save-draft"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
-              </Button>
+              {/* Save Draft button - only for new applications */}
+              {!isCorrectionMode && (
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => saveDraftMutation.mutate()}
+                  disabled={saveDraftMutation.isPending}
+                  data-testid="button-save-draft"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
+                </Button>
+              )}
 
               {/* Preview button - only on final page */}
               {step === totalSteps && (
@@ -2460,6 +3631,7 @@ export default function NewApplication() {
                     e.preventDefault();
                     nextStep();
                   }} 
+                  disabled={isNextDisabled}
                   data-testid="button-next"
                 >
                   Next
@@ -2468,7 +3640,7 @@ export default function NewApplication() {
               ) : (
                 <Button 
                   type="submit" 
-                  disabled={createApplicationMutation.isPending}
+                  disabled={submitApplicationMutation.isPending}
                   data-testid="button-submit-application"
                   onClick={async () => {
                     console.log("Submit button clicked");
@@ -2486,7 +3658,7 @@ export default function NewApplication() {
                   }}
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  {createApplicationMutation.isPending ? "Submitting..." : "Submit Application"}
+                  {submitApplicationMutation.isPending ? "Submitting..." : submitButtonLabel}
                 </Button>
               )}
             </div>
@@ -2515,11 +3687,11 @@ export default function NewApplication() {
                   <CardContent className="grid grid-cols-2 gap-4 text-sm">
                     <div><span className="text-muted-foreground">Property Name:</span> <span className="font-medium">{form.watch("propertyName") || "—"}</span></div>
                     <div><span className="text-muted-foreground">District:</span> <span className="font-medium">{form.watch("district") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Tehsil:</span> <span className="font-medium">{displayTehsil}</span></div>
                     <div className="col-span-2"><span className="text-muted-foreground">Address:</span> <span className="font-medium">{form.watch("address") || "—"}</span></div>
                     <div><span className="text-muted-foreground">Pincode:</span> <span className="font-medium">{form.watch("pincode") || "—"}</span></div>
                     <div><span className="text-muted-foreground">Location Type:</span> <span className="font-medium">{LOCATION_TYPES.find(t => t.value === form.watch("locationType"))?.label || "—"}</span></div>
                     <div><span className="text-muted-foreground">Telephone:</span> <span className="font-medium">{form.watch("telephone") || "—"}</span></div>
-                    <div><span className="text-muted-foreground">Fax:</span> <span className="font-medium">{form.watch("fax") || "—"}</span></div>
                   </CardContent>
                 </Card>
 
@@ -2533,6 +3705,7 @@ export default function NewApplication() {
                     <div><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{form.watch("ownerMobile") || "—"}</span></div>
                     <div><span className="text-muted-foreground">Email:</span> <span className="font-medium">{form.watch("ownerEmail") || "—"}</span></div>
                     <div><span className="text-muted-foreground">Aadhaar:</span> <span className="font-medium">{form.watch("ownerAadhaar") || "—"}</span></div>
+                    <div><span className="text-muted-foreground">Ownership Type:</span> <span className="font-medium">{propertyOwnership ? OWNERSHIP_LABELS[propertyOwnership] : "—"}</span></div>
                   </CardContent>
                 </Card>
 
@@ -2546,10 +3719,11 @@ export default function NewApplication() {
                     <div><span className="text-muted-foreground">Room Rate:</span> <span className="font-medium">₹{form.watch("proposedRoomRate") || 0}/day</span></div>
                     <div><span className="text-muted-foreground">Project Type:</span> <span className="font-medium">{form.watch("projectType") === "new_project" ? "New Project" : "New Rooms"}</span></div>
                     <div><span className="text-muted-foreground">Property Area:</span> <span className="font-medium">{form.watch("propertyArea") || 0} sq m</span></div>
-                    <div><span className="text-muted-foreground">Single Bed Rooms:</span> <span className="font-medium">{form.watch("singleBedRooms") || 0}</span></div>
-                    <div><span className="text-muted-foreground">Double Bed Rooms:</span> <span className="font-medium">{form.watch("doubleBedRooms") || 0}</span></div>
-                    <div><span className="text-muted-foreground">Family Suites:</span> <span className="font-medium">{form.watch("familySuites") || 0}</span></div>
+                    <div><span className="text-muted-foreground">Single Bed Rooms:</span> <span className="font-medium">{form.watch("singleBedRooms") || 0} (Beds/room: {singleBedBeds})</span></div>
+                    <div><span className="text-muted-foreground">Double Bed Rooms:</span> <span className="font-medium">{form.watch("doubleBedRooms") || 0} (Beds/room: {doubleBedBeds})</span></div>
+                    <div><span className="text-muted-foreground">Family Suites:</span> <span className="font-medium">{form.watch("familySuites") || 0} (Beds/room: {familySuiteBeds})</span></div>
                     <div><span className="text-muted-foreground">Total Rooms:</span> <span className="font-medium">{totalRooms}</span></div>
+                    <div><span className="text-muted-foreground">Total Beds:</span> <span className="font-medium">{totalBeds}</span></div>
                     <div><span className="text-muted-foreground">Attached Washrooms:</span> <span className="font-medium">{form.watch("attachedWashrooms") || 0}</span></div>
                     <div><span className="text-muted-foreground">GSTIN:</span> <span className="font-medium">{form.watch("gstin") || "Not provided"}</span></div>
                   </CardContent>

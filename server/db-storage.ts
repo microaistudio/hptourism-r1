@@ -114,6 +114,10 @@ export class DbStorage implements IStorage {
       .orderBy(desc(documents.uploadDate));
   }
 
+  async deleteDocumentsByApplication(applicationId: string): Promise<void> {
+    await db.delete(documents).where(eq(documents.applicationId, applicationId));
+  }
+
   // Payment methods
   async createPayment(payment: InsertPayment): Promise<Payment> {
     const result = await db.insert(payments).values(payment).returning();
@@ -143,7 +147,22 @@ export class DbStorage implements IStorage {
 
   // Notification methods
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const result = await db.insert(notifications).values([notification]).returning();
+    const rawChannels = notification.channels as { email?: boolean; sms?: boolean; whatsapp?: boolean; inapp?: boolean } | undefined;
+    const normalizedChannels = rawChannels
+      ? ({
+          email: rawChannels.email,
+          sms: rawChannels.sms,
+          whatsapp: rawChannels.whatsapp,
+          inapp: rawChannels.inapp,
+        } as InsertNotification["channels"])
+      : undefined;
+
+    const payload: InsertNotification = {
+      ...notification,
+      channels: normalizedChannels,
+    };
+
+    const result = await db.insert(notifications).values(payload as any).returning();
     return result[0];
   }
 
@@ -161,7 +180,13 @@ export class DbStorage implements IStorage {
 
   // Application Action methods
   async createApplicationAction(action: InsertApplicationAction): Promise<ApplicationAction> {
-    const result = await db.insert(applicationActions).values([action]).returning();
+    const payload: InsertApplicationAction = {
+      ...action,
+      issuesFound: Array.isArray(action.issuesFound)
+        ? action.issuesFound.map((issue) => String(issue))
+        : undefined,
+    };
+    const result = await db.insert(applicationActions).values(payload as any).returning();
     return result[0];
   }
 
@@ -173,14 +198,19 @@ export class DbStorage implements IStorage {
 
   // Dev methods
   async getStats() {
-    const { sql, count } = await import('drizzle-orm');
-    
-    const [usersCount, appsCount, docsCount, paymentsCount] = await Promise.all([
-      db.select({ count: count() }).from(users).then(rows => rows[0]?.count || 0),
-      db.select({ count: count() }).from(homestayApplications).then(rows => rows[0]?.count || 0),
-      db.select({ count: count() }).from(documents).then(rows => rows[0]?.count || 0),
-      db.select({ count: count() }).from(payments).then(rows => rows[0]?.count || 0),
+    const { count } = await import('drizzle-orm');
+
+    const [usersCountResult, appsCountResult, docsCountResult, paymentsCountResult] = await Promise.all([
+      db.select({ count: count() }).from(users),
+      db.select({ count: count() }).from(homestayApplications),
+      db.select({ count: count() }).from(documents),
+      db.select({ count: count() }).from(payments),
     ]);
+
+    const usersCount = usersCountResult[0]?.count ?? 0;
+    const appsCount = appsCountResult[0]?.count ?? 0;
+    const docsCount = docsCountResult[0]?.count ?? 0;
+    const paymentsCount = paymentsCountResult[0]?.count ?? 0;
     
     return {
       users: Number(usersCount),

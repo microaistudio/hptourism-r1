@@ -15,12 +15,7 @@ import Dashboard from "@/pages/dashboard";
 import ProfilePage from "@/pages/profile";
 import NewApplication from "@/pages/applications/new";
 import ApplicationDetail from "@/pages/applications/detail";
-import PaymentPage from "@/pages/applications/payment";
 import HimKoshPaymentPage from "@/pages/applications/payment-himkosh";
-import PaymentGatewaySelect from "@/pages/applications/payment-gateway-select";
-import PaymentRazorpay from "@/pages/applications/payment-razorpay";
-import PaymentCCAvenue from "@/pages/applications/payment-ccavenue";
-import PaymentPayU from "@/pages/applications/payment-payu";
 import PublicProperties from "@/pages/public/properties";
 import PublicPropertyDetail from "@/pages/public/property-detail";
 import AnalyticsPage from "@/pages/analytics";
@@ -41,6 +36,7 @@ import DTDOApplicationReview from "@/pages/dtdo/application-review";
 import DTDOScheduleInspection from "@/pages/dtdo/schedule-inspection";
 import DTDOInspectionReview from "@/pages/dtdo/inspection-review";
 import DTDOProfile from "@/pages/dtdo/profile";
+import OfficerApplicationSearch from "@/pages/officer-application-search";
 import TestAPI from "@/pages/test-api";
 import HimKoshTest from "@/pages/himkosh-test";
 import type { User } from "@shared/schema";
@@ -110,21 +106,6 @@ function Router() {
       <Route path="/applications/new">
         {() => <ProtectedRoute component={NewApplication} allowedRoles={['property_owner']} />}
       </Route>
-      <Route path="/applications/:id/payment-gateway">
-        {() => <ProtectedRoute component={PaymentGatewaySelect} allowedRoles={['property_owner']} />}
-      </Route>
-      <Route path="/applications/:id/payment-razorpay">
-        {() => <ProtectedRoute component={PaymentRazorpay} allowedRoles={['property_owner']} />}
-      </Route>
-      <Route path="/applications/:id/payment-ccavenue">
-        {() => <ProtectedRoute component={PaymentCCAvenue} allowedRoles={['property_owner']} />}
-      </Route>
-      <Route path="/applications/:id/payment-payu">
-        {() => <ProtectedRoute component={PaymentPayU} allowedRoles={['property_owner']} />}
-      </Route>
-      <Route path="/applications/:id/payment">
-        {() => <ProtectedRoute component={PaymentPage} allowedRoles={['property_owner']} />}
-      </Route>
       <Route path="/applications/:id/payment-himkosh">
         {() => <ProtectedRoute component={HimKoshPaymentPage} allowedRoles={['property_owner']} />}
       </Route>
@@ -178,6 +159,9 @@ function Router() {
       <Route path="/da/inspections/:id">
         {() => <ProtectedRoute component={DAInspectionReport} allowedRoles={['dealing_assistant']} />}
       </Route>
+      <Route path="/da/search">
+        {() => <ProtectedRoute component={OfficerApplicationSearch} allowedRoles={['dealing_assistant']} />}
+      </Route>
 
       {/* DTDO (District Tourism Development Officer) Routes */}
       <Route path="/dtdo/dashboard">
@@ -194,6 +178,9 @@ function Router() {
       </Route>
       <Route path="/dtdo/profile">
         {() => <ProtectedRoute component={DTDOProfile} allowedRoles={['district_tourism_officer', 'district_officer']} />}
+      </Route>
+      <Route path="/dtdo/search">
+        {() => <ProtectedRoute component={OfficerApplicationSearch} allowedRoles={['district_tourism_officer', 'district_officer']} />}
       </Route>
       
       <Route component={NotFound} />

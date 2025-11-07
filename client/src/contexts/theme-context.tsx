@@ -9,10 +9,25 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const FALLBACK_THEME: ThemeName = "classic";
+const THEME_OPTIONS: ThemeName[] = [
+  "classic-clean",
+  "classic",
+  "professional-blue",
+  "mountain-sky",
+  "heritage-gold",
+  "forest-green",
+  "vibrant",
+  "official-dual-logo",
+];
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<ThemeName>(() => {
     const saved = localStorage.getItem("hp-tourism-theme");
-    return (saved as ThemeName) || "classic-clean";
+    if (saved && THEME_OPTIONS.includes(saved as ThemeName)) {
+      return saved as ThemeName;
+    }
+    return FALLBACK_THEME;
   });
 
   useEffect(() => {

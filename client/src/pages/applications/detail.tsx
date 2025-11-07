@@ -9,17 +9,19 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard, QrCode, Edit, Check } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, User, MapPin, Phone, Mail, Bed, IndianRupee, Calendar, FileText, ArrowLeftCircle, ClipboardCheck, CalendarClock, FileImage, Download, Images, Award, CreditCard, QrCode, Printer } from "lucide-react";
+import himachalTourismLogo from "@assets/WhatsApp Image 2025-10-25 at 07.59.16_5c0e8739_1761362811579.jpg";
+import hpGovtLogo from "@assets/WhatsApp Image 2025-10-25 at 08.03.16_1cdc4198_1761362811579.jpg";
 import type { HomestayApplication, User as UserType, Document } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { generateCertificatePDF } from "@/lib/certificateGenerator";
-import { ObjectUploader, UploadedFileMetadata } from "@/components/ObjectUploader";
+import { generateCertificatePDF, type CertificateFormat } from "@/lib/certificateGenerator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { buildObjectViewUrl } from "@/lib/utils";
 
 export default function ApplicationDetail() {
   const [, params] = useRoute("/applications/:id");
@@ -44,28 +46,22 @@ export default function ApplicationDetail() {
   const [categoryRecommendation, setCategoryRecommendation] = useState("");
   const [issuesFound, setIssuesFound] = useState("");
   const [inspectionCompletionNotes, setInspectionCompletionNotes] = useState("");
+  const certificateFormatOptions: { value: CertificateFormat; label: string; description: string }[] = [
+    { value: "classic", label: "Format 1", description: "Official teal design" },
+    { value: "modern", label: "Format 2", description: "Contemporary card layout" },
+    { value: "heritage", label: "Format 3", description: "Heritage parchment style" },
+  ];
+  const [certificateFormat, setCertificateFormat] =
+    useState<CertificateFormat>("classic");
+  const activeCertificateFormat =
+    certificateFormatOptions.find((option) => option.value === certificateFormat) ??
+    certificateFormatOptions[0];
   
   // Image gallery state
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
 
-  // Edit mode state for property owners
-  const [isEditingDocuments, setIsEditingDocuments] = useState(false);
-  const [documentsLoaded, setDocumentsLoaded] = useState(false);
-  const [uploadedDocuments, setUploadedDocuments] = useState<{
-    revenuePapers: UploadedFileMetadata[];
-    affidavitSection29: UploadedFileMetadata[];
-    undertakingFormC: UploadedFileMetadata[];
-    registerForVerification: UploadedFileMetadata[];
-    billBook: UploadedFileMetadata[];
-  }>({
-    revenuePapers: [],
-    affidavitSection29: [],
-    undertakingFormC: [],
-    registerForVerification: [],
-    billBook: [],
-  });
-  const [propertyPhotos, setPropertyPhotos] = useState<UploadedFileMetadata[]>([]);
+  // Determine whether owner can edit/resubmit
 
   const applicationId = params?.id;
 
@@ -223,79 +219,6 @@ export default function ApplicationDetail() {
     },
   });
 
-  // Resubmit mutation for property owners (must be before early returns)
-  const resubmitMutation = useMutation({
-    mutationFn: async () => {
-      if (!applicationId) throw new Error("No application ID");
-      const allDocuments = [
-        ...uploadedDocuments.revenuePapers.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'revenue_papers' })),
-        ...uploadedDocuments.affidavitSection29.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'affidavit_section_29' })),
-        ...uploadedDocuments.undertakingFormC.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'undertaking_form_c' })),
-        ...uploadedDocuments.registerForVerification.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'register_for_verification' })),
-        ...uploadedDocuments.billBook.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'bill_book' })),
-        ...propertyPhotos.map(f => ({ id: f.id || crypto.randomUUID(), fileName: f.fileName, fileUrl: f.filePath, documentType: 'property_photo' })),
-      ];
-      
-      const response = await fetch(`/api/applications/${applicationId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: 'submitted', documents: allDocuments }),
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to update application");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/applications", applicationId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/applications"] });
-      toast({ title: "Application Resubmitted", description: "Your application has been resubmitted successfully." });
-      setIsEditingDocuments(false);
-      setLocation("/dashboard");
-    },
-    onError: () => {
-      toast({ title: "Update Failed", description: "Failed to resubmit application", variant: "destructive" });
-    },
-  });
-
-  // Load existing documents for editing (must be before early returns)
-  useEffect(() => {
-    const app = applicationData?.application;
-    if (app?.documents && !documentsLoaded) {
-      const docs = app.documents as any[];
-      const docsByType = {
-        revenuePapers: [] as UploadedFileMetadata[],
-        affidavitSection29: [] as UploadedFileMetadata[],
-        undertakingFormC: [] as UploadedFileMetadata[],
-        registerForVerification: [] as UploadedFileMetadata[],
-        billBook: [] as UploadedFileMetadata[],
-      };
-      const photos: UploadedFileMetadata[] = [];
-      
-      docs.forEach((doc: any) => {
-        const file: UploadedFileMetadata = {
-          id: doc.id,
-          filePath: doc.fileUrl || doc.filePath,
-          fileName: doc.fileName,
-          fileSize: doc.fileSize || 0,
-          mimeType: doc.mimeType || 'application/octet-stream',
-        };
-        
-        switch (doc.documentType) {
-          case 'revenue_papers': docsByType.revenuePapers.push(file); break;
-          case 'affidavit_section_29': docsByType.affidavitSection29.push(file); break;
-          case 'undertaking_form_c': docsByType.undertakingFormC.push(file); break;
-          case 'register_for_verification': docsByType.registerForVerification.push(file); break;
-          case 'bill_book': docsByType.billBook.push(file); break;
-          case 'property_photo': photos.push(file); break;
-        }
-      });
-      
-      setUploadedDocuments(docsByType);
-      setPropertyPhotos(photos);
-      setDocumentsLoaded(true);
-    }
-  }, [applicationData, documentsLoaded]);
-
   if (isLoading) {
     return (
       <div className="bg-background flex items-center justify-center">
@@ -330,12 +253,29 @@ export default function ApplicationDetail() {
   const isDistrictOfficer = user?.role === "district_officer";
   const isStateOfficer = user?.role === "state_officer";
   const isPropertyOwner = user?.role === "property_owner";
-  const canEdit = isPropertyOwner && ['reverted_to_applicant', 'reverted_by_dtdo'].includes(app.status);
+  const currentStatus = app.status ?? "draft";
+  const totalFeeValue = Number(app.totalFee ?? 0);
+  const ownerEditableStatuses = [
+    'draft',
+    'sent_back_for_corrections',
+    'reverted_to_applicant',
+    'reverted_by_dtdo',
+  ];
+  const canEdit = isPropertyOwner && ownerEditableStatuses.includes(currentStatus);
   
   // District officers can review pending applications
   // State officers can review applications in state_review status
-  const canReview = (isDistrictOfficer && app.status === "pending") || 
-                    (isStateOfficer && app.status === "state_review");
+  const canReview = (isDistrictOfficer && currentStatus === "pending") || 
+                    (isStateOfficer && currentStatus === "state_review");
+
+  const startCase = (input: string) =>
+    input
+      .replace(/[_-]/g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
 
   const getStatusBadge = (status: string) => {
     const config = {
@@ -357,19 +297,443 @@ export default function ApplicationDetail() {
     return config[category as keyof typeof config];
   };
 
+  const displayValue = (value: unknown, fallback = "—"): string => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : fallback;
+    }
+    if (value === null || value === undefined) {
+      return fallback;
+    }
+    return String(value);
+  };
+
+  const locationTypeLabels: Record<string, string> = {
+    mc: "Municipal Council / Corporation",
+    tcp: "Town & Country Planning",
+    gp: "Gram Panchayat (Rural)",
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const asNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const formatCurrency = (value: unknown) => {
+    const num = asNumber(value);
+    if (num === null) return "—";
+    return `₹${num.toLocaleString("en-IN")}`;
+  };
+
+  const formatDistance = (value: unknown) => {
+    const num = asNumber(value);
+    if (num === null || num === 0) return "—";
+    return `${num} km`;
+  };
+
+  const formatArea = (value: unknown) => {
+    const num = asNumber(value);
+    if (num === null || num === 0) return "—";
+    return `${num} sq ft`;
+  };
+
+  const formatDocumentType = (value?: string | null) => {
+    if (!value) return "Supporting Document";
+    return startCase(value);
+  };
+
+  const statusLabel = getStatusBadge(currentStatus).label;
+  const categoryLabel = app.category ? startCase(app.category) : "—";
+  const projectTypeLabel =
+    app.projectType === "new_project"
+      ? "New Project"
+      : app.projectType === "new_rooms"
+        ? "Existing + New Rooms"
+        : displayValue(app.projectType);
+  const ownershipLabel = app.propertyOwnership ? startCase(app.propertyOwnership) : "—";
+  const locationTypeLabel = locationTypeLabels[app.locationType ?? ""] ?? "—";
+
+  const submissionDate = app.submittedAt ? new Date(app.submittedAt) : null;
+  const lastUpdatedAt = app.updatedAt ? new Date(app.updatedAt) : null;
+
+  const amenityLabels: Record<string, string> = {
+    ac: "Air Conditioning",
+    wifi: "WiFi",
+    parking: "Parking",
+    restaurant: "Restaurant",
+    hotWater: "Hot Water",
+    tv: "Television",
+    laundry: "Laundry Service",
+    roomService: "Room Service",
+    garden: "Garden",
+    mountainView: "Mountain View",
+    petFriendly: "Pet Friendly",
+  };
+
+  const selectedAmenityLabels = Object.entries((app.amenities ?? {}) as Record<string, any>)
+    .filter(([, value]) => Boolean(value))
+    .map(([key]) => amenityLabels[key] ?? startCase(key));
+
+  const allDocumentsRaw = (documentsData?.documents ??
+    (Array.isArray(app.documents) ? app.documents : [])) as Array<any>;
+
+  const propertyPhotoDocs = allDocumentsRaw.filter(
+    (doc) => (doc?.documentType || doc?.type) === "property_photo",
+  );
+
+  const supportingDocs = allDocumentsRaw.filter(
+    (doc) => (doc?.documentType || doc?.type) !== "property_photo",
+  );
+
+  const normalizedSupportingDocs = supportingDocs.map((doc, index) => ({
+    type: formatDocumentType(doc?.documentType || doc?.type),
+    name: displayValue(doc?.fileName || doc?.name || `Document ${index + 1}`),
+  }));
+
+  const printGeneratedAt = new Date();
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <>
+      <div className="print-only application-print-sheet text-black text-sm leading-relaxed">
+        <div className="flex items-center justify-between border-b border-gray-300 pb-4 mb-6">
+          <img src={himachalTourismLogo} alt="Himachal Tourism" className="h-16 w-auto" />
+          <div className="text-center">
+            <p className="uppercase tracking-[0.35em] text-xs text-gray-600">
+              Government of Himachal Pradesh
+            </p>
+            <h1 className="text-2xl font-semibold mt-1">HP Tourism eServices</h1>
+            <p className="text-sm mt-1">Homestay Registration Application</p>
+          </div>
+          <img src={hpGovtLogo} alt="Government of Himachal Pradesh" className="h-16 w-auto" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-6 border border-gray-300 rounded-lg p-4 mb-8 break-inside-avoid">
+          <div className="space-y-1">
+            <p className="text-xs uppercase text-gray-600">Application Number</p>
+            <p className="font-semibold">{displayValue(app.applicationNumber)}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs uppercase text-gray-600">Current Status</p>
+            <p className="font-semibold">{statusLabel}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs uppercase text-gray-600">Submitted On</p>
+            <p>{submissionDate ? submissionDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—"}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs uppercase text-gray-600">Last Updated</p>
+            <p>{lastUpdatedAt ? lastUpdatedAt.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—"}</p>
+          </div>
+        </div>
+
+        <section className="mb-6 break-inside-avoid print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">1. Property Details</h2>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-4">
+            <div>
+              <p className="text-xs uppercase text-gray-600">Property Name</p>
+              <p>{displayValue(app.propertyName)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Category</p>
+              <p>{categoryLabel}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Address</p>
+              <p>{displayValue(app.address)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Location Type</p>
+              <p>{locationTypeLabel}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">District</p>
+              <p>{displayValue(app.district)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Tehsil / Sub-Division</p>
+              <p>{displayValue(app.tehsil)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Block / Development Block</p>
+              <p>{displayValue(app.block)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Gram Panchayat / Village</p>
+              <p>{displayValue(app.gramPanchayat)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Urban Local Body</p>
+              <p>{displayValue(app.urbanBody)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">PIN Code</p>
+              <p>{displayValue(app.pincode)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Total Rooms</p>
+              <p>{displayValue(app.totalRooms)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Ownership Type</p>
+              <p>{ownershipLabel}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6 break-inside-avoid print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">2. Owner Information</h2>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-4">
+            <div>
+              <p className="text-xs uppercase text-gray-600">Full Name</p>
+              <p>{displayValue(app.ownerName)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Gender</p>
+              <p>{app.ownerGender ? startCase(app.ownerGender) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Mobile Number</p>
+              <p>{displayValue(app.ownerMobile)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Email Address</p>
+              <p>{displayValue(app.ownerEmail)}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs uppercase text-gray-600">Aadhaar Number</p>
+              <p>{displayValue(app.ownerAadhaar)}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6 break-inside-avoid print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">3. Accommodation Details</h2>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-4">
+            <div>
+              <p className="text-xs uppercase text-gray-600">Project Type</p>
+              <p>{projectTypeLabel}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Property Area</p>
+              <p>{formatArea(app.propertyArea)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Single Bed Rooms</p>
+              <p>{displayValue(app.singleBedRooms)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Double Bed Rooms</p>
+              <p>{displayValue(app.doubleBedRooms)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Family Suites</p>
+              <p>{displayValue(app.familySuites)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Attached Washrooms</p>
+              <p>{displayValue(app.attachedWashrooms)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Proposed Tariff</p>
+              <p>{formatCurrency(app.proposedRoomRate)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Single Bed Room Rate</p>
+              <p>{formatCurrency(app.singleBedRoomRate)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Double Bed Room Rate</p>
+              <p>{formatCurrency(app.doubleBedRoomRate)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Family Suite Rate</p>
+              <p>{formatCurrency(app.familySuiteRate)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">GSTIN</p>
+              <p>{displayValue(app.gstin)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Certificate Validity (Years)</p>
+              <p>{displayValue(app.certificateValidityYears)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Pangi Sub Division</p>
+              <p>{app.isPangiSubDivision ? "Yes" : "No"}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6 break-inside-avoid print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">4. Distances & Public Areas</h2>
+          <div className="grid grid-cols-3 gap-x-6 gap-y-4 mt-4">
+            <div>
+              <p className="text-xs uppercase text-gray-600">Airport</p>
+              <p>{formatDistance(app.distanceAirport)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Railway Station</p>
+              <p>{formatDistance(app.distanceRailway)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">City Center</p>
+              <p>{formatDistance(app.distanceCityCenter)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Shopping Area</p>
+              <p>{formatDistance(app.distanceShopping)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Bus Stand</p>
+              <p>{formatDistance(app.distanceBusStand)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Lobby Area</p>
+              <p>{formatArea(app.lobbyArea)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Dining Area</p>
+              <p>{formatArea(app.diningArea)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Parking</p>
+              <p>{displayValue(app.parkingArea)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Nearest Hospital</p>
+              <p>{displayValue(app.nearestHospital)}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-6 mt-4">
+            <div>
+              <p className="text-xs uppercase text-gray-600">Eco-Friendly Facilities</p>
+              <p>{displayValue(app.ecoFriendlyFacilities)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Facilities for Differently Abled</p>
+              <p>{displayValue(app.differentlyAbledFacilities)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Fire Safety Equipment</p>
+              <p>{displayValue(app.fireEquipmentDetails)}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6 break-inside-avoid print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">5. Amenities</h2>
+          <div className="mt-4">
+            {selectedAmenityLabels.length > 0 ? (
+              <ul className="grid grid-cols-2 gap-2 text-sm list-disc list-inside">
+                {selectedAmenityLabels.map((label) => (
+                  <li key={label}>{label}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm">No amenities selected.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="mb-6 break-inside-avoid print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">6. Supporting Documents</h2>
+          <div className="mt-4">
+            {normalizedSupportingDocs.length > 0 ? (
+              <table className="w-full border border-gray-300 text-sm">
+                <thead className="bg-gray-100">
+                  <tr className="text-left">
+                    <th className="border border-gray-300 px-3 py-2 w-1/3">Document Type</th>
+                    <th className="border border-gray-300 px-3 py-2">File Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {normalizedSupportingDocs.map((doc, index) => (
+                    <tr key={`${doc.name}-${index}`} className="break-inside-avoid">
+                      <td className="border border-gray-300 px-3 py-2">{doc.type}</td>
+                      <td className="border border-gray-300 px-3 py-2">{doc.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm">No supporting documents uploaded.</p>
+            )}
+            <p className="text-sm mt-3">
+              Property Photos Submitted: {propertyPhotoDocs.length > 0 ? `${propertyPhotoDocs.length} file(s)` : "None"}
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-6 print-section">
+          <h2 className="text-base font-semibold border-b border-gray-300 pb-2">7. Fee Summary</h2>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-4">
+            <div>
+              <p className="text-xs uppercase text-gray-600">Base Fee</p>
+              <p>{formatCurrency(app.baseFee)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Total Discounts</p>
+              <p>{formatCurrency(app.totalDiscount)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">GST Amount</p>
+              <p>{formatCurrency(app.gstAmount)}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-600">Total Payable Fee</p>
+              <p className="font-semibold">{formatCurrency(app.totalFee)}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="text-xs text-gray-600 border-t border-gray-200 pt-4 print-section">
+          <p>
+            Generated on {printGeneratedAt.toLocaleString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </p>
+        </section>
+      </div>
+
+      <div className="print:hidden container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge {...getStatusBadge(app.status || 'draft')} data-testid="badge-status">
-              {getStatusBadge(app.status || 'draft').label}
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge {...getStatusBadge(currentStatus)} data-testid="badge-status">
+              {getStatusBadge(currentStatus).label}
             </Badge>
             <Badge {...getCategoryBadge(app.category || 'silver')} data-testid="badge-category">
               {getCategoryBadge(app.category || 'silver').label}
             </Badge>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-application">
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+          </div>
         </div>
+
+        {canEdit && (
+          <div className="mb-6 border border-amber-200 bg-amber-50/60 rounded-lg p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-semibold text-amber-800">Action required: update and resubmit</p>
+              <p className="text-sm text-amber-700">We restored your previous answers so you can fix remarks quickly. Review each step and submit once corrections are complete.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setLocation(`/applications/new?application=${app.id}`)}
+                data-testid="button-open-corrections"
+              >
+                <ClipboardCheck className="w-4 h-4 mr-2" />
+                Open Guided Editor
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
@@ -389,20 +753,40 @@ export default function ApplicationDetail() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-muted-foreground">Address</Label>
-                    <p data-testid="text-address">{app.address}</p>
+                    <p data-testid="text-address">{displayValue(app.address)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">District</Label>
                     <p className="flex items-center gap-2" data-testid="text-district">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
-                      {app.district}
+                      {displayValue(app.district)}
                     </p>
                   </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
+                    <Label className="text-muted-foreground">Tehsil / Sub-Division</Label>
+                    <p data-testid="text-tehsil">{displayValue(app.tehsil)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Block / Development Block</Label>
+                    <p data-testid="text-block">{displayValue(app.block)}</p>
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Gram Panchayat / Village</Label>
+                    <p data-testid="text-gram-panchayat">{displayValue(app.gramPanchayat)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Urban Local Body</Label>
+                    <p data-testid="text-urban-body">{displayValue(app.urbanBody)}</p>
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
                     <Label className="text-muted-foreground">PIN Code</Label>
-                    <p data-testid="text-pincode">{app.pincode}</p>
+                    <p data-testid="text-pincode">{displayValue(app.pincode)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Total Rooms</Label>
@@ -412,11 +796,29 @@ export default function ApplicationDetail() {
                     </p>
                   </div>
                 </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Location Type</Label>
+                    <p data-testid="text-location-type">
+                      {locationTypeLabels[app.locationType ?? ""] ?? "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Project Type</Label>
+                    <p data-testid="text-project-type">
+                      {app.projectType === "new_project"
+                        ? "New Project"
+                        : app.projectType === "new_rooms"
+                          ? "Existing + New Rooms"
+                          : displayValue(app.projectType)}
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             {/* Registration Certificate - Show when approved */}
-            {app.status === 'approved' && app.certificateNumber && (
+            {currentStatus === 'approved' && app.certificateNumber && (
               <Card className="border-green-200 bg-green-50/50">
                 <CardHeader>
                   <div className="flex items-center gap-2">
@@ -467,14 +869,38 @@ export default function ApplicationDetail() {
                       </div>
                     </div>
                   )}
+                  <div className="bg-white p-3 rounded-lg border border-green-200 space-y-2">
+                    <Label className="text-muted-foreground text-xs">Certificate Format</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {certificateFormatOptions.map((option) => (
+                        <Button
+                          key={option.value}
+                          type="button"
+                          size="sm"
+                          variant={certificateFormat === option.value ? "default" : "outline"}
+                          className={
+                            certificateFormat === option.value
+                              ? "bg-green-600 hover:bg-green-700 text-white"
+                              : "text-green-700 border-green-200"
+                          }
+                          onClick={() => setCertificateFormat(option.value)}
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {activeCertificateFormat.description}
+                    </p>
+                  </div>
                   <div className="flex gap-2 pt-2">
                     <Button 
                       className="flex-1 bg-green-600 hover:bg-green-700" 
-                      onClick={() => generateCertificatePDF(app)}
+                      onClick={() => generateCertificatePDF(app, certificateFormat)}
                       data-testid="button-download-certificate"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Download Certificate (PDF)
+                      Download {activeCertificateFormat.label}
                     </Button>
                   </div>
                 </CardContent>
@@ -482,7 +908,7 @@ export default function ApplicationDetail() {
             )}
 
             {/* Payment Pending - Show when payment is pending (property owners only) */}
-            {app.status === 'payment_pending' && userData?.user?.role === 'property_owner' && (
+            {currentStatus === 'payment_pending' && userData?.user?.role === 'property_owner' && (
               <Card className="border-primary">
                 <CardHeader>
                   <div className="flex items-center gap-2">
@@ -498,16 +924,16 @@ export default function ApplicationDetail() {
                     <div className="p-3 bg-primary/5 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">Total Registration Fee</span>
-                        <span className="text-2xl font-bold text-primary">₹{parseFloat(app.totalFee).toLocaleString('en-IN')}</span>
+                        <span className="text-2xl font-bold text-primary">₹{totalFeeValue.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                     <Button 
                       className="w-full" 
-                      onClick={() => setLocation(`/applications/${app.id}/payment-gateway`)}
+                      onClick={() => setLocation(`/applications/${app.id}/payment-himkosh`)}
                       data-testid="button-proceed-payment"
                     >
                       <CreditCard className="w-4 h-4 mr-2" />
-                      Choose Payment Method
+                      Proceed to HimKosh
                     </Button>
                   </div>
                 </CardContent>
@@ -515,7 +941,7 @@ export default function ApplicationDetail() {
             )}
 
             {/* Payment Status - Show for officers when payment is pending */}
-            {app.status === 'payment_pending' && userData?.user?.role !== 'property_owner' && (
+            {currentStatus === 'payment_pending' && userData?.user?.role !== 'property_owner' && (
               <Card className="border-primary/50">
                 <CardHeader>
                   <div className="flex items-center gap-2">
@@ -530,7 +956,7 @@ export default function ApplicationDetail() {
                   <div className="p-3 bg-primary/5 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-muted-foreground">Total Registration Fee</span>
-                      <span className="text-2xl font-bold text-primary">₹{parseFloat(app.totalFee).toLocaleString('en-IN')}</span>
+                      <span className="text-2xl font-bold text-primary">₹{totalFeeValue.toLocaleString('en-IN')}</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
                       The property owner needs to complete payment before certificate can be issued.
@@ -635,19 +1061,13 @@ export default function ApplicationDetail() {
                       : "No documents uploaded yet"}
                   </CardDescription>
                 </div>
-                {canEdit && !isEditingDocuments && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditingDocuments(true)}
-                    data-testid="button-edit-documents"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                )}
               </CardHeader>
               <CardContent>
+                {canEdit && (
+                  <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    Use the guided editor to replace or add documents before you resubmit. The list below shows the files currently attached to your application.
+                  </div>
+                )}
                 {isLoadingDocuments ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
@@ -689,7 +1109,30 @@ export default function ApplicationDetail() {
                               </Button>
                             </div>
                             <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                              {propertyPhotos.map((photo, index) => (
+                              {propertyPhotos.map((photo, index) => {
+                                const photoAny = photo as Record<string, unknown>;
+                                const candidateUrl =
+                                  typeof photoAny.fileUrl === "string" && photoAny.fileUrl.length > 0
+                                    ? (photoAny.fileUrl as string)
+                                    : typeof photoAny.url === "string" && (photoAny.url as string).length > 0
+                                      ? (photoAny.url as string)
+                                      : undefined;
+                                const resolvedSrc =
+                                  candidateUrl ||
+                                  (photo.filePath
+                                    ? buildObjectViewUrl(photo.filePath, {
+                                        mimeType:
+                                          typeof photo.mimeType === "string"
+                                            ? photo.mimeType
+                                            : undefined,
+                                        fileName:
+                                          typeof photo.fileName === "string"
+                                            ? photo.fileName
+                                            : undefined,
+                                      })
+                                    : undefined);
+
+                                return (
                                 <div
                                   key={photo.id}
                                   className="aspect-square border rounded-md overflow-hidden cursor-pointer hover-elevate active-elevate-2"
@@ -699,13 +1142,20 @@ export default function ApplicationDetail() {
                                   }}
                                   data-testid={`thumbnail-property-${index}`}
                                 >
-                                  <img
-                                    src={`/api/object-storage/view?path=${encodeURIComponent(photo.filePath)}`}
-                                    alt={photo.fileName}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  {resolvedSrc ? (
+                                    <img
+                                      src={resolvedSrc}
+                                      alt={photo.fileName || `Property photo ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground bg-muted">
+                                      Missing Image
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
+                              );
+                              })}
                             </div>
                           </div>
                         );
@@ -744,7 +1194,15 @@ export default function ApplicationDetail() {
                                     <Button 
                                       size="sm" 
                                       variant="outline"
-                                      onClick={() => window.open(`/api/object-storage/view?path=${encodeURIComponent(doc.filePath)}`, '_blank')}
+                                      onClick={() =>
+                                        window.open(
+                                          buildObjectViewUrl(doc.filePath, {
+                                            mimeType: doc.mimeType,
+                                            fileName: doc.fileName,
+                                          }),
+                                          '_blank'
+                                        )
+                                      }
                                       data-testid={`button-view-document-${doc.id}`}
                                     >
                                       <Download className="w-4 h-4 mr-1" />
@@ -883,120 +1341,6 @@ export default function ApplicationDetail() {
                   </div>
                 )}
 
-                {/* Edit Mode Upload Components */}
-                {isEditingDocuments && (
-                  <div className="space-y-6 mt-6 pt-6 border-t">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Update Documents</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Replace or add documents as needed. Existing documents will be kept unless you remove them.
-                      </p>
-                      
-                      {/* Property Photos */}
-                      <div className="space-y-2">
-                        <Label>Property Photos</Label>
-                        <ObjectUploader
-                          label="Property Photos"
-                          existingFiles={propertyPhotos}
-                          onUploadComplete={setPropertyPhotos}
-                          fileType="property-photos"
-                          accept="image/*"
-                          multiple={true}
-                          maxFiles={10}
-                        />
-                      </div>
-
-                      {/* Revenue Papers */}
-                      <div className="space-y-2">
-                        <Label>Revenue Papers (Jamabandi / Mutation)</Label>
-                        <ObjectUploader
-                          label="Revenue Papers"
-                          existingFiles={uploadedDocuments.revenuePapers}
-                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, revenuePapers: files }))}
-                          fileType="documents/revenue-papers"
-                          accept="application/pdf,image/*"
-                          multiple={true}
-                          maxFiles={5}
-                        />
-                      </div>
-
-                      {/* Affidavit Section 29 */}
-                      <div className="space-y-2">
-                        <Label>Affidavit Under Section 29</Label>
-                        <ObjectUploader
-                          label="Affidavit Section 29"
-                          existingFiles={uploadedDocuments.affidavitSection29}
-                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, affidavitSection29: files }))}
-                          fileType="documents/affidavit"
-                          accept="application/pdf,image/*"
-                          multiple={true}
-                          maxFiles={5}
-                        />
-                      </div>
-
-                      {/* Undertaking Form C */}
-                      <div className="space-y-2">
-                        <Label>Undertaking in Form-C</Label>
-                        <ObjectUploader
-                          label="Undertaking Form C"
-                          existingFiles={uploadedDocuments.undertakingFormC}
-                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, undertakingFormC: files }))}
-                          fileType="documents/undertaking"
-                          accept="application/pdf,image/*"
-                          multiple={true}
-                          maxFiles={5}
-                        />
-                      </div>
-
-                      {/* Register for Verification */}
-                      <div className="space-y-2">
-                        <Label>Register for Verification</Label>
-                        <ObjectUploader
-                          label="Register for Verification"
-                          existingFiles={uploadedDocuments.registerForVerification}
-                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, registerForVerification: files }))}
-                          fileType="documents/register"
-                          accept="application/pdf,image/*"
-                          multiple={true}
-                          maxFiles={5}
-                        />
-                      </div>
-
-                      {/* Bill Book */}
-                      <div className="space-y-2">
-                        <Label>Bill Book</Label>
-                        <ObjectUploader
-                          label="Bill Book"
-                          existingFiles={uploadedDocuments.billBook}
-                          onUploadComplete={(files) => setUploadedDocuments(prev => ({ ...prev, billBook: files }))}
-                          fileType="documents/bill-book"
-                          accept="application/pdf,image/*"
-                          multiple={true}
-                          maxFiles={5}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsEditingDocuments(false)}
-                        data-testid="button-cancel-edit"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={() => resubmitMutation.mutate()}
-                        disabled={resubmitMutation.isPending}
-                        data-testid="button-resubmit-application"
-                      >
-                        <Check className="w-4 h-4 mr-2" />
-                        {resubmitMutation.isPending ? "Resubmitting..." : "Resubmit Application"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -1103,12 +1447,12 @@ export default function ApplicationDetail() {
                 <CardHeader>
                   <CardTitle>Officer Actions</CardTitle>
                   <CardDescription>
-                    Available actions for this application (Status: {app.status?.replace(/_/g, ' ')})
+                    Available actions for this application (Status: {currentStatus.replace(/_/g, ' ')})
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Send Back for Corrections */}
-                  {(app.status === 'submitted' || app.status === 'document_verification') && (
+                  {(currentStatus === 'submitted' || currentStatus === 'document_verification') && (
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" className="w-full" data-testid="button-send-back">
@@ -1161,7 +1505,7 @@ export default function ApplicationDetail() {
                   )}
 
                   {/* Schedule Site Inspection */}
-                  {(app.status === 'document_verification' || app.status === 'submitted') && (
+                  {(currentStatus === 'document_verification' || currentStatus === 'submitted') && (
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" className="w-full" data-testid="button-schedule-inspection">
@@ -1213,7 +1557,7 @@ export default function ApplicationDetail() {
                   )}
 
                   {/* Complete Inspection */}
-                  {app.status === 'site_inspection_scheduled' && (
+                  {currentStatus === 'site_inspection_scheduled' && (
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" className="w-full" data-testid="button-complete-inspection">
@@ -1384,9 +1728,9 @@ export default function ApplicationDetail() {
                   )}
 
                   {/* Info message if no actions available */}
-                  {app.status !== 'submitted' && 
-                   app.status !== 'document_verification' && 
-                   app.status !== 'site_inspection_scheduled' && (
+                  {currentStatus !== 'submitted' && 
+                   currentStatus !== 'document_verification' && 
+                   currentStatus !== 'site_inspection_scheduled' && (
                     <div className="text-sm text-muted-foreground p-4 border rounded-md">
                       No workflow actions available for current status. Use the Review section above to approve or reject.
                     </div>
@@ -1497,7 +1841,8 @@ export default function ApplicationDetail() {
           <ImageGallery
             images={propertyPhotos.map(photo => ({
               filePath: photo.filePath,
-              fileName: photo.fileName
+              fileName: photo.fileName,
+              mimeType: photo.mimeType,
             }))}
             open={isGalleryOpen}
             onClose={() => setIsGalleryOpen(false)}
@@ -1506,5 +1851,6 @@ export default function ApplicationDetail() {
         );
       })()}
     </div>
+    </>
   );
 }

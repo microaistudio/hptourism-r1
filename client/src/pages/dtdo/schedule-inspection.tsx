@@ -156,6 +156,7 @@ export default function DTDOScheduleInspection() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = format(tomorrow, "yyyy-MM-dd");
+  const FIFTEEN_MINUTES_IN_SECONDS = 15 * 60;
 
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
@@ -227,10 +228,11 @@ export default function DTDOScheduleInspection() {
               value={inspectionDate}
               onChange={(e) => setInspectionDate(e.target.value)}
               min={minDate}
+              step={FIFTEEN_MINUTES_IN_SECONDS}
               data-testid="input-inspection-date"
             />
             <p className="text-xs text-muted-foreground">
-              Select date and time for the property inspection
+              Select date and time for the property inspection. Time picks move in 15‑minute blocks (00, 15, 30, 45) to match field visits.
             </p>
           </div>
 

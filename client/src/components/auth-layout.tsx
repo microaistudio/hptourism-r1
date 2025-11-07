@@ -46,9 +46,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
+      <div className="fixed inset-0 flex w-full overflow-hidden">
         <AppSidebar />
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-h-0">
           <header className="flex items-center justify-between gap-2 p-3 border-b bg-background">
             <div className="flex items-center gap-2">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
@@ -76,7 +76,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             </div>
           </header>
           
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-y-auto">
             {children}
           </main>
         </div>
