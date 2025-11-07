@@ -23,6 +23,7 @@ import heroImage1 from "@assets/stock_images/beautiful_himachal_p_50139e3f.jpg";
 import heroImage2 from "@assets/stock_images/beautiful_scenic_him_3e373e25.jpg";
 import heroImage3 from "@assets/stock_images/beautiful_scenic_him_799557d0.jpg";
 import heroImage4 from "@assets/stock_images/beautiful_scenic_him_10b034ba.jpg";
+import heroImageSukhu from "@assets/stock_images/cm_sukhu_sukh_ki_sarkar.jpg";
 import { CATEGORY_REQUIREMENTS, MAX_ROOMS_ALLOWED, MAX_BEDS_ALLOWED } from "@shared/fee-calculator";
 
 // Fallback stats if API fails
@@ -101,7 +102,10 @@ export default function HomePage() {
         {/* Hero Carousel for themes with images */}
         {showCarousel && (
           <div className="absolute inset-0">
-            <HeroCarousel images={heroImages} interval={5000} />
+            <HeroCarousel
+              images={heroImages}
+              interval={5000}
+            />
           </div>
         )}
         

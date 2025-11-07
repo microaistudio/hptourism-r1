@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 interface HeroCarouselProps {
   images: string[];
   interval?: number;
+  onSlideChange?: (index: number) => void;
 }
 
-export function HeroCarousel({ images, interval = 5000 }: HeroCarouselProps) {
+export function HeroCarousel({ images, interval = 5000, onSlideChange }: HeroCarouselProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -23,8 +24,12 @@ export function HeroCarousel({ images, interval = 5000 }: HeroCarouselProps) {
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
+    const index = emblaApi.selectedScrollSnap();
+    setSelectedIndex(index);
+    if (onSlideChange) {
+      onSlideChange(index);
+    }
+  }, [emblaApi, onSlideChange]);
 
   useEffect(() => {
     if (!emblaApi) return;
